@@ -11,17 +11,15 @@ import java.time.LocalDateTime;
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 public class UserHiddenMessage {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private Long userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "message_id", nullable = false)
-    private Message message;
+    @Column(name = "message_id", nullable = false)
+    private Long messageId;
 
     @Column(name = "hidden_at", nullable = false)
     private LocalDateTime hiddenAt = LocalDateTime.now();

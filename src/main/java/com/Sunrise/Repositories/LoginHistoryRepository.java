@@ -9,6 +9,6 @@ import org.springframework.data.repository.query.Param;
 
 public interface LoginHistoryRepository extends JpaRepository<LoginHistory, Long> {
     @Modifying
-    @Query(value = "INSERT INTO login_history (user_id, ip_address, device_info) VALUES (:user_id, :ip_address, :device_info)", nativeQuery = true)
-    void addLoginHistory(@Param("user_id") Long user_id, @Param("ip_address") String ip_address, @Param("device_info") String device_info);
+    @Query(value = "INSERT INTO login_history (user_id, ip_address, device_info) VALUES (:userId, :ipAddress, :deviceInfo)", nativeQuery = true)
+    void addLoginHistory(@Param("userId") Long userId, @Param("ipAddress") String ipAddress, @Param("deviceInfo") String deviceInfo);
 }

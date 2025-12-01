@@ -8,24 +8,22 @@ import java.time.LocalDateTime;
 @Table(name = "messages")
 public class Message {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "sender_id", nullable = false)
-    private User sender;
+    @Column(name = "sender_id", nullable = false)
+    private Long senderId;
 
-    @ManyToOne
-    @JoinColumn(name = "chat_id", nullable = false)
-    private Chat chat;
+    @Column(name = "chat_id", nullable = false)
+    private Long chatId;
 
     @Column(name = "text", nullable = false)
     private String text;
-    @Column(name = "sent_at", nullable = false)
-    private LocalDateTime sent_at = LocalDateTime.now();
 
-    @Column(name = "read_count", nullable = false)
+    @Column(name = "sent_at", nullable = false)
+    private LocalDateTime sentAt = LocalDateTime.now();
+
     @Min(0)
+    @Column(name = "read_count", nullable = false)
     private Long readCount = 0L;
 
     @Column(name = "hidden_by_admin", nullable = false)

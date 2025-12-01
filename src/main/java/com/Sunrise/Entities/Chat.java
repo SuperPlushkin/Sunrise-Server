@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 public class Chat {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     protected Long id;
 
     @Column(name = "name", length = 50)
@@ -42,5 +42,8 @@ public class Chat {
     }
     public static Chat createGroupChat(Long id, String name, Long createdBy) {
         return new Chat(id, name, createdBy, LocalDateTime.now(), true, false);
+    }
+    public static Chat copyChat(Chat chat) {
+        return new Chat(chat.id, chat.name, chat.createdBy, chat.createdAt, chat.isGroup, chat.isDeleted);
     }
 }

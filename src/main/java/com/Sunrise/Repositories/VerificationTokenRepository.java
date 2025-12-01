@@ -13,7 +13,7 @@ import java.util.Optional;
 
 public interface VerificationTokenRepository extends JpaRepository<VerificationToken, Long> {
 
-    @Query(value = "SELECT * FROM verification_token WHERE token = :token", nativeQuery = true)
+    @Query("SELECT vt FROM VerificationToken vt WHERE vt.token = :token")
     Optional<VerificationToken> findByToken(@Param("token") String token);
 
     @Modifying
@@ -23,6 +23,6 @@ public interface VerificationTokenRepository extends JpaRepository<VerificationT
 
     @Modifying
     @Transactional
-    @Query(value = "DELETE FROM verification_token WHERE expiry_date < :dateTime", nativeQuery = true)
-    int deleteByExpiryDateBefore(@Param("dateTime") LocalDateTime time);
+    @Query("DELETE FROM VerificationToken vt WHERE vt.expiryDate < :dateTime")
+    int deleteByExpiryDateBefore(@Param("dateTime") LocalDateTime dateTime);
 }

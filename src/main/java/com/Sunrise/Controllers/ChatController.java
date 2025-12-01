@@ -251,9 +251,9 @@ public class ChatController {
         }
     }
     @GetMapping("/{chatId}/is-group")
-    public ResponseEntity<?> isGroupChat(@PathVariable @ValidId Long chatId) {
+    public ResponseEntity<?> isGroupChat(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
 
-        var result = chatService.isGroupChat(chatId);
+        var result = chatService.isGroupChat(chatId, userId);
 
         if (result.isSuccess())
         {

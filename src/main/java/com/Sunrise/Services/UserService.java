@@ -3,7 +3,7 @@ package com.Sunrise.Services;
 import com.Sunrise.DTO.ServiceResults.FilteredUsersResult;
 import com.Sunrise.DTO.ServiceResults.UserDTO;
 
-import com.Sunrise.Services.StorageDataServices.DataAccessService;
+import com.Sunrise.Services.DataServices.DataAccessService;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

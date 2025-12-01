@@ -1,6 +1,8 @@
 package com.Sunrise.Repositories;
 
 import com.Sunrise.DTO.DBResults.ChatStatsResult;
+import com.Sunrise.DTO.DBResults.GetChatMemberResult;
+import com.Sunrise.DTO.DBResults.GetPersonalChatResult;
 import com.Sunrise.DTO.DBResults.MessageResult;
 import com.Sunrise.Entities.Chat;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -15,6 +17,18 @@ import java.util.List;
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
 
+    @Query("SELECT cm.chatId as chatId, cm.userId as userId, cm.isAdmin as isAdmin FROM ChatMember cm")
+    List<GetChatMemberResult> getAllChatMembers();
+
+    @Query("SELECT c.id as chatId, cm1.userId as userId1, cm2.userId as userId2 " +
+            "FROM Chat c " +
+            "JOIN ChatMember cm1 ON c.id = cm1.chatId AND cm1.isDeleted = false " +
+            "JOIN ChatMember cm2 ON c.id = cm2.chatId AND cm2.isDeleted = false " +
+            "WHERE c.isGroup = false " +
+            "AND c.isDeleted = false AND cm1.userId < cm2.userId")
+    List<GetPersonalChatResult> getAllPersonalChats();
+
+
     // ========== ДЕЙСТВИЯ С ИСТОРИЕЙ ЧАТОВ ==========
 
 
@@ -27,7 +41,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
 
     // Удаление всех сообщений (для всех в чате) | АДМИН
-    @Query(value = "SELECT *FROM clear_chat_history_for_all(:chatId, :userId)", nativeQuery = true)
+    @Query(value = "SELECT * FROM clear_chat_history_for_all(:chatId, :userId)", nativeQuery = true)
     Integer clearChatHistoryForAll(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
 
@@ -52,8 +66,8 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             "VALUES (:messageId, :userId, NOW()) ON CONFLICT (message_id, user_id) DO NOTHING", nativeQuery = true)
     void markMessageAsRead(@Param("messageId") Long messageId, @Param("userId") Long userId);
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.chat.id = :chatId AND m.hiddenByAdmin = false " +
-            "AND m.id NOT IN (SELECT uhm.message.id FROM UserHiddenMessage uhm WHERE uhm.user.id = :userId)")
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatId = :chatId AND m.hiddenByAdmin = false " +
+            "AND m.id NOT IN (SELECT uhm.messageId FROM UserHiddenMessage uhm WHERE uhm.userId = :userId)")
     Integer getVisibleMessagesCount(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
 

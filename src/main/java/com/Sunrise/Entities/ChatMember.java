@@ -10,8 +10,8 @@ import java.time.LocalDateTime;
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 public class ChatMember {
+
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "chat_id", nullable = false)

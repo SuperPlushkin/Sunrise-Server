@@ -13,7 +13,6 @@ import java.time.LocalDateTime;
 public class VerificationToken {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "token", nullable = false, unique = true)
@@ -42,5 +41,9 @@ public class VerificationToken {
         this.expiryDate = LocalDateTime.now().plusHours(24);
         this.createdAt = LocalDateTime.now();
         this.tokenType = tokenType;
+    }
+
+    public static VerificationToken copyVerificationToken(VerificationToken verificationToken) {
+        return new VerificationToken(verificationToken.id, verificationToken.token, verificationToken.user_id, verificationToken.expiryDate, verificationToken.createdAt, verificationToken.tokenType);
     }
 }

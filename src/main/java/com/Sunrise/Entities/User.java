@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 public class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(name = "username", unique = true, nullable = false, length = 30)
@@ -49,8 +48,12 @@ public class User {
         this.email = email;
         this.hashPassword = hashPassword;
     }
-
-    public static User createUser(Long id, String username, String name, String email, String hashPassword, Boolean isEnabled) {
-        return new User(id, username, name, email, hashPassword, null, LocalDateTime.now(), isEnabled, false);
+    public User(Long id, String username, String name, String email, String hashPassword, Boolean isEnabled) {
+        this.id = id;
+        this.username = username;
+        this.name = name;
+        this.email = email;
+        this.hashPassword = hashPassword;
+        this.isEnabled = isEnabled;
     }
 }

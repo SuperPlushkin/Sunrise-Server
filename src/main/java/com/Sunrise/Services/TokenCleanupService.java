@@ -1,14 +1,11 @@
 package com.Sunrise.Services;
 
-import com.Sunrise.Repositories.VerificationTokenRepository;
-import com.Sunrise.Services.StorageDataServices.DataAccessService;
+import com.Sunrise.Services.DataServices.DataAccessService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
 
 @Service
 public class TokenCleanupService {
