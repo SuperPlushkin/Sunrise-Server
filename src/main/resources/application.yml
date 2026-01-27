@@ -1,23 +1,21 @@
 # application.yml
 server:
   port: 8081
+  servlet:
+    context-path: /app
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
 
 spring:
   config:
     activate:
       on-profile: docker-all-stack, docker-only-app, local
 
-  application:
-    name: Server
+  application.name: Server
 
-  datasource:
-    url: ${SPRING_DATASOURCE_URL:${SPRING_DATASOURCE_REMOTE_URL}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_REMOTE_USER}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_REMOTE_PASSWORD}}
-    driver-class-name: org.postgresql.Driver
-
-  autoconfigure:
-    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  autoconfigure.exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration # у меня ваще-то jwt используется
 
   mail:
     host: smtp.mail.ru
@@ -31,6 +29,20 @@ spring:
           ssl:
             enable: true
 
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    servlet:
+      content-type: text/html
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:${SPRING_DATASOURCE_REMOTE_URL}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DB_REMOTE_USER}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DB_REMOTE_PASSWORD}}
+    driver-class-name: org.postgresql.Driver
+
   jpa:
     hibernate:
       ddl-auto: ${SPRING_JPA_DDL_AUTO:validate}
@@ -42,15 +54,11 @@ spring:
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
     open-in-view: false
 
-  # Автоматическое создание схемы
-  sql:
-    init:
-      mode: always
-
-jwt:
-  secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
+  sql.init.mode: always
 
 app:
+  jwt:
+    secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
   confirmation:
     mail_address: ${MAIL_USERNAME}
     base-url: ${SPRING_BASE_URL:${BASE_URL}}

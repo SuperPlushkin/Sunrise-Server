@@ -20,12 +20,10 @@ public class UserService {
         try
         {
             List<UserDTO> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
-
-            return new FilteredUsersResult(true, null, users);
+            return FilteredUsersResult.success(users);
         }
-        catch (Exception e)
-        {
-            return new FilteredUsersResult(false, "Error during getFilteredUsers: " + e.getMessage(), null);
+        catch (Exception e) {
+            return FilteredUsersResult.error("Error during getFilteredUsers: " + e.getMessage());
         }
     }
 }

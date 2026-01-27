@@ -8,4 +8,11 @@ public class HistoryOperationResult extends ServiceResult {
         super(success, errorMessage);
         this.affectedMessages = affectedMessages;
     }
+
+    public static HistoryOperationResult success(Integer affectedMessages) {
+        return new HistoryOperationResult(true, null, affectedMessages);
+    }
+    public static HistoryOperationResult error(String errorMessage) {
+        return new HistoryOperationResult(false, errorMessage, null);
+    }
 }

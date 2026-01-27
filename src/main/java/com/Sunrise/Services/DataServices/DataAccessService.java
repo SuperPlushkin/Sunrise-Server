@@ -12,6 +12,8 @@ import com.Sunrise.Entities.VerificationToken;
 import com.Sunrise.Services.DataServices.CacheEntities.CacheChat;
 import com.Sunrise.Services.DataServices.Interfaces.IAsyncStorageService;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -21,6 +23,7 @@ import java.util.*;
 @Service
 public class DataAccessService {
 
+    private static final Logger log = LoggerFactory.getLogger(DataAccessService.class);
     private final CacheService cacheService;
     private final IAsyncStorageService dbService;
 
@@ -34,7 +37,8 @@ public class DataAccessService {
 
     @PostConstruct
     public void initializeFullCache() {
-        System.out.println("🔄 Starting full cache initialization from database...");
+        log.info("------------------------------------------------------");
+        log.info("🔄 Starting full cache initialization from database...");
 
         try {
             long startTime = System.currentTimeMillis();
@@ -54,8 +58,10 @@ public class DataAccessService {
             printInitializationStats(endTime - startTime);
 
         } catch (Exception e) {
-            System.err.println("❌ Cache initialization failed: " + e.getMessage());
+            log.error("❌ Cache initialization failed: {}", e.getMessage());
         }
+
+        log.info("------------------------------------------------------");
     }
 
     private void loadAllUsersToCache() {
@@ -94,32 +100,17 @@ public class DataAccessService {
 
     private void printInitializationStats(long duration) {
         CacheService.CacheStats stats = cacheService.getStats();
-        System.out.println("✅ Full cache initialization completed in " + duration + "ms");
-        System.out.println("📊 Final Cache Statistics:");
-        System.out.println("   ├─ Active Users: " + stats.activeUserCount());
-        System.out.println("   ├─ Activated Users: " + stats.activatedUserCount());
-        System.out.println("   ├─ Users: " + stats.userCount());
-        System.out.println("   ├─ Active Chats: " + stats.chatCount());
-        System.out.println("   ├─ Active Sessions: " + stats.activeUserCount());
-        System.out.println("   ├─ Verification Tokens: " + stats.verificationTokenCount());
-        System.out.println("   ├─ User-Chat Relations: " + stats.userChatsCount());
-        System.out.println("   ├─ Chat Members: " + stats.chatMembersCount());
-        System.out.println("   └─ Admin Rights: " + stats.adminRightsCount());
-    }
-
-
-    // ========== ACTIVE USER METHODS ==========
-
-
-    // Основные методы
-    public Optional<User> getActiveUser(String jwt) {
-        return cacheService.getActiveUser(jwt);
-    }
-    public Boolean existsActiveUser(String jwt) {
-        return cacheService.existsActiveUser(jwt);
-    }
-    public void deleteActiveUser(String jwt) {
-        cacheService.deleteActiveUser(jwt);
+        log.info("✅ Full cache initialization completed in {} ms", duration);
+        log.info("📊 Final Cache Statistics:");
+        log.info("   ├─ Active Users: {}", stats.activeUserCount());
+        log.info("   ├─ Activated Users: {}", stats.activatedUserCount());
+        log.info("   ├─ Users: {}", stats.userCount());
+        log.info("   ├─ Active Chats: {}", stats.chatCount());
+        log.info("   ├─ Active Sessions: {}", stats.activeUserCount());
+        log.info("   ├─ Verification Tokens: {}", stats.verificationTokenCount());
+        log.info("   ├─ User-Chat Relations: {}", stats.userChatsCount());
+        log.info("   ├─ Chat Members: {}", stats.chatMembersCount());
+        log.info("   └─ Admin Rights: {}", stats.adminRightsCount());
     }
 
 
@@ -127,20 +118,13 @@ public class DataAccessService {
 
 
     // Основные методы
-    public Long makeUser(String username, String name, String email, String hash_password, Boolean isEnabled) {
-        Long userId = generateRandomId();
-        User user = new User(userId, username, name, email, hash_password, isEnabled);
-
-        saveUser(user);
-        return userId;
+    public void saveUser(User user) {
+        cacheService.saveUser(user);
+        dbService.saveUserAsync(user);
     }
     public void enableUser(Long userId) {
         cacheService.enableUser(userId);
         dbService.enableUserAsync(userId);
-    }
-    public void saveUser(User user) {
-        cacheService.saveUser(user);
-        dbService.saveUserAsync(user);
     }
     public void deleteUser(Long userId) {
         cacheService.deleteUser(userId);
@@ -188,30 +172,20 @@ public class DataAccessService {
 
 
     // Основные методы
-    public Long makePersonalChatAndAddPeople(Long userId1, Long userId2) {
-        if (findPersonalChat(userId1, userId2) instanceof Optional<Long> chatId && chatId.isPresent())
-            return chatId.get();
-
-        Long chatId = generateRandomId();
-        Chat chat = cacheService.makePersonalChat(chatId, userId1, userId2);
+    public void savePersonalChatAndAddPerson(Chat chat, Long userToAdd) {
+        cacheService.savePersonalChat(chat, userToAdd);
 
         dbService.saveChatAsync(chat);
-        dbService.addUserToChatAsync(userId1, chatId, true);
-        dbService.addUserToChatAsync(userId2, chatId, true);
-
-        return chatId;
+        dbService.addUserToChatAsync(userToAdd, chat.getId(), true);
+        dbService.addUserToChatAsync(userToAdd, chat.getId(), true);
     }
-    public Long makeGroupChatAndAddPeople(String name, Long createdBy, Set<Long> usersId) {
-        Long chatId = generateRandomId();
-        Chat chat = cacheService.makeGroupChat(chatId, name, createdBy, usersId);
+    public void saveGroupChatAndAddPeople(Chat chat, Set<Long> usersId) {
+        cacheService.saveGroupChat(chat, usersId);
 
         dbService.saveChatAsync(chat);
-        dbService.addUserToChatAsync(createdBy, chatId, true);
-
+        dbService.addUserToChatAsync(chat.getCreatedBy(), chat.getId(), true);
         for (Long userId : usersId)
-            dbService.addUserToChatAsync(userId, chatId, false);
-
-        return chatId;
+            dbService.addUserToChatAsync(userId, chat.getId(), false);
     }
     public void deleteChat(Long chatId) {
         cacheService.deleteChat(chatId);
@@ -319,23 +293,23 @@ public class DataAccessService {
 //        dbService.makeAdminAsync(chatId, newCreatorId);
     } // КОЛХОЗ, ПОТОМ ИСПРАВЛЮ
 
+
     // ========== VERIFICATION TOKEN METHODS ==========
 
 
     // Основные методы
-    public String makeVerificationToken(Long userId, String tokenType) {
-        var verificationToken = cacheService.makeVerificationToken(generateRandomId(), userId, tokenType);
-        dbService.saveVerificationTokenAsync(verificationToken);
-
-        return verificationToken.getToken();
+    public void saveVerificationToken(VerificationToken verifToken) {
+        cacheService.saveVerificationToken(verifToken);
+        dbService.saveVerificationTokenAsync(verifToken);
     }
     public void deleteVerificationToken(String token) {
         cacheService.deleteVerificationToken(token);
         dbService.deleteVerificationTokenAsync(token);
     }
-    public void cleanupExpiredTokensAndWait() {
-        cacheService.cleanupExpiredVerificationTokens();
+    public int cleanupExpiredTokensAndWait() {
+        int numDeleted = cacheService.cleanupExpiredVerificationTokens();
         dbService.cleanupExpiredVerificationTokens();
+        return numDeleted;
     }
 
 
@@ -351,8 +325,14 @@ public class DataAccessService {
     public CacheService.CacheStats getCacheStats() {
         return cacheService.getStats();
     }
-    private Long generateRandomId() {
+    public static Long generateRandomId() {
         SecureRandom random = new SecureRandom();
         return Math.abs(random.nextLong());
+    }
+    public static String generate64CharString() {
+        SecureRandom random = new SecureRandom();
+        byte[] bytes = new byte[48]; // 48 bytes = 64 base64 characters
+        random.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     }
 }

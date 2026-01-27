@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @Service
 public class DBService implements IAsyncStorageService {
@@ -193,7 +192,7 @@ public class DBService implements IAsyncStorageService {
     public Long getChatCreator(Long chatId) {
         return chatRepository.getChatCreator(chatId);
     }
-    public Long findAnotherAdmin(Long chatId, Long excludeUserId) {
+    public Optional<Long> findAnotherAdmin(Long chatId, Long excludeUserId) {
         return chatRepository.findAnotherAdmin(chatId, excludeUserId);
     }
 
@@ -258,9 +257,9 @@ public class DBService implements IAsyncStorageService {
         deleteVerificationToken(token);
     }
 
-    public void cleanupExpiredVerificationTokens() {
+    public int cleanupExpiredVerificationTokens() {
         LocalDateTime now = LocalDateTime.now();
-        tokenRepository.deleteByExpiryDateBefore(now);
+        return tokenRepository.deleteByExpiryDateBefore(now);
     }
     @Async("dbExecutor")
     public void cleanupExpiredVerificationTokensAsync() {

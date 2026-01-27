@@ -7,6 +7,7 @@ import com.Sunrise.DTO.Requests.CreatePersonalChatRequest;
 import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Services.ChatService;
 import com.Sunrise.Controllers.Annotations.ValidId;
+import com.Sunrise.Services.MessageService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
@@ -17,16 +18,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/app/chat")
+@RequestMapping("/chat")
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final ChatService chatService;
+    private final MessageService messageService;
     public enum ClearType { FOR_ALL, FOR_SELF }
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, MessageService messageService) {
         this.chatService = chatService;
+        this.messageService = messageService;
     }
 
     @PostMapping("/create-personal")
@@ -52,7 +55,7 @@ public class ChatController {
     @PostMapping("/create-group")
     public ResponseEntity<?> createGroupChat(@RequestBody @Valid CreateGroupChatRequest request, @CurrentUserId Long userId) {
 
-        var result = chatService.createGroupChat(request.getChatName(), userId, request.getUserIds());
+        var result = chatService.createGroupChat(request.getChatName().trim(), userId, request.getUserIds());
 
         if (result.isSuccess())
         {
@@ -172,7 +175,7 @@ public class ChatController {
                                              @RequestParam(defaultValue = "0") @Min(value = 1, message = "offset must be positive") Integer offset,
                                              @CurrentUserId Long userId) {
 
-        var result = chatService.getChatMessages(chatId, userId, limited, offset);
+        var result = messageService.getChatMessages(chatId, userId, limited, offset);
 
         if (result.isSuccess())
         {
@@ -195,15 +198,13 @@ public class ChatController {
     @PostMapping("/{chatId}/mark-read/{messageId}")
     public ResponseEntity<?> markMessageAsRead(@PathVariable @ValidId Long chatId, @PathVariable @ValidId Long messageId, @CurrentUserId Long userId) {
 
-        var result = chatService.markMessageAsRead(chatId, messageId, userId);
+        var result = messageService.markMessageAsRead(chatId, messageId, userId);
 
-        if (result.isSuccess())
-        {
+        if (result.isSuccess()) {
             log.info("Successfully marked message as read --> messageId: {}", messageId);
             return ResponseEntity.ok("Successfully marked message as read");
         }
-        else
-        {
+        else {
             log.warn(result.getErrorMessage());
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
@@ -212,7 +213,7 @@ public class ChatController {
     @GetMapping("/{chatId}/message-count")
     public ResponseEntity<?> getVisibleMessageCount(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
 
-        var result = chatService.getVisibleMessagesCount(chatId, userId);
+        var result = messageService.getVisibleMessagesCount(chatId, userId);
 
         if (result.isSuccess())
         {

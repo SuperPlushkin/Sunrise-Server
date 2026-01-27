@@ -9,4 +9,11 @@ public class IsGroupChatResult extends ServiceResult {
 
         this.isGroupChat = isGroupChat;
     }
+
+    public static IsGroupChatResult success(Boolean isGroupChat) {
+        return new IsGroupChatResult(true, null, isGroupChat);
+    }
+    public static IsGroupChatResult error(String errorMessage) {
+        return new IsGroupChatResult(false, errorMessage, null);
+    }
 }

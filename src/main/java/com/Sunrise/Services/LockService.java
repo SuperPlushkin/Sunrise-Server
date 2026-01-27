@@ -1,10 +1,10 @@
 package com.Sunrise.Services;
 
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -13,11 +13,14 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @Service
 public class LockService {
 
+    // TODO: Заменить на Redis при масштабировании
+    // В данный момент работает для single-instance deployment
+
     private final ReentrantLock globalChatsLock = new ReentrantLock();
-    private final ReentrantLock authLock = new ReentrantLock();
 
     private final Map<Long, ReadWriteLock> chatSpecificLocks = new ConcurrentHashMap<>();
     private final Map<Long, ReadWriteLock> userSpecificLocks = new ConcurrentHashMap<>();
+    private final Map<String, ReentrantLock> registrationLocks = new ConcurrentHashMap<>();
 
 
     // ========== GLOBAL LOCKS ==========
@@ -30,123 +33,79 @@ public class LockService {
     }
 
 
+    // ========== REGISTRATION LOCKS ==========
+
+    public boolean lockRegistration(String username, String email) {
+        String userKey = "username:" + username.trim();
+        String emailKey = "email:" + email.trim();
+
+        try {
+            ReentrantLock lock1 = registrationLocks.computeIfAbsent(userKey, k -> new ReentrantLock());
+            if (!lock1.tryLock(2, TimeUnit.SECONDS)) return false;
+
+            ReentrantLock lock2 = registrationLocks.computeIfAbsent(emailKey, k -> new ReentrantLock());
+            if (!lock2.tryLock(2, TimeUnit.SECONDS)) {
+                lock1.unlock();
+                return false;
+            }
+
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
+    }
+    public void unlockRegistration(String username, String email) {
+        ReentrantLock lock2 = registrationLocks.get("email:" + email.trim());
+        ReentrantLock lock1 = registrationLocks.get("username:" + username.trim());
+
+        if (lock2 != null && lock2.isHeldByCurrentThread()) lock2.unlock();
+        if (lock1 != null && lock1.isHeldByCurrentThread()) lock1.unlock();
+    }
+
+
     // ========== CHAT LOCKS ==========
 
-    public Lock getReadChatLock(Long chatId) {
-        return chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).readLock();
-    }
-    public Lock getWriteChatLock(Long chatId) {
-        return chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).writeLock();
-    }
-
     public void lockReadChat(Long chatId) {
-        getReadChatLock(chatId).lock();
+        chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).readLock().lock();
     }
     public void unlockReadChat(Long chatId) {
-        getReadChatLock(chatId).unlock();
+        chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).readLock().unlock();
     }
 
     public void lockWriteChat(Long chatId) {
-        getWriteChatLock(chatId).lock();
+        chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).writeLock().lock();
     }
     public void unlockWriteChat(Long chatId) {
-        getWriteChatLock(chatId).unlock();
+        chatSpecificLocks.computeIfAbsent(chatId, k -> new ReentrantReadWriteLock()).writeLock().unlock();
     }
 
 
     // ========== USER LOCKS ==========
 
-    public Lock getReadUserLock(Long userId) {
+    private Lock getReadUserLock(Long userId) {
         return userSpecificLocks.computeIfAbsent(userId, k -> new ReentrantReadWriteLock()).readLock();
     }
-    public Lock getWriteUserLock(Long userId) {
+    private Lock getWriteUserLock(Long userId) {
         return userSpecificLocks.computeIfAbsent(userId, k -> new ReentrantReadWriteLock()).writeLock();
     }
 
-    public void lockReadUser(Long userId) {
-        getReadUserLock(userId).lock();
-    }
-    public void unlockReadUser(Long userId) {
-        getReadUserLock(userId).unlock();
-    }
-
-    public void lockWriteUser(Long userId) {
-        getWriteUserLock(userId).lock();
-    }
-    public void unlockWriteUser(Long userId) {
-        getWriteUserLock(userId).unlock();
-    }
-
-
-    // ========== BATCH OPERATIONS ==========
-
-    public void lockMultipleUsers(Set<Long> userIds, boolean writeLock) {
-        userIds.stream().sorted()
+    public void lockUsersSafely(Set<Long> usersToLock, boolean writeLock) {
+        usersToLock.stream().sorted()
                 .forEach(userId -> {
                     if (writeLock)
-                    {
-                        lockWriteUser(userId);
-                    }
-                    else lockReadUser(userId);
+                        getWriteUserLock(userId).lock();
+                    else
+                        getReadUserLock(userId).lock();
                 });
     }
-    public void unlockMultipleUsers(Set<Long> userIds, boolean writeLock) {
-        userIds.forEach(userId -> {
-            if (writeLock) unlockWriteUser(userId);
-            else unlockReadUser(userId);
-        });
+    public void unlockUsersSafely(Set<Long> usersToLock, boolean writeLock) {
+        usersToLock.stream().sorted((a, b) -> Long.compare(b, a))
+                .forEach(userId -> {
+                    if (writeLock)
+                        getWriteUserLock(userId).unlock();
+                    else
+                        getReadUserLock(userId).unlock();
+                });
     }
-
-    public void lockUsersAndChat(Long chatId, Set<Long> userIds, boolean usersWriteLock) {
-        lockMultipleUsers(userIds, usersWriteLock);
-        lockWriteChat(chatId);
-    }
-    public void unlockUsersAndChat(Long chatId, Set<Long> userIds, boolean usersWriteLock) {
-        unlockWriteChat(chatId);
-        unlockMultipleUsers(userIds, usersWriteLock);
-    }
-
-
-    // ========== ORDERED LOCKING (Deadlock prevention) ==========
-
-    public void acquireLocksInOrder(Lock... locks) {
-        List<Lock> sortedLocks = Arrays.stream(locks).sorted(Comparator.comparing(System::identityHashCode)).toList();
-
-        for (Lock lock : sortedLocks) {
-            lock.lock();
-        }
-    }
-    public void releaseLocks(Lock... locks) {
-        for (Lock lock : locks)
-            lock.unlock();
-    }
-    public Lock[] getOrderedUserLocks(Set<Long> userIds, boolean writeLock) {
-        return userIds.stream().sorted()
-                .map(userId -> writeLock ? getWriteUserLock(userId) : getReadUserLock(userId))
-                .toArray(Lock[]::new);
-    }
-
-
-    // ========== LOCK MANAGEMENT ==========
-
-    @Scheduled(fixedRate = 300000) // Каждые 5 минут
-    public void cleanupExpiredLocks() {
-        globalChatsLock.lock();
-        try {
-            // Здесь нужно добавить логику проверки существования чатов/пользователей
-//             chatSpecificLocks.entrySet().removeIf(entry -> !chatExists(entry.getKey()));
-//             userSpecificLocks.entrySet().removeIf(entry -> !userExists(entry.getKey()));
-        } finally {
-            globalChatsLock.unlock();
-        }
-    }
-
-    public LockStats getLockStats() {
-        return new LockStats(
-            chatSpecificLocks.size(),
-            userSpecificLocks.size(),
-            globalChatsLock.getQueueLength()
-        );
-    }
-    public record LockStats(int chatLocksCount, int userLocksCount, int globalLockQueueLength) {}
 }

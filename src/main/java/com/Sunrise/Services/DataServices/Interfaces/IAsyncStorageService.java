@@ -61,7 +61,7 @@ public interface IAsyncStorageService extends IStorageService {
     Long getChatCreator(Long chatId);
     List<GetChatMemberResult> getAllChatMembers();
     Integer getChatMemberCount(Long chatId);
-    Long findAnotherAdmin(Long chatId, Long excludeUserId);
+    Optional<Long> findAnotherAdmin(Long chatId, Long excludeUserId);
     void updateChatCreator(Long chatId, Long newCreatorId);
     void updateChatCreatorAsync(Long chatId, Long newCreatorId);
 

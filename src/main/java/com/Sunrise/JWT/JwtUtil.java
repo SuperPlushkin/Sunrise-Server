@@ -11,18 +11,12 @@ import java.util.Map;
 @Component
 public class JwtUtil {
     private final SecretKey secretKey;
-    private final long expiration = 1000 * 60 * 60 * 10; // 10 часов
+    public final long expiration = 1000 * 60 * 60 * 10; // 10 часов
 
     public JwtUtil(SecretKey secretKey) {
         this.secretKey = secretKey;
     }
 
-    // Существующий метод для обратной совместимости
-    public String generateToken(String username) {
-        return generateToken(username, null);
-    }
-
-    // Новый метод с поддержкой userId
     public String generateToken(String username, Long userId) {
         Map<String, Object> claims = new HashMap<>();
         if (userId != null) {
@@ -58,6 +52,10 @@ public class JwtUtil {
 
     private boolean isTokenExpired(String token) {
         return getClaims(token).getExpiration().before(new Date());
+    }
+
+    public Date getTokenExpirationTime(String token) {
+        return getClaims(token).getExpiration();
     }
 
     private Claims getClaims(String token) {

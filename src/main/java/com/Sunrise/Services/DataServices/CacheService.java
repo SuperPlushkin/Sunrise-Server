@@ -9,7 +9,6 @@ import com.Sunrise.Services.DataServices.CacheEntities.CacheUser;
 import com.Sunrise.Services.DataServices.Interfaces.ICacheStorageService;
 import org.springframework.stereotype.Service;
 
-import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,38 +18,15 @@ import java.util.stream.Stream;
 public class CacheService implements ICacheStorageService {
 
     // Основные кеши
-    private final Map<String, Long> activeUserCache = new ConcurrentHashMap<>(); // jwt -> userId (активные пользователи)
     private final Map<Long, CacheUser> userCache = new ConcurrentHashMap<>(); // userId -> CacheUser (пользователи)
 
-    private final Set<Long> notDeletedChatIds = ConcurrentHashMap.newKeySet();
+    private final Set<Long> notDeletedChatIds = ConcurrentHashMap.newKeySet(); // chatId
     private final Map<Long, CacheChat> chatInfoCache = new ConcurrentHashMap<>(); // chatId -> CacheChat (чаты)
 
     private final Map<String, VerificationToken> verificationTokenCache = new ConcurrentHashMap<>(); // token -> VerificationToken (токены)
 
     // Связующие кеши
     private final Map<String, Long> personalChatCache = new ConcurrentHashMap<>(); // "userId_1:userId_2" -> chatId (личные чаты)
-
-
-    // ========== ACTIVE USER METHODS ==========
-
-
-    // Основные методы
-    public void saveActiveUser(String jwt, Long userId) {
-        if (jwt != null && userId != null) {
-            activeUserCache.put(jwt, userId);
-        }
-    }
-    public void deleteActiveUser(String jwt) {
-        activeUserCache.remove(jwt);
-    }
-
-    // Вспомогательные методы
-    public Optional<User> getActiveUser(String jwt) {
-        return activeUserCache.get(jwt) instanceof Long userId ? Optional.ofNullable(userCache.get(userId)) : Optional.empty();
-    }
-    public Boolean existsActiveUser(String jwt) {
-        return activeUserCache.containsKey(jwt);
-    }
 
 
     // ========== USER METHODS ==========
@@ -65,7 +41,6 @@ public class CacheService implements ICacheStorageService {
             cacheUser.setIsDeleted(true);
             return cacheUser;
         });
-        activeUserCache.entrySet().removeIf(entry -> entry.getValue().equals(userId));
     }
     public void restoreUser(Long userId) {
         userCache.computeIfPresent(userId, (id, cacheUser) -> {
@@ -179,13 +154,6 @@ public class CacheService implements ICacheStorageService {
     }
 
     // Методы для работы с личными чатами
-    public Chat makePersonalChat(Long chatId, Long userId1, Long userId2) {
-        Chat chat = Chat.createPersonalChat(chatId, userId1);
-
-        // Сохраняем в кеш
-        savePersonalChat(chat, userId2);
-        return chat;
-    }
     public void savePersonalChat(Chat chat, Long userId2) {
         Long id = chat.getId();
         Long createdBy = chat.getCreatedBy();
@@ -216,12 +184,6 @@ public class CacheService implements ICacheStorageService {
     }
 
     // Методы для работы с групповыми чатами
-    public Chat makeGroupChat(Long chatId, String name, Long createdBy, Set<Long> usersId) {
-        Chat chat = Chat.createGroupChat(chatId, name, createdBy);
-
-        saveGroupChat(chat, usersId);
-        return chat;
-    }
     public void saveGroupChat(Chat chat, Set<Long> usersId) {
         Long id = chat.getId();
         Long createdBy = chat.getCreatedBy();
@@ -305,16 +267,8 @@ public class CacheService implements ICacheStorageService {
 
 
     // Основные методы
-    public VerificationToken makeVerificationToken(Long id, Long user_id, String tokenType) {
-        var verifToken = new VerificationToken(id, generate64CharString(), user_id, tokenType);
-
-        // Сохраняем в кеш
-        saveVerificationToken(verifToken);
-        return verifToken;
-    }
     public void saveVerificationToken(VerificationToken token) {
-        if (token != null && token.getToken() != null)
-            verificationTokenCache.put(token.getToken(), token);
+        verificationTokenCache.put(token.getToken(), token);
     }
     public void deleteVerificationToken(String token) {
         verificationTokenCache.remove(token);
@@ -324,8 +278,11 @@ public class CacheService implements ICacheStorageService {
     public Optional<VerificationToken> getVerificationToken(String token) {
         return Optional.ofNullable(verificationTokenCache.get(token));
     }
-    public void cleanupExpiredVerificationTokens() {
+    public int cleanupExpiredVerificationTokens() {
+        int before = verificationTokenCache.size();
         verificationTokenCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
+
+        return before - verificationTokenCache.size();
     }
 
 
@@ -385,19 +342,6 @@ public class CacheService implements ICacheStorageService {
     }
 
 
-    // ========== INITIALIZATION METHODS ==========
-
-    // Метод для инициализации быстрого кеша при загрузке данных
-    public void initializeNotDeletedChats() {
-        notDeletedChatIds.clear();
-        chatInfoCache.forEach((chatId, chat) -> {
-            if (!chat.getIsDeleted()) {
-                notDeletedChatIds.add(chatId);
-            }
-        });
-    }
-
-
     // ========== CACHE STATISTICS AND MANAGEMENT ==========
 
 
@@ -412,7 +356,7 @@ public class CacheService implements ICacheStorageService {
 
         return new CacheStats(
             activatedUserCount,
-            activeUserCache.size(),
+            0,
             userCache.size(),
             notDeletedChatIds.size(),
             chatInfoCache.size(),
@@ -429,12 +373,6 @@ public class CacheService implements ICacheStorageService {
 
 
     // Основные методы
-    private String generate64CharString() {
-        SecureRandom random = new SecureRandom();
-        byte[] bytes = new byte[48]; // 48 bytes = 64 base64 characters
-        random.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
     private String getPersonalChatKey(Long userId1, Long userId2) {
         return Math.min(userId1, userId2) + ":" + Math.max(userId1, userId2);
     }

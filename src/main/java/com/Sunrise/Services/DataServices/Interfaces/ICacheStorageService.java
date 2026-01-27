@@ -9,14 +9,6 @@ import java.util.Set;
 
 public interface ICacheStorageService extends IStorageService {
 
-
-    // ========== ACTIVE USER METHODS ==========
-
-    Optional<User> getActiveUser(String jwt);
-    void saveActiveUser(String jwt, Long userId);
-    void deleteActiveUser(String jwt);
-
-
     // ========== CHAT MEMBER METHODS ==========
 
     Optional<Boolean> isGroupChat(Long chatId);

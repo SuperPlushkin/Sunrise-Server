@@ -28,5 +28,5 @@ public interface IStorageService {
     Optional<VerificationToken> getVerificationToken(String token);
     void saveVerificationToken(VerificationToken token);
     void deleteVerificationToken(String token);
-    void cleanupExpiredVerificationTokens();
+    int cleanupExpiredVerificationTokens();
 }

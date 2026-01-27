@@ -13,4 +13,11 @@ public class GetChatMessagesResult extends ServiceResult {
 
         this.messages = messages;
     }
+
+    public static GetChatMessagesResult success(List<MessageResult> messages) {
+        return new GetChatMessagesResult(true, null, messages);
+    }
+    public static GetChatMessagesResult error(String errorMessage) {
+        return new GetChatMessagesResult(false, errorMessage, null);
+    }
 }

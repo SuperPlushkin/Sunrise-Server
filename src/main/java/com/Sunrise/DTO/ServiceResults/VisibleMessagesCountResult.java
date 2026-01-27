@@ -9,4 +9,11 @@ public class VisibleMessagesCountResult extends ServiceResult {
 
         this.visibleMessagesCount = visibleMessagesCount;
     }
+
+    public static VisibleMessagesCountResult success(Integer visibleMessagesCount) {
+        return new VisibleMessagesCountResult(true, null, visibleMessagesCount);
+    }
+    public static VisibleMessagesCountResult error(String errorMessage) {
+        return new VisibleMessagesCountResult(false, errorMessage, null);
+    }
 }

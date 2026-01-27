@@ -16,4 +16,11 @@ public final class ChatStatsOperationResult extends ServiceResult {
         this.hiddenByUser = hiddenByUser;
         this.canClearForAll = canClearForAll;
     }
+
+    public static ChatStatsOperationResult success(Integer totalMessages, Integer deletedForAll, Integer hiddenByUser, Boolean canClearForAll) {
+        return new ChatStatsOperationResult(true, null, totalMessages, deletedForAll, hiddenByUser, canClearForAll);
+    }
+    public static ChatStatsOperationResult error(String errorMessage) {
+        return new ChatStatsOperationResult(false, errorMessage, null, null, null, null);
+    }
 }

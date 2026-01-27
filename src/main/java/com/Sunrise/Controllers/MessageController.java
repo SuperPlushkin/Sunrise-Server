@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/app/actions")
+@RequestMapping("/actions")
 public class MessageController {
 
     private List<String> messages = new ArrayList<>();

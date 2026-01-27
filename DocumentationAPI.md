@@ -27,7 +27,7 @@ POST /auth/login
   "password": "123456Au"    // обязательно, минимум 6 символов
 }
 
-# 3. Использование API с токеном (получение 20 пользователей с фильтром "kiril")
+# 3. Использование API с токеном (получение первых 10 пользователей с фильтром "kiril")
 GET /user/getmany?limited=10&offset=0&filter=kiril
 Authorization: Bearer <ваш_токен>
 

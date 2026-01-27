@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
@@ -96,7 +97,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     @Query("UPDATE Chat c SET c.isDeleted = true WHERE c.id = :chatId")
     void deleteChat(@Param("chatId") Long chatId);
 
-    @Query(value = "SELECT COUNT(*) FROM chat_members WHERE chat_id = :chatId AND is_deleted = false", nativeQuery = true)
+    @Query("SELECT COUNT(cm) FROM ChatMember cm WHERE cm.chatId = :chatId AND cm.isDeleted = false")
     Integer getChatMemberCount(@Param("chatId") Long chatId);
 
     @Query(value = "SELECT total_messages, hidden_for_all, hidden_by_user, can_clear_for_all " +
@@ -106,10 +107,10 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     @Query("SELECT c.createdBy FROM Chat c WHERE c.id = :chatId")
     Long getChatCreator(@Param("chatId") Long chatId);
 
-    @Query(value = "SELECT cm.user_id FROM chat_members cm " +
-            "WHERE cm.chat_id = :chatId AND cm.user_id != :userId AND cm.is_admin = true AND cm.is_deleted = false " +
-            "ORDER BY cm.joined_at ASC LIMIT 1", nativeQuery = true)
-    Long findAnotherAdmin(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    @Query("SELECT cm.userId FROM ChatMember cm " +
+            "WHERE cm.chatId = :chatId AND cm.userId != :userId AND cm.isAdmin = true AND cm.isDeleted = false " +
+            "ORDER BY cm.joinedAt ASC")
+    Optional<Long> findAnotherAdmin(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
     @Modifying
     @Transactional

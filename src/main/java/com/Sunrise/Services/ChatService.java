@@ -3,10 +3,14 @@ package com.Sunrise.Services;
 import com.Sunrise.Controllers.ChatController;
 import com.Sunrise.DTO.DBResults.*;
 import com.Sunrise.DTO.ServiceResults.*;
+import com.Sunrise.Entities.Chat;
 import com.Sunrise.Services.DataServices.DataAccessService;
+import com.Sunrise.Subclasses.ValidationException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+
+import static com.Sunrise.Services.DataServices.DataAccessService.generateRandomId;
 
 @Service
 public class ChatService {
@@ -21,390 +25,284 @@ public class ChatService {
 
     public HistoryOperationResult clearChatHistory(Long chatId, ChatController.ClearType clearType, Long userId) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
+        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
-            if(dataAccessService.notExistsUserById(userId))
-                return new HistoryOperationResult(false, "User not found", null);
-
-            if(!dataAccessService.existsChat(chatId))
-                return new HistoryOperationResult(false, "Chat not found", null);
-
-            if(!dataAccessService.isUserInChat(userId, chatId))
-                return new HistoryOperationResult(false, "User is not a member of this chat", null);
+            validateUserInChat(chatId, userId);
 
             var messages_count = switch (clearType) {
                 case FOR_ALL -> dataAccessService.clearChatHistoryForAll(chatId, userId); // Уведомить всех надо об этом
                 case FOR_SELF -> dataAccessService.clearChatHistoryForSelf(chatId, userId);  // Уведомить пользователя надо об этом
             };
 
-            return new HistoryOperationResult(true, null, messages_count);
+            return HistoryOperationResult.success(messages_count);
+        }
+        catch (ValidationException e) {
+            return HistoryOperationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return new HistoryOperationResult(false, "ClearChatHistory failed due to server error", 0);
+            return HistoryOperationResult.error("ClearChatHistory failed due to server error");
         }
-        finally
-        {
+        finally {
             lockService.unlockWriteChat(chatId);
-            lockService.unlockReadUser(userId);
         }
     } // Уведомить пользователя надо об этом
     public HistoryOperationResult restoreChatHistory(Long chatId, Long userId) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
+        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
-            if(dataAccessService.notExistsUserById(userId))
-                return new HistoryOperationResult(false, "User not found", null);
-
-            if(!dataAccessService.existsChat(chatId))
-                return new HistoryOperationResult(false, "Chat not found", null);
-
-            if(dataAccessService.isUserInChat(userId, chatId))
-                return new HistoryOperationResult(false, "User is not a member of this chat", null);
+            validateUserInChat(chatId, userId);
 
             var messages_count = dataAccessService.restoreChatHistoryForSelf(chatId, userId); // Уведомить пользователя надо об этом
 
-            return new HistoryOperationResult(true, null, messages_count);
+            return HistoryOperationResult.success(messages_count);
+        }
+        catch (ValidationException e) {
+            return HistoryOperationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return new HistoryOperationResult(false, "RestoreChatHistory failed due to server error", null);
+            return HistoryOperationResult.error("RestoreChatHistory failed due to server error");
         }
-        finally
-        {
+        finally {
             lockService.unlockWriteChat(chatId);
-            lockService.unlockReadUser(userId);
         }
     } // Уведомить пользователя надо об этом
 
-    public ChatCreationOperationResult createPersonalChat(Long userId, Long otherUserId) {
+    public ChatCreationOperationResult createPersonalChat(Long creatorId, Long userToAddId) {
+
+        if (creatorId.equals(userToAddId))
+            return ChatCreationOperationResult.error("Cannot create personal chat with yourself");
+
+        Set<Long> usersId = Set.of(creatorId, userToAddId);
 
         lockService.lockGlobalChats(); // БЛОКИРУЕМ СПИСОК ЧАТОВ
-        lockService.lockWriteUser(otherUserId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
-        lockService.lockWriteUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ
+        lockService.lockUsersSafely(usersId, true); // БЛОКИРУЕМ ПОЛЬЗОВАТЕЛЕЙ
         try
         {
-            if (userId.equals(otherUserId))
-                return new ChatCreationOperationResult(false, "Cannot create personal chat with yourself", null);
+            if (dataAccessService.notExistsUserById(creatorId) || dataAccessService.notExistsUserById(userToAddId))
+                return ChatCreationOperationResult.error("One or both users not found");
 
-            if (dataAccessService.notExistsUserById(userId) || dataAccessService.notExistsUserById(otherUserId))
-                return new ChatCreationOperationResult(false, "One or both users not found", null);
+            if (dataAccessService.findPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
+                return ChatCreationOperationResult.success(chatId.get());
 
-            Long chatId = dataAccessService.makePersonalChatAndAddPeople(userId, otherUserId);
+            Chat chat = Chat.createPersonalChat(generateRandomId(), creatorId);
 
-            return new ChatCreationOperationResult(true, null, chatId);
+            dataAccessService.savePersonalChatAndAddPerson(chat, userToAddId);
+
+            return ChatCreationOperationResult.success(chat.getId());
         }
-        catch (Exception e)
-        {
-            return new ChatCreationOperationResult(false, "CreatePersonalChat failed due to server error", (long)0);
+        catch (Exception e) {
+            return ChatCreationOperationResult.error("CreatePersonalChat failed due to server error");
         }
-        finally
-        {
+        finally {
+            lockService.unlockUsersSafely(usersId, true);
             lockService.unlockGlobalChats();
-            lockService.unlockWriteUser(otherUserId);
-            lockService.unlockWriteUser(userId);
         }
     }
-    public ChatCreationOperationResult createGroupChat(String chatName, Long createdBy, Set<Long> usersId) {
+    public ChatCreationOperationResult createGroupChat(String chatName, Long createdBy, Set<Long> usersToAddId) {
+
+        if (usersToAddId.contains(createdBy))
+            return ChatCreationOperationResult.error("Creator in usersToAdd");
+
+        Set<Long> allUserIds = new HashSet<>(usersToAddId);
+        allUserIds.add(createdBy);
 
         lockService.lockGlobalChats(); // БЛОКИРУЕМ СПИСОК ЧАТОВ
-        usersId.forEach(lockService::lockWriteUser); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫХ ПОЛЬЗОВАТЕЛЕЙ
-        lockService.lockWriteUser(createdBy); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ
+        lockService.lockUsersSafely(allUserIds, false); // БЛОКИРУЕМ ПОЛЬЗОВАТЕЛЕЙ
         try
         {
-            if (chatName == null || chatName.trim().length() < 4)
-                return new ChatCreationOperationResult(false, "Group chat name must be at least 4 characters", null);
-
             if (dataAccessService.notExistsUserById(createdBy))
-                return new ChatCreationOperationResult(false, "Creator not found", null);
+                return ChatCreationOperationResult.error("Creator not found");
 
-            if (usersId.contains(createdBy))
-                return new ChatCreationOperationResult(false, "Creator cannot be in member list", null);
-
-            for (Long userId : usersId)
+            for (Long userId : usersToAddId)
             {
                 if (dataAccessService.notExistsUserById(userId))
-                    return new ChatCreationOperationResult(false, "User not found: " + userId, null);
+                    return ChatCreationOperationResult.error("User not found: " + userId);
             }
 
-            // Создание чата
-            Long chatId = dataAccessService.makeGroupChatAndAddPeople(chatName.trim(), createdBy, usersId);
+            Chat chat = Chat.createGroupChat(generateRandomId(), chatName, createdBy);
 
-            return new ChatCreationOperationResult(true, null, chatId);
+            dataAccessService.saveGroupChatAndAddPeople(chat, usersToAddId);
+
+            return ChatCreationOperationResult.success(chat.getId());
         }
-        catch (Exception e)
-        {
-            return new ChatCreationOperationResult(false, "CreateGroupChat failed due to server error", (long)0);
+        catch (Exception e) {
+            return ChatCreationOperationResult.error("CreateGroupChat failed due to server error");
         }
-        finally
-        {
+        finally {
+            lockService.unlockUsersSafely(allUserIds, false);
             lockService.unlockGlobalChats();
-            usersId.forEach(lockService::unlockWriteUser);
-            lockService.unlockWriteUser(createdBy);
         }
-    }
+    } // TODO: ПЕРЕДЕЛАТЬ LOCKs
 
     public SimpleResult addGroupMember(Long chatId, Long inviterId, Long newUserId) {
 
-        lockService.lockWriteChat(chatId);  // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ
-        lockService.lockWriteUser(newUserId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ
-        lockService.lockReadUser(inviterId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ) - ПРИГЛАСИТЕЛЯ НЕ БЛОКИРУЕМ НА ЗАПИСЬ
+        if(inviterId.equals(newUserId))
+            return SimpleResult.error("Tы даун?");
+
+        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
             Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);
 
             if (isGroup.isEmpty())
-                return new SimpleResult(false, "Chat not found");
+                return SimpleResult.error("Chat not found");
 
             if (!isGroup.get())
-                return new SimpleResult(false, "Cannot add members to personal chat");
-
-//            if (dataAccessService.notExistsUserById(inviterId))
-//                return new SimpleResult(false, "Inviter not found");
+                return SimpleResult.error("Cannot add members to personal chat");
 
             var isChatAdmin = dataAccessService.isChatAdmin(chatId, inviterId);
 
             if (isChatAdmin.isEmpty())
-                return new SimpleResult(false, "Cannot find user");
+                return SimpleResult.error("User not found");
 
             if (!isChatAdmin.get())
-                return new SimpleResult(false, "Only admin can add members to group");
+                return SimpleResult.error("Only admin can add members to group");
 
             if (dataAccessService.notExistsUserById(newUserId))
-                return new SimpleResult(false, "User not found");
+                return SimpleResult.error("User not found");
 
-            if (!dataAccessService.isUserInChat(chatId, newUserId))
-                return new SimpleResult(false, "User is already a member of this group");
+            if (dataAccessService.isUserInChat(chatId, newUserId))
+                return SimpleResult.error("User is already a member of this group");
 
             dataAccessService.addUserToChat(chatId, newUserId, false); // Надо всех уведомить
 
-            return new SimpleResult(true, null);
+            return SimpleResult.success();
         }
         catch (Exception e) {
-            return new SimpleResult(false, "AddGroupMember failed due to server error");
+            return SimpleResult.error("AddGroupMember failed due to server error");
         }
         finally {
             lockService.unlockWriteChat(chatId);
-            lockService.unlockWriteUser(newUserId);
-            lockService.unlockReadUser(inviterId);
         }
     } // Надо всех уведомить
     public SimpleResult leaveChat(Long chatId, Long userId) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ
-        lockService.lockWriteUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ
+        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
             if (dataAccessService.notExistsUserById(userId))
-                return new SimpleResult(false, "User not found");
+                return SimpleResult.error("User not found");
 
             if (!dataAccessService.isUserInChat(chatId, userId))
-                return new SimpleResult(false, "User is not a member of this chat");
+                return SimpleResult.error("User is not a member of this chat");
 
             Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);
 
             if (isGroup.isEmpty())
-                return new SimpleResult(false, "Chat not found");
+                return SimpleResult.error("Chat not found");
 
             if (isGroup.get())
             {
                 var creatorId = dataAccessService.getChatCreator(chatId);
 
                 if (creatorId.isEmpty())
-                    return new SimpleResult(false, "Chat not found");
+                    return SimpleResult.error("Chat not found");
 
-                leaveGroupChatHandler(chatId, userId, creatorId.get());
+                if (userId.equals(creatorId.get())){
+                    var anotherAdmin = dataAccessService.findAnotherAdmin(chatId, userId);
+
+                    if (anotherAdmin.isPresent()) // Ищем другого админа для передачи прав
+                    {
+                        dataAccessService.updateChatCreator(chatId, anotherAdmin.get());
+                        dataAccessService.removeUserFromChat(chatId, userId);
+                    }
+                    else dataAccessService.deleteChat(chatId); // Удаляем чат, если больше пользователей нет
+                }
+                else dataAccessService.removeUserFromChat(chatId, userId); // Личный чат - удаляем полностью
             }
             else dataAccessService.deleteChat(chatId); // Личный чат - удаляем полностью
 
-            return new SimpleResult(true, null);
+            return SimpleResult.success();
         }
         catch (Exception e) {
-            return new SimpleResult(false, "LeaveChat failed due to server error");
+            return SimpleResult.error("LeaveChat failed due to server error");
         }
         finally {
             lockService.unlockWriteChat(chatId);
-            lockService.unlockWriteUser(userId);
         }
-    } // Надо всех уведомить                TODO: ПОДУМАТЬ И СПРОСИТЬ У ПАПЫ
-    private void leaveGroupChatHandler(Long chatId, Long userId, Long creatorId){
-        if (userId.equals(creatorId)) {
-
-            var anotherAdmin = dataAccessService.findAnotherAdmin(chatId, userId);
-
-            if (anotherAdmin.isPresent()) // Ищем другого админа для передачи прав
-            {
-                dataAccessService.updateChatCreator(chatId, anotherAdmin.get());
-                dataAccessService.removeUserFromChat(chatId, userId);
-            }
-            else dataAccessService.deleteChat(chatId); // Удаляем чат, если больше пользователей нет
-        }
-        else dataAccessService.removeUserFromChat(chatId, userId); // Не создатель - выходим
-    }
+    } // Надо всех уведомить  TODO: ПОДУМАТЬ НАД ПЕРЕДАЧЕЙ АДМИНА
 
     public ChatStatsOperationResult getChatStats(Long chatId, Long userId) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ (ЧТЕНИЕ)
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
+        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
-            if(dataAccessService.notExistsUserById(userId))
-                return new ChatStatsOperationResult(false, "User not found", null, null, null, null);
-
-            if(!dataAccessService.existsChat(chatId))
-                return new ChatStatsOperationResult(false, "Chat not found", null, null, null, null);
-
-            if(!dataAccessService.isUserInChat(chatId, userId))
-                return new ChatStatsOperationResult(false, "User is not a member of this chat", null, null, null, null);
+            validateUserInChat(chatId, userId);
 
             var result = dataAccessService.getChatClearStats(chatId, userId);
 
-            return new ChatStatsOperationResult(true, null, result.getTotalMessages(), result.getDeletedForAll(), result.getHiddenByUser(), result.getCanClearForAll());
+            return ChatStatsOperationResult.success(result.getTotalMessages(), result.getDeletedForAll(), result.getHiddenByUser(), result.getCanClearForAll());
+        }
+        catch (ValidationException e) {
+            return ChatStatsOperationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return new ChatStatsOperationResult(false, "GetChatStats failed due to server error", 0, 0, 0, false);
+            return ChatStatsOperationResult.error("GetChatStats failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
-            lockService.unlockReadUser(userId);
-        }
-    }
-    public GetChatMessagesResult getChatMessages(Long chatId, Long userId, Integer limit, Integer offset) {
-
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ (ЧТЕНИЕ)
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
-        try
-        {
-            if (dataAccessService.notExistsUserById(userId))
-                return new GetChatMessagesResult(false, "User not found", null);
-
-            if (!dataAccessService.existsChat(chatId))
-                return new GetChatMessagesResult(false, "Chat not found", null);
-
-            if (!dataAccessService.isUserInChat(chatId, userId))
-                return new GetChatMessagesResult(false, "User is not a member of this chat", null);
-
-            List<MessageResult> messages = dataAccessService.getChatMessages(chatId, userId, limit, offset);
-
-            return new GetChatMessagesResult(true, null, messages);
-        }
-        catch (Exception e) {
-            return new GetChatMessagesResult(false, "GetChatMessages failed due to server error", null);
-        }
-        finally {
-            lockService.unlockReadChat(chatId);
-            lockService.unlockReadUser(userId);
         }
     }
 
     public IsChatAdminResult isChatAdmin(Long chatId, Long userId) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ (ЧТЕНИЕ)
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
+        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
-            if (dataAccessService.notExistsUserById(userId))
-                return new IsChatAdminResult(false, "User not found", null);
-
-            if (!dataAccessService.existsChat(chatId))
-                return new IsChatAdminResult(false, "Chat not found", null);
-
-            if (!dataAccessService.isUserInChat(chatId, userId))
-                return new IsChatAdminResult(false, "User is not a member of this chat", null);
+            validateUserInChat(chatId, userId);
 
             var isChatAdmin = dataAccessService.isChatAdmin(chatId, userId);
 
             if (isChatAdmin.isEmpty())
-                return new IsChatAdminResult(false, "Cannot find user", null);
+                return IsChatAdminResult.error("Cannot find user");
 
-            return new IsChatAdminResult(true, null, isChatAdmin.get());
+            return IsChatAdminResult.success(isChatAdmin.get());
+        }
+        catch (ValidationException e) {
+            return IsChatAdminResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return new IsChatAdminResult(false, "GetIsChatAdmin failed due to server error", false);
+            return IsChatAdminResult.error("GetIsChatAdmin failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
-            lockService.unlockReadUser(userId);
         }
     }
     public IsGroupChatResult isGroupChat(Long chatId, Long userId) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ (ЧТЕНИЕ)
+        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
             if (dataAccessService.notExistsUserById(userId))
-                return new IsGroupChatResult(false, "User not found", null);
+                return IsGroupChatResult.error("User not found");
 
             Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);
 
             if (isGroup.isEmpty())
             {
-                return new IsGroupChatResult(false, "Chat not found", null);
+                return IsGroupChatResult.error("Chat not found");
             }
-            else return new IsGroupChatResult(true, null, isGroup.get());
+            else return IsGroupChatResult.success(isGroup.get());
         }
         catch (Exception e) {
-            return new IsGroupChatResult(false, "GetIsGroupChat failed due to server error", null);
+            return IsGroupChatResult.error("GetIsGroupChat failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
         }
     }
 
-    public SimpleResult markMessageAsRead(Long chatId, Long messageId, Long userId) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
-        try
-        {
-            if (dataAccessService.notExistsUserById(userId))
-                return new SimpleResult(false, "User not found");
+    private void validateUserInChat(Long chatId, Long userId) {
+        if (!dataAccessService.existsChat(chatId))
+            throw new ValidationException("Chat not found");
 
-            if (!dataAccessService.existsChat(chatId))
-                return new SimpleResult(false, "Chat not found");
+        if (dataAccessService.notExistsUserById(userId))
+            throw new ValidationException("User not found");
 
-            if (!dataAccessService.isUserInChat(chatId, userId))
-                return new SimpleResult(false, "User is not a member of this chat");
-
-            dataAccessService.markMessageAsRead(messageId, userId); // уведомить всех надо об этом
-
-            return new SimpleResult(true, null);
-        }
-        catch (Exception e) {
-            return new SimpleResult(false, "MarkMessageAsRead failed due to server error");
-        }
-        finally {
-            lockService.unlockWriteChat(chatId);
-            lockService.unlockReadUser(userId);
-        }
-    } // Надо всех уведомить
-    public VisibleMessagesCountResult getVisibleMessagesCount(Long chatId, Long userId) {
-
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ОПРЕДЕЛЕННЫЙ ЧАТ (ЧТЕНИЕ)
-        lockService.lockReadUser(userId); // БЛОКИРУЕМ ОПРЕДЕЛЕННОГО ПОЛЬЗОВАТЕЛЯ (ЧТЕНИЕ)
-        try
-        {
-            if (dataAccessService.notExistsUserById(userId))
-                return new VisibleMessagesCountResult(false, "User not found", null);
-
-            if (!dataAccessService.existsChat(chatId))
-                return new VisibleMessagesCountResult(false, "Chat not found", null);
-
-            if (!dataAccessService.isUserInChat(chatId, userId))
-                return new VisibleMessagesCountResult(false, "User is not a member of this chat", null);
-
-            int count = dataAccessService.getVisibleMessagesCount(chatId, userId);
-
-            return new VisibleMessagesCountResult(true, null, count);
-        }
-        catch (Exception e) {
-            return new VisibleMessagesCountResult(false, "GetVisibleMessagesCount failed due to server error", null);
-        }
-        finally{
-            lockService.unlockReadChat(chatId);
-            lockService.unlockReadUser(userId);
-        }
+        if (!dataAccessService.isUserInChat(chatId, userId))
+            throw new ValidationException("User is not a member of this chat");
     }
 }
