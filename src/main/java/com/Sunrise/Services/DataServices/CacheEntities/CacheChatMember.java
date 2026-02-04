@@ -1,7 +1,6 @@
 package com.Sunrise.Services.DataServices.CacheEntities;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 
 @lombok.Setter
@@ -9,18 +8,20 @@ import java.util.List;
 @lombok.AllArgsConstructor
 @lombok.NoArgsConstructor
 public class CacheChatMember {
-    private Long id;
-    private LocalDateTime joinedAt = LocalDateTime.now();
+    private Long userId;
+    private LocalDateTime joinedAt;
     private LocalDateTime currentJoinDate;
     private Boolean isAdmin = false;
     private Boolean isDeleted = false;
-    private List<MembershipPeriod> membershipHistory = new ArrayList<>();
+    private List<MembershipPeriod> membershipHistory;
 
-    public CacheChatMember(Long id, Boolean isAdmin) {
-        this.id = id;
+    public CacheChatMember(Long userId, Boolean isAdmin) {
+        this.userId = userId;
         this.isAdmin = isAdmin;
         this.joinedAt = LocalDateTime.now();
+        this.currentJoinDate = LocalDateTime.now();
         this.isDeleted = false;
+        this.membershipHistory = List.of(new MembershipPeriod(this.joinedAt, null));
     }
 
     public void markAsDeleted() {

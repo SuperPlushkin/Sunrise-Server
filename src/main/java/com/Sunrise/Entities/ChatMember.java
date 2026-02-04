@@ -11,14 +11,8 @@ import java.time.LocalDateTime;
 @lombok.AllArgsConstructor
 public class ChatMember {
 
-    @Id
-    private Long id;
-
-    @Column(name = "chat_id", nullable = false)
-    private Long chatId;
-
-    @Column(name = "user_id", nullable = false)
-    private Long userId;
+    @EmbeddedId
+    private ChatMemberId id;
 
     @Column(name = "joined_at", nullable = false)
     private LocalDateTime joinedAt = LocalDateTime.now();
@@ -28,4 +22,20 @@ public class ChatMember {
 
     @Column(name = "is_deleted",nullable = false)
     private Boolean isDeleted = false;
+
+    public Long getChatId() {
+        return id != null ? id.getChatId() : null;
+    }
+
+    public Long getUserId() {
+        return id != null ? id.getUserId() : null;
+    }
+
+    // Конструктор для удобства
+    public ChatMember(Long chatId, Long userId, Boolean isAdmin) {
+        this.id = new ChatMemberId(chatId, userId);
+        this.isAdmin = isAdmin;
+        this.joinedAt = LocalDateTime.now();
+        this.isDeleted = false;
+    }
 }

@@ -5,12 +5,9 @@ import com.Sunrise.DTO.DBResults.GetChatMemberResult;
 import com.Sunrise.DTO.DBResults.GetPersonalChatResult;
 import com.Sunrise.DTO.DBResults.MessageResult;
 import com.Sunrise.DTO.ServiceResults.UserDTO;
-import com.Sunrise.Entities.Chat;
-import com.Sunrise.Entities.LoginHistory;
-import com.Sunrise.Entities.User;
-import com.Sunrise.Entities.VerificationToken;
+import com.Sunrise.Entities.*;
 import com.Sunrise.Services.DataServices.CacheEntities.CacheChat;
-import com.Sunrise.Services.DataServices.Interfaces.IAsyncStorageService;
+import com.Sunrise.Services.DataServices.CacheEntities.FullChatMember;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +22,9 @@ public class DataAccessService {
 
     private static final Logger log = LoggerFactory.getLogger(DataAccessService.class);
     private final CacheService cacheService;
-    private final IAsyncStorageService dbService;
+    private final DBService dbService;
 
-    public DataAccessService(CacheService cacheService, IAsyncStorageService  dbService) {
+    public DataAccessService(CacheService cacheService, DBService dbService) {
         this.cacheService = cacheService;
         this.dbService = dbService;
     }
@@ -47,11 +44,11 @@ public class DataAccessService {
 
             loadAllChatsToCache(); // 2. Загружаем ВСЕ чаты
 
-            loadActiveVerificationTokensToCache(); // 3. Загружаем ВСЕ токены подтверждения
+            initializePersonalChats(); // 3. Инициализируем ВСЕ личные чаты
 
-            initializeChatMemberships(); // 4. Инициализируем ВСЕ связи пользователей с чатами
+            loadActiveVerificationTokensToCache(); // 4. Загружаем ВСЕ токены подтверждения
 
-            initializePersonalChats(); // 5. Инициализируем ВСЕ личные чаты
+            initializeChatMemberships(); // 5. Инициализируем ВСЕ связи пользователей с чатами
 
             long endTime = System.currentTimeMillis();
 
@@ -65,9 +62,8 @@ public class DataAccessService {
     }
 
     private void loadAllUsersToCache() {
-        for (User user : dbService.getAllUsers()) {
+        for (User user : dbService.getAllUsers())
             cacheService.saveUser(user);
-        }
     }
     private void loadAllChatsToCache() {
         for (Chat chat : dbService.getAllChats()) {
@@ -85,7 +81,7 @@ public class DataAccessService {
             Long userId = membership.getUserId();
             Boolean isAdmin = membership.getIsAdmin();
 
-            cacheService.addUserToChatWith(chatId, userId, isAdmin); // Добавляем пользователя в чат с правами администратора
+            cacheService.addUserToChat(chatId, userId, isAdmin); // Добавляем пользователя в чат с правами администратора
         }
     }
     private void initializePersonalChats() {
@@ -94,7 +90,7 @@ public class DataAccessService {
             Long userId1 = personalChat.getUserId1();
             Long userId2 = personalChat.getUserId2();
 
-            cacheService.savePersonalChat(userId1, userId2, chatId);
+            cacheService.makePersonalChatCache(userId1, userId2, chatId);
         }
     }
 
@@ -173,10 +169,10 @@ public class DataAccessService {
 
     // Основные методы
     public void savePersonalChatAndAddPerson(Chat chat, Long userToAdd) {
-        cacheService.savePersonalChat(chat, userToAdd);
+        cacheService.makePersonalChatCache(chat, userToAdd);
 
         dbService.saveChatAsync(chat);
-        dbService.addUserToChatAsync(userToAdd, chat.getId(), true);
+        dbService.addUserToChatAsync(chat.getCreatedBy(), chat.getId(), true);
         dbService.addUserToChatAsync(userToAdd, chat.getId(), true);
     }
     public void saveGroupChatAndAddPeople(Chat chat, Set<Long> usersId) {
@@ -186,6 +182,10 @@ public class DataAccessService {
         dbService.addUserToChatAsync(chat.getCreatedBy(), chat.getId(), true);
         for (Long userId : usersId)
             dbService.addUserToChatAsync(userId, chat.getId(), false);
+    }
+    public void restoreChat(Long chatId) {
+        cacheService.restoreChat(chatId);
+        dbService.restoreChatAsync(chatId);
     }
     public void deleteChat(Long chatId) {
         cacheService.deleteChat(chatId);
@@ -197,10 +197,13 @@ public class DataAccessService {
     public Optional<Long> findPersonalChat(Long userId1, Long userId2) {
         return cacheService.findExistingPersonalChat(userId1, userId2);
     }
+    public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
+        return cacheService.findDeletedPersonalChat(userId1, userId2);
+    }
     public Optional<Boolean> isGroupChat(Long chatId) {
         return cacheService.isGroupChat(chatId);
     }
-    public Boolean existsChat(Long chatId) {
+    public Boolean chatIsValid(Long chatId) {
         return cacheService.existsChat(chatId);
     }
     public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
@@ -221,28 +224,12 @@ public class DataAccessService {
         return cacheService.getChatMembers(chatId).size();
     }
 
-
-    // Методы для работы с сообщениями (пока что все с бд)
-    public List<MessageResult> getChatMessages(Long chatId, Long userId, Integer limit, Integer offset) {
-        return dbService.getChatMessages(chatId, userId, limit, offset);
-    }
-    public Integer getVisibleMessagesCount(Long chatId, Long userId) {
-        return dbService.getVisibleMessagesCount(chatId, userId); // добавить кеш можно будет
-    }
-    public void markMessageAsRead(Long messageId, Long userId) {
-        dbService.markMessageAsRead(messageId, userId);
-    }
-
-
     // Методы для истории чатов (пока что все с бд)
     public Integer clearChatHistoryForAll(Long chatId, Long userId) {
         return dbService.clearChatHistoryForAll(chatId, userId);
     }
     public Integer clearChatHistoryForSelf(Long chatId, Long userId) {
         return dbService.clearChatHistoryForSelf(chatId, userId);
-    }
-    public Integer restoreChatHistoryForSelf(Long chatId, Long userId) {
-        return dbService.restoreChatHistoryForSelf(chatId, userId);
     }
     public ChatStatsResult getChatClearStats(Long chatId, Long userId) {
         return dbService.getChatClearStats(chatId, userId);
@@ -251,19 +238,26 @@ public class DataAccessService {
 
     // ========== CHAT MEMBER METHODS ==========
 
-    public Set<Long> getChatMembers(Long chatId) {
+    public Optional<Set<FullChatMember>> getChatMembers(Long chatId) {
+        return cacheService.getFullChatMembers(chatId);
+    }
+    public Set<Long> getChatMemberIDs(Long chatId) {
         return cacheService.getChatMembers(chatId);
     }
     public Optional<List<Chat>> getUserChats(Long userId) {
         Optional<List<Long>> cachedChatIds = cacheService.getUserChats(userId);
         List<Chat> result = null;
+        System.out.println(cachedChatIds.isPresent());
 
-        if (cachedChatIds.isPresent() && !cachedChatIds.get().isEmpty()) {
+        if (cachedChatIds.isPresent()) {
             result = new ArrayList<>();
+            System.out.println(cachedChatIds.get().size());
             for (Long chatId : cachedChatIds.get()) {
                 Optional<CacheChat> cacheChat = cacheService.getChatInfo(chatId);
+                System.out.println(cacheChat.isPresent());
                 cacheChat.ifPresent(result::add);
             }
+            System.out.println(result.size());
         }
 
         return Optional.ofNullable(result);
@@ -272,7 +266,7 @@ public class DataAccessService {
         return cacheService.isUserInChat(chatId, userId);
     }
     public void addUserToChat(Long userId, Long chatId, Boolean isAdmin) {
-        cacheService.addUserToChatWith(chatId, userId, isAdmin);
+        cacheService.addUserToChat(chatId, userId, isAdmin);
         dbService.addUserToChatAsync(userId, chatId, isAdmin);
     }
     public void removeUserFromChat(Long userId, Long chatId) {
@@ -290,8 +284,7 @@ public class DataAccessService {
         });
 
         dbService.updateChatCreatorAsync(chatId, newCreatorId);
-//        dbService.makeAdminAsync(chatId, newCreatorId);
-    } // КОЛХОЗ, ПОТОМ ИСПРАВЛЮ
+    }
 
 
     // ========== VERIFICATION TOKEN METHODS ==========
@@ -319,12 +312,31 @@ public class DataAccessService {
     }
 
 
+    // ========== MESSAGE METHODS ==========
+
+    public void saveMessage(Message message) {
+        dbService.saveMessageAsync(message);
+    }
+
+    public List<MessageResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+        return dbService.getChatMessagesFirst(chatId, userId, limit);
+    }
+    public List<MessageResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
+        return dbService.getChatMessagesBefore(chatId, userId, messageId, limit);
+    }
+    public List<MessageResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
+        return dbService.getChatMessagesAfter(chatId, userId, messageId, limit);
+    }
+
+    public Integer getVisibleMessagesCount(Long chatId, Long userId) {
+        return dbService.getVisibleMessagesCount(chatId, userId); // добавить кеш можно будет
+    }
+    public void markMessageAsRead(Long messageId, Long userId) {
+        dbService.markMessageAsRead(messageId, userId);
+    }
+
     // ========== SUB METHODS ==========
 
-
-    public CacheService.CacheStats getCacheStats() {
-        return cacheService.getStats();
-    }
     public static Long generateRandomId() {
         SecureRandom random = new SecureRandom();
         return Math.abs(random.nextLong());

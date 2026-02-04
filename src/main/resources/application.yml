@@ -54,7 +54,7 @@ spring:
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
     open-in-view: false
 
-  sql.init.mode: always
+#  sql.init.mode: always
 
 app:
   jwt:

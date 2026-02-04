@@ -6,7 +6,7 @@ import com.Sunrise.Entities.VerificationToken;
 import com.Sunrise.Services.DataServices.CacheEntities.CacheChat;
 import com.Sunrise.Services.DataServices.CacheEntities.CacheChatMember;
 import com.Sunrise.Services.DataServices.CacheEntities.CacheUser;
-import com.Sunrise.Services.DataServices.Interfaces.ICacheStorageService;
+import com.Sunrise.Services.DataServices.CacheEntities.FullChatMember;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -15,7 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 @Service
-public class CacheService implements ICacheStorageService {
+public class CacheService {
 
     // Основные кеши
     private final Map<Long, CacheUser> userCache = new ConcurrentHashMap<>(); // userId -> CacheUser (пользователи)
@@ -67,6 +67,24 @@ public class CacheService implements ICacheStorageService {
     public Optional<CacheUser> getCacheUser(Long userId) {
         return Optional.ofNullable(userCache.get(userId));
     }
+    public Optional<Set<FullChatMember>> getFullChatMembers(Long chatId){
+        Set<FullChatMember> fullChatMembers = new HashSet<>();
+
+        CacheChat chat = chatInfoCache.get(chatId);
+        if (chatInfoCache.get(chatId) == null)
+            return Optional.empty();
+
+        for (Long memberId : getChatMembers(chatId)){
+            CacheChatMember chatMember = chat.getMemberInfo(memberId);
+            Optional<CacheUser> user = getCacheUser(chatMember.getUserId());
+            if (user.isEmpty())
+                return Optional.empty();
+
+            fullChatMembers.add(FullChatMember.create(user.get(), chatMember));
+        }
+
+        return Optional.of(fullChatMembers);
+    }
     public Optional<User> getUserByUsername(String username) {
         return userCache.values().stream().filter(user -> user.getUsername().equalsIgnoreCase(username)).findFirst().map(user -> (User)user);
     }
@@ -114,7 +132,7 @@ public class CacheService implements ICacheStorageService {
             notDeletedChatIds.remove(chatId);
             return cacheChat;
         });
-        personalChatCache.entrySet().removeIf(entry -> entry.getValue().equals(chatId));
+//        personalChatCache.entrySet().removeIf(entry -> entry.getValue().equals(chatId));
     }
     public void restoreChat(Long chatId) {
         chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
@@ -154,21 +172,18 @@ public class CacheService implements ICacheStorageService {
     }
 
     // Методы для работы с личными чатами
-    public void savePersonalChat(Chat chat, Long userId2) {
+    public void makePersonalChatCache(Chat chat, Long userId2) {
         Long id = chat.getId();
         Long createdBy = chat.getCreatedBy();
 
         // Сохраняем в кеш
         CacheChat cacheChat = new CacheChat(id, null, createdBy, false);
-        chatInfoCache.put(id, cacheChat);
 
-        addUserToChat(id, createdBy);
-        saveAdminRights(id, createdBy, true);
+        makeChatCache(cacheChat);
+        makePersonalChatCache(createdBy, userId2, id);
 
-        addUserToChat(id, userId2);
-        saveAdminRights(id, userId2, true);
-
-        savePersonalChat(createdBy, userId2, id);
+        addUserToChat(id, createdBy, true);
+        addUserToChat(id, userId2, true);
     }
     public Optional<Long> findExistingPersonalChat(Long userId1, Long userId2) {
         String key = getPersonalChatKey(userId1, userId2);
@@ -179,7 +194,17 @@ public class CacheService implements ICacheStorageService {
         }
         return Optional.empty();
     }
-    public void savePersonalChat(Long userId1, Long userId2, Long chatId) {
+    public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
+        String key = getPersonalChatKey(userId1, userId2);
+
+        if (personalChatCache.get(key) instanceof Long chatId) {
+            if (chatInfoCache.get(chatId) instanceof CacheChat chat && chat.getIsDeleted())
+                return Optional.of(chatId);
+            System.out.println(key);
+        }
+        return Optional.empty();
+    }
+    public void makePersonalChatCache(Long userId1, Long userId2, Long chatId) {
         personalChatCache.put(getPersonalChatKey(userId1, userId2), chatId);
     }
 
@@ -190,34 +215,33 @@ public class CacheService implements ICacheStorageService {
 
         // Сохраняем в кеш
         CacheChat cacheChat = new CacheChat(id, chat.getName(), createdBy, true);
-        chatInfoCache.put(id, cacheChat);
 
-        addUserToChat(id, createdBy);
-        saveAdminRights(id, createdBy, true);
+        makeChatCache(cacheChat);
 
-        for(Long userId : usersId) {
-            addUserToChat(id, userId);
-            saveAdminRights(id, userId, false);
-        }
+        addUserToChat(id, createdBy, true);
+        for(Long userId : usersId)
+            addUserToChat(id, userId, false);
     }
+
+    public void makeChatCache(CacheChat cacheChat){
+        chatInfoCache.put(cacheChat.getId(), cacheChat);
+        notDeletedChatIds.add(cacheChat.getId());
+    }
+
 
     // ========== CHAT MEMBER METHODS ==========
 
 
     // Основные методы
-    public void addUserToChat(Long chatId, Long userId) {
+    public void addUserToChat(Long chatId, Long userId, Boolean isAdmin) {
         userCache.computeIfPresent(userId, (id, cacheUser) -> {
             cacheUser.addChat(chatId);
             return cacheUser;
         });
         chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
-            cacheChat.addMember(userId, false);
+            cacheChat.addMember(userId, isAdmin);
             return cacheChat;
         });
-    }
-    public void addUserToChatWith(Long chatId, Long userId, Boolean isAdmin) {
-        addUserToChat(chatId, userId);
-        saveAdminRights(chatId, userId, isAdmin);
     }
     public void removeUserFromChat(Long userId, Long chatId) {
         userCache.computeIfPresent(userId, (id, cacheUser) -> {

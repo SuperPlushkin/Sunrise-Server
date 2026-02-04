@@ -6,7 +6,8 @@ public interface MessageResult {
     String getSenderUsername();
     String getText();
     String getSentAt();
-    Boolean getIsDeleted();
     Long getReadCount();
+    Boolean getIsReadByUser();
     Boolean getIsHiddenByUser();
+    Boolean getIsHiddenByAdmin();
 }

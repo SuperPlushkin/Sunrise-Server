@@ -13,7 +13,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -22,21 +21,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
             "FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :prefix, '%')) " +
             "AND u.isEnabled = true AND u.isDeleted = false")
     List<UserDTO> findFilteredUsers(@Param("prefix") String prefix, Pageable pageable);
-
-    @Query("SELECT u FROM User u WHERE u.username = :username AND u.isEnabled = true AND u.isDeleted = false")
-    Optional<User> findByUsername(@Param("username") String username);
-
-    @Query(value = "SELECT EXISTS(" +
-            "SELECT 1 FROM chat_members " +
-            "WHERE chat_id = :chatId AND user_id = :userId AND is_deleted = FALSE" +
-            ")", nativeQuery = true)
-    Boolean isChatMember(@Param("chatId") Long chatId, @Param("userId") Long userId);
-
-    @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.username = :username AND u.isDeleted = false")
-    boolean existsByUsername(@Param("username") String username);
-
-    @Query("SELECT COUNT(u) > 0 FROM User u WHERE u.email = :email AND u.isDeleted = false")
-    boolean existsByEmail(@Param("email") String email);
 
     @Modifying
     @Transactional

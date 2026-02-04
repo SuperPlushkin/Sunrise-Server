@@ -7,9 +7,7 @@ import com.Sunrise.DTO.Requests.CreatePersonalChatRequest;
 import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Services.ChatService;
 import com.Sunrise.Controllers.Annotations.ValidId;
-import com.Sunrise.Services.MessageService;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -24,12 +22,10 @@ public class ChatController {
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
 
     private final ChatService chatService;
-    private final MessageService messageService;
     public enum ClearType { FOR_ALL, FOR_SELF }
 
-    public ChatController(ChatService chatService, MessageService messageService) {
+    public ChatController(ChatService chatService) {
         this.chatService = chatService;
-        this.messageService = messageService;
     }
 
     @PostMapping("/create-personal")
@@ -41,7 +37,6 @@ public class ChatController {
         {
             log.info("User created personal chat successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                "info", "User created personal chat successfully",
                 "chat_id", result.getChatId()
             ));
         }
@@ -115,7 +110,6 @@ public class ChatController {
         {
             log.info("User got chat stats successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                "info", "User got chat stats successfully",
                 "total_messages", result.getTotalMessages(),
                 "deleted_for_all", result.getDeletedForAll(),
                 "hidden_by_user", result.getHiddenByUser(),
@@ -138,7 +132,6 @@ public class ChatController {
         {
             log.info("User clear chat history successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                "info", "User clear chat history successfully",
                 "cleared_messages", result.getAffectedMessages()
             ));
         }
@@ -149,17 +142,18 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/restore-history")
-    public ResponseEntity<?> restoreChatHistory(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
 
-        var result = chatService.restoreChatHistory(chatId, userId);
+    @GetMapping("/{chatId}/members")
+    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
+
+        var result = chatService.getChatMembers(chatId, userId);
 
         if (result.isSuccess())
         {
-            log.info("User restored chat history successfully --> id: {}", userId);
+            log.info("User got chat members successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                "info", "User restored chat history successfully",
-                "restored_messages", result.getAffectedMessages()
+                "members", result.getChatMembers(),
+                "count", result.getChatMembersCount()
             ));
         }
         else
@@ -168,104 +162,19 @@ public class ChatController {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
+    @GetMapping
+    public ResponseEntity<?> getUserChats(@CurrentUserId Long userId) {
 
-    @GetMapping("/{chatId}/messages")
-    public ResponseEntity<?> getChatMessages(@PathVariable @ValidId Long chatId,
-                                             @RequestParam(defaultValue = "50") @Min(value = 1, message = "limited must be positive") Integer limited,
-                                             @RequestParam(defaultValue = "0") @Min(value = 1, message = "offset must be positive") Integer offset,
-                                             @CurrentUserId Long userId) {
-
-        var result = messageService.getChatMessages(chatId, userId, limited, offset);
-
-        if (result.isSuccess())
-        {
-            var messages = result.getMessages();
-
-            log.info("User got chat messages successfully --> id: {}", userId);
-            return ResponseEntity.ok(Map.of(
-                "info", "User got chat messages successfully",
-                "messages", messages,
-                "count", messages.size()
-            ));
-        }
-        else
-        {
-            log.warn(result.getErrorMessage());
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
-
-    @PostMapping("/{chatId}/mark-read/{messageId}")
-    public ResponseEntity<?> markMessageAsRead(@PathVariable @ValidId Long chatId, @PathVariable @ValidId Long messageId, @CurrentUserId Long userId) {
-
-        var result = messageService.markMessageAsRead(chatId, messageId, userId);
+        var result = chatService.getUserChats(userId);
 
         if (result.isSuccess()) {
-            log.info("Successfully marked message as read --> messageId: {}", messageId);
-            return ResponseEntity.ok("Successfully marked message as read");
+            log.info("User got chats successfully --> id: {}", userId);
+            return ResponseEntity.ok(Map.of(
+                "chats", result.getUserChats(),
+                "count", result.getUserChatsCount()
+            ));
         }
         else {
-            log.warn(result.getErrorMessage());
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
-
-    @GetMapping("/{chatId}/message-count")
-    public ResponseEntity<?> getVisibleMessageCount(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
-
-        var result = messageService.getVisibleMessagesCount(chatId, userId);
-
-        if (result.isSuccess())
-        {
-            log.info("User got chat visible messages count successfully --> id: {}", userId);
-            return ResponseEntity.ok(Map.of(
-                "info", "User got chat visible messages count successfully",
-                "count", result.getVisibleMessagesCount()
-            ));
-        }
-        else
-        {
-            log.warn(result.getErrorMessage());
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
-
-
-    // Чтобы было, по факту бесполезно
-    @GetMapping("/{chatId}/is-admin")
-    public ResponseEntity<?> isChatAdmin(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
-
-        var result = chatService.isChatAdmin(chatId, userId);
-
-        if (result.isSuccess())
-        {
-            log.info("User got chat admin status successfully --> id: {}", userId);
-            return ResponseEntity.ok(Map.of(
-                "info", "User got chat admin status successfully",
-                "is_admin", result.getIsChatAdmin()
-            ));
-        }
-        else
-        {
-            log.warn(result.getErrorMessage());
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
-    @GetMapping("/{chatId}/is-group")
-    public ResponseEntity<?> isGroupChat(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
-
-        var result = chatService.isGroupChat(chatId, userId);
-
-        if (result.isSuccess())
-        {
-            log.info("User got chat IsGroup status successfully --> chatId: {}", chatId);
-            return ResponseEntity.ok(Map.of(
-                "info", "User got chat IsGroup status successfully",
-                "is_group", result.getIsGroupChat()
-            ));
-        }
-        else
-        {
             log.warn(result.getErrorMessage());
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }

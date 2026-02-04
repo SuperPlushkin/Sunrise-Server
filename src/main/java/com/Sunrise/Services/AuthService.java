@@ -16,9 +16,6 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import static com.Sunrise.Services.DataServices.DataAccessService.generate64CharString;
-import static com.Sunrise.Services.DataServices.DataAccessService.generateRandomId;
-
 @Service
 public class AuthService {
 
@@ -49,11 +46,11 @@ public class AuthService {
             if (dataAccessService.existsUserByEmail(email.toLowerCase()))
                 return UserInsertOperationResult.error("Email already exists");
 
-            User user = new User(generateRandomId(), username, name, email, passwordEncoder.encode(password), false);
+            User user = new User(DataAccessService.generateRandomId(), username, name, email, passwordEncoder.encode(password), false);
 
             dataAccessService.saveUser(user);
 
-            VerificationToken verifToken = new VerificationToken(generateRandomId(), generate64CharString(), user.getId(), "email_confirmation");
+            VerificationToken verifToken = new VerificationToken(DataAccessService.generateRandomId(), DataAccessService.generate64CharString(), user.getId(), "email_confirmation");
 
             dataAccessService.saveVerificationToken(verifToken);
             emailService.sendVerificationEmail(email, verifToken.getToken());
