@@ -1,6 +1,6 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.Entities.VerificationToken;
+import com.Sunrise.Entities.DB.VerificationToken;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

@@ -1,13 +1,14 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
-import com.Sunrise.DTO.ServiceResults.UserConfirmOperationResult;
-import com.Sunrise.DTO.ServiceResults.UserInsertOperationResult;
+import com.Sunrise.DTO.ServiceResults.UserLoginResult;
+import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
 import com.Sunrise.Services.DataServices.DataAccessService;
-import com.Sunrise.Entities.User;
-import com.Sunrise.Entities.VerificationToken;
+import com.Sunrise.Entities.DB.User;
+import com.Sunrise.Entities.DB.VerificationToken;
 import com.Sunrise.JWT.JwtUtil;
 
+import com.Sunrise.Services.DataServices.LockService;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -32,19 +33,19 @@ public class AuthService {
         this.lockService = lockService;
     }
 
-    public UserInsertOperationResult registerUser(String username, String name, String email, String password) {
+    public UserRegistrationResult registerUser(String username, String name, String email, String password) {
 
         if (!lockService.lockRegistration(username, email))
-            return UserInsertOperationResult.error("Try again later");
+            return UserRegistrationResult.error("Try again later");
 
         try
         {
             // проверка на уникальность
             if (dataAccessService.existsUserByUsername(username.trim()))
-                return UserInsertOperationResult.error("Username already exists");
+                return UserRegistrationResult.error("Username already exists");
 
             if (dataAccessService.existsUserByEmail(email.toLowerCase()))
-                return UserInsertOperationResult.error("Email already exists");
+                return UserRegistrationResult.error("Email already exists");
 
             User user = new User(DataAccessService.generateRandomId(), username, name, email, passwordEncoder.encode(password), false);
 
@@ -55,27 +56,27 @@ public class AuthService {
             dataAccessService.saveVerificationToken(verifToken);
             emailService.sendVerificationEmail(email, verifToken.getToken());
 
-            return UserInsertOperationResult.success(verifToken.getToken());
+            return UserRegistrationResult.success(verifToken.getToken());
         }
         catch (Exception e) {
-            return UserInsertOperationResult.error("Registration failed due to server error");
+            return UserRegistrationResult.error("Registration failed due to server error");
         }
         finally {
             lockService.unlockRegistration(username, email);
         }
     }
-    public UserConfirmOperationResult authenticateUser(String username, String password, HttpServletRequest httpRequest) {
+    public UserLoginResult authenticateUser(String username, String password, HttpServletRequest httpRequest) {
         try
         {
             Optional<User> userOpt = dataAccessService.getUserByUsername(username);
 
             if (userOpt.isEmpty())
-                return UserConfirmOperationResult.error("Invalid username or password");
+                return UserLoginResult.error("Invalid username or password");
 
             User user = userOpt.get();
 
             if (!user.getIsEnabled())
-                return UserConfirmOperationResult.error("Please verify your email first");
+                return UserLoginResult.error("Please verify your email first");
 
             if (passwordEncoder.matches(password, user.getHashPassword())) {
                 dataAccessService.updateLastLogin(username, LocalDateTime.now());
@@ -83,12 +84,12 @@ public class AuthService {
 
                 String token = jwtUtil.generateToken(username, user.getId());
 
-                return UserConfirmOperationResult.success(token, jwtUtil.getTokenExpirationTime(token));
+                return UserLoginResult.success(token, jwtUtil.getTokenExpirationTime(token));
             }
-            else return UserConfirmOperationResult.error("Invalid username or password");
+            else return UserLoginResult.error("Invalid username or password");
         }
         catch (Exception e) {
-            return UserConfirmOperationResult.error("Authentication failed");
+            return UserLoginResult.error("Authentication failed");
         }
     }
     public TokenConfirmationResult confirmToken(String type, String token) {

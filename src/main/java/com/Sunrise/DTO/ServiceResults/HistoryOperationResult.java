@@ -1,7 +1,7 @@
 package com.Sunrise.DTO.ServiceResults;
 
 @lombok.Getter
-public class HistoryOperationResult extends ServiceResult {
+public class HistoryOperationResult extends ServiceResultTemplate {
     private final Integer affectedMessages;
 
     public HistoryOperationResult(boolean success, String errorMessage, Integer affectedMessages) {

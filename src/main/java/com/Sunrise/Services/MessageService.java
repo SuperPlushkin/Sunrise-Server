@@ -1,12 +1,14 @@
 package com.Sunrise.Services;
 
-import com.Sunrise.DTO.DBResults.MessageResult;
+import com.Sunrise.DTO.DBResults.GetMessageDBResult;
 import com.Sunrise.DTO.ServiceResults.CreateMessageResult;
-import com.Sunrise.DTO.ServiceResults.GetChatMessagesResult;
+import com.Sunrise.DTO.ServiceResults.ChatMessagesResult;
 import com.Sunrise.DTO.ServiceResults.SimpleResult;
 import com.Sunrise.DTO.ServiceResults.VisibleMessagesCountResult;
-import com.Sunrise.Entities.Message;
+import com.Sunrise.Entities.DB.Message;
 import com.Sunrise.Services.DataServices.DataAccessService;
+import com.Sunrise.Services.DataServices.DataValidator;
+import com.Sunrise.Services.DataServices.LockService;
 import com.Sunrise.Subclasses.ValidationException;
 import org.springframework.stereotype.Service;
 
@@ -90,64 +92,64 @@ public class MessageService {
         }
     }
 
-    public GetChatMessagesResult getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+    public ChatMessagesResult getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<MessageResult> messages = dataAccessService.getChatMessagesFirst(chatId, userId, limit);
+            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesFirst(chatId, userId, limit);
 
-            return GetChatMessagesResult.success(messages);
+            return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
-            return GetChatMessagesResult.error(e.getMessage());
+            return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return GetChatMessagesResult.error("getChatMessagesFirst failed due to server error");
+            return ChatMessagesResult.error("getChatMessagesFirst failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
         }
     }
-    public GetChatMessagesResult getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
+    public ChatMessagesResult getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<MessageResult> messages = dataAccessService.getChatMessagesBefore(chatId, userId, messageId, limit);
+            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesBefore(chatId, userId, messageId, limit);
 
-            return GetChatMessagesResult.success(messages);
+            return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
-            return GetChatMessagesResult.error(e.getMessage());
+            return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return GetChatMessagesResult.error("getChatMessagesBefore failed due to server error");
+            return ChatMessagesResult.error("getChatMessagesBefore failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
         }
     }
-    public GetChatMessagesResult getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
+    public ChatMessagesResult getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<MessageResult> messages = dataAccessService.getChatMessagesAfter(chatId, userId, messageId, limit);
+            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesAfter(chatId, userId, messageId, limit);
 
-            return GetChatMessagesResult.success(messages);
+            return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
-            return GetChatMessagesResult.error(e.getMessage());
+            return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return GetChatMessagesResult.error("getChatMessagesAfter failed due to server error");
+            return ChatMessagesResult.error("getChatMessagesAfter failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);

@@ -1,7 +1,7 @@
 package com.Sunrise.DTO.ServiceResults;
 
 @lombok.Getter
-public class VisibleMessagesCountResult extends ServiceResult {
+public class VisibleMessagesCountResult extends ServiceResultTemplate {
     private final Integer visibleMessagesCount;
 
     public VisibleMessagesCountResult(boolean success, String errorMessage, Integer visibleMessagesCount) {

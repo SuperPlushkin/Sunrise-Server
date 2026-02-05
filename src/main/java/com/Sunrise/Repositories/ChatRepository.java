@@ -1,9 +1,9 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.DBResults.ChatStatsResult;
-import com.Sunrise.DTO.DBResults.GetChatMemberResult;
-import com.Sunrise.DTO.DBResults.GetPersonalChatResult;
-import com.Sunrise.Entities.Chat;
+import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTO.DBResults.GetChatMemberDBResult;
+import com.Sunrise.DTO.DBResults.GetPersonalChatDBResult;
+import com.Sunrise.Entities.DB.Chat;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,14 +17,14 @@ import java.util.List;
 public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     @Query("SELECT cm.id.chatId as chatId, cm.id.userId as userId, cm.isAdmin as isAdmin FROM ChatMember cm")
-    List<GetChatMemberResult> getAllChatMembers();
+    List<GetChatMemberDBResult> getAllChatMembers();
 
     @Query("SELECT c.id as chatId, cm1.id.userId as userId1, cm2.id.userId as userId2 " +
             "FROM Chat c " +
             "JOIN ChatMember cm1 ON c.id = cm1.id.chatId AND cm1.isDeleted = false " +
             "JOIN ChatMember cm2 ON c.id = cm2.id.chatId AND cm2.isDeleted = false " +
             "WHERE c.isGroup = false AND cm1.id.userId < cm2.id.userId")
-    List<GetPersonalChatResult> getAllPersonalChats();
+    List<GetPersonalChatDBResult> getAllPersonalChats();
 
 
     // ========== ДЕЙСТВИЯ С ИСТОРИЕЙ ЧАТОВ ==========
@@ -66,7 +66,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     @Query(value = "SELECT total_messages, hidden_for_all, hidden_by_user, can_clear_for_all " +
             "FROM get_chat_clear_stats(:chatId, :userId)", nativeQuery = true)
-    ChatStatsResult getChatClearStats(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    ChatStatsDBResult getChatClearStats(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
     @Modifying
     @Transactional

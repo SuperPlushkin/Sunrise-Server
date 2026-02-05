@@ -1,7 +1,7 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.ServiceResults.UserDTO;
-import com.Sunrise.Entities.User;
+import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.Entities.DB.User;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,10 +17,10 @@ import java.util.List;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @Query("SELECT new com.Sunrise.DTO.ServiceResults.UserDTO(u.id, u.username, u.name) " +
-            "FROM User u WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :prefix, '%')) " +
+    @Query("SELECT u.id, u.username, u.name FROM User u " +
+            "WHERE LOWER(u.username) LIKE LOWER(CONCAT('%', :prefix, '%')) " +
             "AND u.isEnabled = true AND u.isDeleted = false")
-    List<UserDTO> findFilteredUsers(@Param("prefix") String prefix, Pageable pageable);
+    List<ChatStatsDBResult.GetUserResult> findFilteredUsers(@Param("prefix") String prefix, Pageable pageable);
 
     @Modifying
     @Transactional

@@ -1,10 +1,10 @@
 package com.Sunrise.Services.DataServices;
 
-import com.Sunrise.DTO.DBResults.ChatStatsResult;
-import com.Sunrise.DTO.DBResults.GetChatMemberResult;
-import com.Sunrise.DTO.DBResults.GetPersonalChatResult;
-import com.Sunrise.DTO.DBResults.MessageResult;
-import com.Sunrise.Entities.*;
+import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTO.DBResults.GetChatMemberDBResult;
+import com.Sunrise.DTO.DBResults.GetPersonalChatDBResult;
+import com.Sunrise.DTO.DBResults.GetMessageDBResult;
+import com.Sunrise.Entities.DB.*;
 import com.Sunrise.Repositories.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -155,13 +155,13 @@ public class DBService {
 
 
     // Методы для работы с личными чатами
-    public List<GetPersonalChatResult> getAllPersonalChats() {
+    public List<GetPersonalChatDBResult> getAllPersonalChats() {
         return chatRepository.getAllPersonalChats();
     }
 
 
     // Методы для работы с участниками чата
-    public List<GetChatMemberResult> getAllChatMembers() {
+    public List<GetChatMemberDBResult> getAllChatMembers() {
         return chatRepository.getAllChatMembers();
     }
 
@@ -173,7 +173,7 @@ public class DBService {
     public Integer clearChatHistoryForSelf(Long chatId, Long userId) {
         return chatRepository.clearChatHistoryForSelf(chatId, userId);
     }
-    public ChatStatsResult getChatClearStats(Long chatId, Long userId) {
+    public ChatStatsDBResult getChatClearStats(Long chatId, Long userId) {
         return chatRepository.getChatClearStats(chatId, userId);
     }
 
@@ -219,13 +219,13 @@ public class DBService {
 
 
     // Вспомогательные методы
-    public List<MessageResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
         return messageRepository.getChatMessagesFirst(chatId, userId, limit);
     }
-    public List<MessageResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
         return messageRepository.getChatMessagesBefore(chatId, userId, messageId, limit);
     }
-    public List<MessageResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
         return messageRepository.getChatMessagesAfter(chatId, userId, messageId, limit);
     }
 

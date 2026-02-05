@@ -1,7 +1,7 @@
 package com.Sunrise.DTO.ServiceResults;
 
 @lombok.Getter
-public class IsGroupChatResult extends ServiceResult {
+public class IsGroupChatResult extends ServiceResultTemplate {
     private final Boolean isGroupChat;
 
     public IsGroupChatResult(boolean success, String errorMessage, Boolean isGroupChat) {

@@ -5,7 +5,7 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 
 @Getter
-public class CreateMessageResult extends ServiceResult {
+public class CreateMessageResult extends ServiceResultTemplate {
     private final Long messageId;
     private final LocalDateTime sentAt;
 

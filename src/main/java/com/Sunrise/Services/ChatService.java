@@ -1,10 +1,13 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.Controllers.ChatController;
+import com.Sunrise.DTO.Responses.ChatMemberDTO;
+import com.Sunrise.DTO.Responses.ChatDTO;
 import com.Sunrise.DTO.ServiceResults.*;
-import com.Sunrise.Entities.Chat;
+import com.Sunrise.Entities.DB.Chat;
 import com.Sunrise.Services.DataServices.DataAccessService;
-import com.Sunrise.Services.DataServices.CacheEntities.FullChatMember;
+import com.Sunrise.Services.DataServices.DataValidator;
+import com.Sunrise.Services.DataServices.LockService;
 import com.Sunrise.Subclasses.ValidationException;
 import org.springframework.stereotype.Service;
 
@@ -16,9 +19,9 @@ import static com.Sunrise.Services.DataServices.DataAccessService.generateRandom
 @Service
 public class ChatService {
 
-    private final LockService lockService;
-    private final DataAccessService dataAccessService;
     private final DataValidator validator;
+    private final DataAccessService dataAccessService;
+    private final LockService lockService;
 
     public ChatService(LockService lockService, DataAccessService dataAccessService, DataValidator validator) {
         this.lockService = lockService;
@@ -26,10 +29,10 @@ public class ChatService {
         this.validator = validator;
     }
 
-    public ChatCreationOperationResult createPersonalChat(Long creatorId, Long userToAddId) {
+    public ChatCreationResult createPersonalChat(Long creatorId, Long userToAddId) {
 
         if (creatorId.equals(userToAddId))
-            return ChatCreationOperationResult.error("Cannot create personal chat with yourself");
+            return ChatCreationResult.error("Cannot create personal chat with yourself");
 
         Set<Long> usersId = Set.of(creatorId, userToAddId);
 
@@ -41,34 +44,34 @@ public class ChatService {
             validator.validateActiveUser(userToAddId);
 
             if (dataAccessService.findPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
-                return ChatCreationOperationResult.success(chatId.get());
+                return ChatCreationResult.success(chatId.get());
 
             if (dataAccessService.findDeletedPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
                 dataAccessService.restoreChat(chatId.get());
-                return ChatCreationOperationResult.success(chatId.get());
+                return ChatCreationResult.success(chatId.get());
             }
 
             Chat chat = Chat.createPersonalChat(generateRandomId(), creatorId);
 
             dataAccessService.savePersonalChatAndAddPerson(chat, userToAddId);
 
-            return ChatCreationOperationResult.success(chat.getId());
+            return ChatCreationResult.success(chat.getId());
         }
         catch (ValidationException e) {
-            return ChatCreationOperationResult.error(e.getMessage());
+            return ChatCreationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return ChatCreationOperationResult.error("CreatePersonalChat failed due to server error");
+            return ChatCreationResult.error("CreatePersonalChat failed due to server error");
         }
         finally {
             lockService.unlockUsersSafely(usersId, true);
             lockService.unlockGlobalChats();
         }
     }
-    public ChatCreationOperationResult createGroupChat(String chatName, Long creatorId, Set<Long> usersToAddId) {
+    public ChatCreationResult createGroupChat(String chatName, Long creatorId, Set<Long> usersToAddId) {
 
         if (usersToAddId.contains(creatorId))
-            return ChatCreationOperationResult.error("Creator in usersToAdd");
+            return ChatCreationResult.error("Creator in usersToAdd");
 
         Set<Long> allUserIds = new HashSet<>(usersToAddId);
         allUserIds.add(creatorId);
@@ -87,13 +90,13 @@ public class ChatService {
 
             dataAccessService.saveGroupChatAndAddPeople(chat, usersToAddId);
 
-            return ChatCreationOperationResult.success(chat.getId());
+            return ChatCreationResult.success(chat.getId());
         }
         catch (ValidationException e) {
-            return ChatCreationOperationResult.error(e.getMessage());
+            return ChatCreationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return ChatCreationOperationResult.error("CreateGroupChat failed due to server error");
+            return ChatCreationResult.error("CreateGroupChat failed due to server error");
         }
         finally {
             lockService.unlockUsersSafely(allUserIds, false);
@@ -200,7 +203,7 @@ public class ChatService {
         }
     }
 
-    public GetUserChatsResult getUserChats(Long userId) {
+    public UserChatsResult getUserChats(Long userId) {
 
         lockService.lockGlobalChats(); // БЛОКИРУЕМ СПИСОК ЧАТОВ
         try
@@ -210,23 +213,23 @@ public class ChatService {
             var result = dataAccessService.getUserChats(userId);
 
             if(result.isEmpty())
-                return GetUserChatsResult.error("Cannot find users chats");
+                return UserChatsResult.error("Cannot find users chats");
 
-            List<Chat> chats = result.get();
+            Set<ChatDTO> chats = result.get().stream().map(ChatDTO::fromCacheChat).collect(Collectors.toSet());
 
-            return GetUserChatsResult.success(chats, chats.size());
+            return UserChatsResult.success(chats, chats.size());
         }
         catch (ValidationException e) {
-            return GetUserChatsResult.error(e.getMessage());
+            return UserChatsResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return GetUserChatsResult.error("getUserChats failed due to server error");
+            return UserChatsResult.error("getUserChats failed due to server error");
         }
         finally {
             lockService.unlockGlobalChats();
         }
     }
-    public ChatStatsOperationResult getChatStats(Long chatId, Long userId) {
+    public ChatStatsResult getChatStats(Long chatId, Long userId) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
@@ -235,19 +238,19 @@ public class ChatService {
 
             var result = dataAccessService.getChatClearStats(chatId, userId);
 
-            return ChatStatsOperationResult.success(result.getTotalMessages(), result.getDeletedForAll(), result.getHiddenByUser(), result.getCanClearForAll());
+            return ChatStatsResult.success(result.getTotalMessages(), result.getDeletedForAll(), result.getHiddenByUser(), result.getCanClearForAll());
         }
         catch (ValidationException e) {
-            return ChatStatsOperationResult.error(e.getMessage());
+            return ChatStatsResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return ChatStatsOperationResult.error("GetChatStats failed due to server error");
+            return ChatStatsResult.error("GetChatStats failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
         }
     }
-    public GetChatMembersResult getChatMembers(Long chatId, Long userId) {
+    public ChatMembersResult getChatMembers(Long chatId, Long userId) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
@@ -257,17 +260,18 @@ public class ChatService {
             var chatMembersOptional = dataAccessService.getChatMembers(chatId);
 
             if(chatMembersOptional.isEmpty())
-                return GetChatMembersResult.error("Cannot find chat members");
+                return ChatMembersResult.error("Cannot find chat members");
 
-            Set<FullChatMember> chatMembers = chatMembersOptional.get();
+            var chatMembers = chatMembersOptional.get().stream()
+                                    .map(ChatMemberDTO::fromCacheChatMember).collect(Collectors.toSet());
 
-            return GetChatMembersResult.success(chatMembers, chatMembers.size());
+            return ChatMembersResult.success(chatMembers, chatMembers.size());
         }
         catch (ValidationException e) {
-            return GetChatMembersResult.error(e.getMessage());
+            return ChatMembersResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return GetChatMembersResult.error("getUserChats failed due to server error");
+            return ChatMembersResult.error("getUserChats failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);

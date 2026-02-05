@@ -1,7 +1,7 @@
 package com.Sunrise.DTO.ServiceResults;
 
 @lombok.Getter
-public class IsChatAdminResult extends ServiceResult {
+public class IsChatAdminResult extends ServiceResultTemplate {
     private final Boolean isChatAdmin;
 
     public IsChatAdminResult(boolean success, String errorMessage, Boolean isChatAdmin) {

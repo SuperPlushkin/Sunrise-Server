@@ -1,12 +1,14 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.DTO.ServiceResults.FilteredUsersResult;
-import com.Sunrise.DTO.ServiceResults.UserDTO;
 
+import com.Sunrise.DTO.Responses.UserDTO;
+import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -19,8 +21,11 @@ public class UserService {
     public FilteredUsersResult getFilteredUsers(int limit, int offset, String filter) {
         try
         {
-            List<UserDTO> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
-            return FilteredUsersResult.success(users);
+            Set<User> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
+
+            Set<UserDTO> userDTOSet = users.stream().map(UserDTO::new).collect(Collectors.toSet());
+
+            return FilteredUsersResult.success(userDTOSet);
         }
         catch (Exception e) {
             return FilteredUsersResult.error("Error during getFilteredUsers: " + e.getMessage());

@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/chat")
+@RequestMapping("/chats")
 public class MessageController {
 
     private static final Logger log = LoggerFactory.getLogger(MessageController.class);

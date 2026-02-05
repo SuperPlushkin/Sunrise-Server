@@ -1,13 +1,12 @@
 package com.Sunrise.Services.DataServices;
 
-import com.Sunrise.DTO.DBResults.ChatStatsResult;
-import com.Sunrise.DTO.DBResults.GetChatMemberResult;
-import com.Sunrise.DTO.DBResults.GetPersonalChatResult;
-import com.Sunrise.DTO.DBResults.MessageResult;
-import com.Sunrise.DTO.ServiceResults.UserDTO;
-import com.Sunrise.Entities.*;
-import com.Sunrise.Services.DataServices.CacheEntities.CacheChat;
-import com.Sunrise.Services.DataServices.CacheEntities.FullChatMember;
+import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTO.DBResults.GetChatMemberDBResult;
+import com.Sunrise.DTO.DBResults.GetPersonalChatDBResult;
+import com.Sunrise.DTO.DBResults.GetMessageDBResult;
+import com.Sunrise.Entities.DB.*;
+import com.Sunrise.Entities.Cache.CacheChat;
+import com.Sunrise.Entities.Cache.CacheChatMember;
 import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,7 +75,7 @@ public class DataAccessService {
         }
     }
     private void initializeChatMemberships() {
-        for (GetChatMemberResult membership : dbService.getAllChatMembers()) { // Загружаем все членства в чатах
+        for (GetChatMemberDBResult membership : dbService.getAllChatMembers()) { // Загружаем все членства в чатах
             Long chatId = membership.getChatId();
             Long userId = membership.getUserId();
             Boolean isAdmin = membership.getIsAdmin();
@@ -85,7 +84,7 @@ public class DataAccessService {
         }
     }
     private void initializePersonalChats() {
-        for (GetPersonalChatResult personalChat : dbService.getAllPersonalChats()) {
+        for (GetPersonalChatDBResult personalChat : dbService.getAllPersonalChats()) {
             Long chatId = personalChat.getChatId();
             Long userId1 = personalChat.getUserId1();
             Long userId2 = personalChat.getUserId2();
@@ -135,8 +134,8 @@ public class DataAccessService {
     public Optional<User> getUserByUsername(String username) {
         return cacheService.getUserByUsername(username);
     }
-    public List<UserDTO> getFilteredUsers(String filter, int limit, int offset) {
-        return cacheService.getFilteredUsers(filter, limit, offset).stream().map(UserDTO::new).toList();
+    public Set<User> getFilteredUsers(String filter, int limit, int offset) {
+        return cacheService.getFilteredUsers(filter, limit, offset);
     }
     public boolean notExistsUserById(Long userId) {
         return !cacheService.existsUser(userId);
@@ -231,33 +230,25 @@ public class DataAccessService {
     public Integer clearChatHistoryForSelf(Long chatId, Long userId) {
         return dbService.clearChatHistoryForSelf(chatId, userId);
     }
-    public ChatStatsResult getChatClearStats(Long chatId, Long userId) {
+    public ChatStatsDBResult getChatClearStats(Long chatId, Long userId) {
         return dbService.getChatClearStats(chatId, userId);
     }
 
 
     // ========== CHAT MEMBER METHODS ==========
 
-    public Optional<Set<FullChatMember>> getChatMembers(Long chatId) {
+    public Optional<Set<CacheChatMember>> getChatMembers(Long chatId) {
         return cacheService.getFullChatMembers(chatId);
     }
-    public Set<Long> getChatMemberIDs(Long chatId) {
-        return cacheService.getChatMembers(chatId);
-    }
-    public Optional<List<Chat>> getUserChats(Long userId) {
-        Optional<List<Long>> cachedChatIds = cacheService.getUserChats(userId);
-        List<Chat> result = null;
-        System.out.println(cachedChatIds.isPresent());
+    public Optional<Set<CacheChat>> getUserChats(Long userId) {
+        Optional<Set<Long>> cachedChatIds = cacheService.getUserChats(userId);
+        Set<CacheChat> result = null;
 
         if (cachedChatIds.isPresent()) {
-            result = new ArrayList<>();
-            System.out.println(cachedChatIds.get().size());
+            result = new HashSet<>();
             for (Long chatId : cachedChatIds.get()) {
-                Optional<CacheChat> cacheChat = cacheService.getChatInfo(chatId);
-                System.out.println(cacheChat.isPresent());
-                cacheChat.ifPresent(result::add);
+                cacheService.getChatInfo(chatId).ifPresent(result::add);
             }
-            System.out.println(result.size());
         }
 
         return Optional.ofNullable(result);
@@ -318,13 +309,13 @@ public class DataAccessService {
         dbService.saveMessageAsync(message);
     }
 
-    public List<MessageResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
         return dbService.getChatMessagesFirst(chatId, userId, limit);
     }
-    public List<MessageResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
         return dbService.getChatMessagesBefore(chatId, userId, messageId, limit);
     }
-    public List<MessageResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<GetMessageDBResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
         return dbService.getChatMessagesAfter(chatId, userId, messageId, limit);
     }
 

@@ -1,7 +1,7 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.DBResults.MessageResult;
-import com.Sunrise.Entities.Message;
+import com.Sunrise.DTO.DBResults.GetMessageDBResult;
+import com.Sunrise.Entities.DB.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -17,15 +17,15 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     // ========== ОПЕРАЦИИ С СООБЩЕНИЯМИ ==========
     @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
             "FROM get_first_messages(:chatId, :userId, :limit)", nativeQuery = true)
-    List<MessageResult> getChatMessagesFirst(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("limit") Integer limit);
+    List<GetMessageDBResult> getChatMessagesFirst(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("limit") Integer limit);
 
     @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
             "FROM get_messages_before(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
-    List<MessageResult> getChatMessagesBefore(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
+    List<GetMessageDBResult> getChatMessagesBefore(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
 
     @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
             "FROM get_messages_after(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
-    List<MessageResult> getChatMessagesAfter(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
+    List<GetMessageDBResult> getChatMessagesAfter(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
 
     @Modifying
     @Transactional

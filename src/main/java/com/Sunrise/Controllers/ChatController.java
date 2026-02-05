@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/chat")
+@RequestMapping("/chats")
 public class ChatController {
 
     private static final Logger log = LoggerFactory.getLogger(ChatController.class);
@@ -104,7 +104,7 @@ public class ChatController {
     @GetMapping("/{chatId}/stats")
     public ResponseEntity<?> getChatStats(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
 
-        ChatStatsOperationResult result = chatService.getChatStats(chatId, userId);
+        ChatStatsResult result = chatService.getChatStats(chatId, userId);
 
         if (result.isSuccess())
         {

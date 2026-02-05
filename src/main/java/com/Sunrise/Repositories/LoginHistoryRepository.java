@@ -1,6 +1,6 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.Entities.LoginHistory;
+import com.Sunrise.Entities.DB.LoginHistory;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

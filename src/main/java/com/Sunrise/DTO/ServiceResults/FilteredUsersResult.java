@@ -1,19 +1,19 @@
 package com.Sunrise.DTO.ServiceResults;
 
-import java.util.Date;
-import java.util.List;
+import com.Sunrise.DTO.Responses.UserDTO;
+
+import java.util.Set;
 
 @lombok.Getter
-public class FilteredUsersResult extends ServiceResult{
-    private final List<UserDTO> users;
+public class FilteredUsersResult extends ServiceResultTemplate {
+    private final Set<UserDTO> users;
 
-    public FilteredUsersResult(boolean success, String errorMessage, List<UserDTO> users){
+    public FilteredUsersResult(boolean success, String errorMessage, Set<UserDTO> users){
         super(success, errorMessage);
-
         this.users = users;
     }
 
-    public static FilteredUsersResult success(List<UserDTO> users) {
+    public static FilteredUsersResult success(Set<UserDTO> users) {
         return new FilteredUsersResult(true, null, users);
     }
     public static FilteredUsersResult error(String errorMessage) {

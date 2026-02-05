@@ -1,6 +1,6 @@
 package com.Sunrise.DTO.ServiceResults;
 
-public class SimpleResult extends ServiceResult {
+public class SimpleResult extends ServiceResultTemplate {
     public SimpleResult(boolean success, String errorMessage){
         super(success, errorMessage);
     }
