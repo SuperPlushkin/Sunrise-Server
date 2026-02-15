@@ -1,6 +1,6 @@
 package com.Sunrise.Services;
 
-import com.Sunrise.DTO.DBResults.GetMessageDBResult;
+import com.Sunrise.DTO.DBResults.MessageDBResult;
 import com.Sunrise.DTO.ServiceResults.CreateMessageResult;
 import com.Sunrise.DTO.ServiceResults.ChatMessagesResult;
 import com.Sunrise.DTO.ServiceResults.SimpleResult;
@@ -99,7 +99,7 @@ public class MessageService {
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesFirst(chatId, userId, limit);
+            List<MessageDBResult> messages = dataAccessService.getChatMessagesFirst(chatId, userId, limit);
 
             return ChatMessagesResult.success(messages);
         }
@@ -120,7 +120,7 @@ public class MessageService {
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesBefore(chatId, userId, messageId, limit);
+            List<MessageDBResult> messages = dataAccessService.getChatMessagesBefore(chatId, userId, messageId, limit);
 
             return ChatMessagesResult.success(messages);
         }
@@ -141,7 +141,7 @@ public class MessageService {
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<GetMessageDBResult> messages = dataAccessService.getChatMessagesAfter(chatId, userId, messageId, limit);
+            List<MessageDBResult> messages = dataAccessService.getChatMessagesAfter(chatId, userId, messageId, limit);
 
             return ChatMessagesResult.success(messages);
         }

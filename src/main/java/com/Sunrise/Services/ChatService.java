@@ -43,10 +43,10 @@ public class ChatService {
             validator.validateActiveUser(creatorId);
             validator.validateActiveUser(userToAddId);
 
-            if (dataAccessService.findPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
+            if (dataAccessService.getPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
                 return ChatCreationResult.success(chatId.get());
 
-            if (dataAccessService.findDeletedPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
+            if (dataAccessService.getDeletedPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
                 dataAccessService.restoreChat(chatId.get());
                 return ChatCreationResult.success(chatId.get());
             }
@@ -133,10 +133,10 @@ public class ChatService {
         lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
-            if (dataAccessService.notExistsUserById(userId))
+            if (!dataAccessService.existsUser(userId))
                 return SimpleResult.error("User not found");
 
-            if (!dataAccessService.isUserInChat(chatId, userId))
+            if (!dataAccessService.hasChatMember(chatId, userId))
                 return SimpleResult.error("User is not a member of this chat");
 
             Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);

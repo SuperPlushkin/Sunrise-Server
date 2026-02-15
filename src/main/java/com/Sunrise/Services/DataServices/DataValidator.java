@@ -22,7 +22,7 @@ public class DataValidator {
         for (Long userId : userIds){
             validateActiveUser(userId);
 
-            if (!dataAccessService.isUserInChat(chatId, userId))
+            if (!dataAccessService.hasChatMember(chatId, userId))
                 throw new ValidationException("User is not a member of this chat");
         }
 
@@ -35,19 +35,19 @@ public class DataValidator {
 
         validateActiveUser(userId);
 
-        if (!dataAccessService.isUserInChat(chatId, userId))
+        if (!dataAccessService.hasChatMember(chatId, userId))
             throw new ValidationException("User is not a member of this chat");
 
         return isGroup.get();
     }
 
     public void validateActiveUserInChat(Long chatId, Long userId) {
-        if (!dataAccessService.chatIsValid(chatId))
+        if (!dataAccessService.ensureChatIsValid(chatId))
             throw new ValidationException("Chat does not exist or delete");
 
         validateActiveUser(userId);
 
-        if (!dataAccessService.isUserInChat(chatId, userId))
+        if (!dataAccessService.hasChatMember(chatId, userId))
             throw new ValidationException("User is not a member of this chat");
     }
     public void validateActiveUser(Long userId) {
@@ -75,7 +75,7 @@ public class DataValidator {
 
         validateActiveUser(newUserId);
 
-        if (dataAccessService.isUserInChat(chatId, newUserId))
+        if (dataAccessService.hasChatMember(chatId, newUserId))
             throw new ValidationException("User is already a member of this group");
     }
 }

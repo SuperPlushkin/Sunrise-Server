@@ -7,6 +7,7 @@ import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -21,9 +22,9 @@ public class UserService {
     public FilteredUsersResult getFilteredUsers(int limit, int offset, String filter) {
         try
         {
-            Set<User> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
+            List<User> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
 
-            Set<UserDTO> userDTOSet = users.stream().map(UserDTO::new).collect(Collectors.toSet());
+            List<UserDTO> userDTOSet = users.stream().map(UserDTO::new).toList();
 
             return FilteredUsersResult.success(userDTOSet);
         }

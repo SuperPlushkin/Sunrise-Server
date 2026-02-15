@@ -54,8 +54,8 @@ public class MessageController {
         if (result.isSuccess()) {
             log.info("User send private message in chat successfully --> id: {}", result.getMessageId());
             return ResponseEntity.ok(Map.of(
-                    "messageId", result.getMessageId(),
-                    "sentAt", result.getSentAt()
+                "messageId", result.getMessageId(),
+                "sentAt", result.getSentAt()
             ));
         }
         else {
@@ -99,8 +99,8 @@ public class MessageController {
 
             log.info("User got chat messages before msg successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                    "messages", messages,
-                    "count", messages.size()
+                "messages", messages,
+                "count", messages.size()
             ));
         }
         else {
@@ -121,8 +121,8 @@ public class MessageController {
 
             log.info("User got chat messages after msg successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                    "messages", messages,
-                    "count", messages.size()
+                "messages", messages,
+                "count", messages.size()
             ));
         }
         else {
@@ -154,21 +154,11 @@ public class MessageController {
         if (result.isSuccess()) {
             log.info("User got chat visible messages count successfully --> id: {}", userId);
             return ResponseEntity.ok(Map.of(
-                "count", result.getVisibleMessagesCount()
+                    "count", result.getVisibleMessagesCount()
             ));
-        }
-        else {
+        } else {
             log.warn(result.getErrorMessage());
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
-    }
-
-    @GetMapping("/status")
-    public Map<String, String> getStatus() {
-        return Map.of(
-            "status", "🟢 Онлайн",
-            "version", "1.0",
-            "users", "1"
-        );
     }
 }

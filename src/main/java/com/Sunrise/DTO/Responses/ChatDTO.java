@@ -27,7 +27,7 @@ public class ChatDTO {
         dto.setCreatedAt(chat.getCreatedAt());
         dto.setIsGroup(chat.getIsGroup());
         dto.setIsDeleted(chat.getIsDeleted());
-        dto.setChatMembers(chat.getChatMembers());
+        dto.setChatMembers(chat.getMembers());
         return dto;
     }
 }

@@ -14,21 +14,17 @@ public class ChatMemberDTO {
     private String username;
     private String name;
     private LocalDateTime joinedAt;
-    private LocalDateTime currentJoinDate;
     private Boolean isAdmin = false;
     private Boolean isDeleted = false;
-    private List<CacheChatMember.MembershipPeriod> membershipHistory;
 
     public static ChatMemberDTO fromCacheChatMember(CacheChatMember member) {
         ChatMemberDTO dto = new ChatMemberDTO();
         dto.setUserId(member.getUserId());
         dto.setUsername(member.getUsername());
         dto.setName(member.getName());
-        dto.setCurrentJoinDate(member.getCurrentJoinDate());
-        dto.setCurrentJoinDate(member.getCurrentJoinDate());
+        dto.setJoinedAt(member.getJoinedAt());
         dto.setIsAdmin(member.getIsAdmin());
         dto.setIsDeleted(member.getIsDeleted());
-        dto.setMembershipHistory(member.getMembershipHistory());
         return dto;
     }
 }

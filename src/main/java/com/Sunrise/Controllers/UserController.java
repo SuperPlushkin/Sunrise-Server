@@ -11,8 +11,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/user")
@@ -33,8 +33,7 @@ public class UserController {
 
         if (result.isSuccess())
         {
-            Set<UserDTO> users = result.getUsers();
-
+            List<UserDTO> users = result.getUsers();
             return ResponseEntity.ok(Map.of(
                 "users", users,
                 "count", users.size()

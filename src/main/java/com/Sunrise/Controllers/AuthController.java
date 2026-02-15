@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 
-@Controller
+@RestController
 @RequestMapping("/auth")
 public class AuthController {
 

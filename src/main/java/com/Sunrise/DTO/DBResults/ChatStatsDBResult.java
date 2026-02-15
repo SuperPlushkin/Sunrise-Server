@@ -7,8 +7,6 @@ public interface ChatStatsDBResult {
     Boolean getCanClearForAll();
 
     interface GetUserResult {
-        Long getId();
-        String getUsername();
-        String getName();
+
     }
 }

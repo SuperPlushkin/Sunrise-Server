@@ -67,6 +67,6 @@ app:
 
 logging:
   level:
-    com.Sunrise: ${LOGGING_LEVEL_APP:INFO}
+    com.Sunrise: ${LOGGING_LEVEL_APP:DEBUG}
     org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
     org.hibernate.type.descriptor.sql.BasicBinder: WARN

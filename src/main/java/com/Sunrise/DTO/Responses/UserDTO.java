@@ -1,6 +1,6 @@
 package com.Sunrise.DTO.Responses;
 
-import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTO.DBResults.UserDBResult;
 import com.Sunrise.Entities.DB.User;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -11,7 +11,7 @@ public class UserDTO {
     public final Long id;
     public final String username;
     public final String name;
-    public UserDTO(ChatStatsDBResult.GetUserResult userResult){
+    public UserDTO(UserDBResult userResult){
         this.id = userResult.getId();
         this.username = userResult.getUsername();
         this.name = userResult.getName();

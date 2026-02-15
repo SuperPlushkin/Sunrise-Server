@@ -162,6 +162,7 @@ public class ChatController {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
+
     @GetMapping
     public ResponseEntity<?> getUserChats(@CurrentUserId Long userId) {
 

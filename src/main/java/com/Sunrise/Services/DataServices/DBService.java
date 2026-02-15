@@ -1,17 +1,21 @@
 package com.Sunrise.Services.DataServices;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.DTO.DBResults.GetChatMemberDBResult;
-import com.Sunrise.DTO.DBResults.GetPersonalChatDBResult;
-import com.Sunrise.DTO.DBResults.GetMessageDBResult;
+import com.Sunrise.DTO.DBResults.ChatMemberDBResult;
+import com.Sunrise.DTO.DBResults.PersonalChatDBResult;
+import com.Sunrise.DTO.DBResults.MessageDBResult;
 import com.Sunrise.Entities.DB.*;
 import com.Sunrise.Repositories.*;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 public class DBService {
@@ -22,7 +26,8 @@ public class DBService {
     private final VerificationTokenRepository tokenRepository;
     private final MessageRepository messageRepository;
 
-    public DBService(UserRepository userRepository, ChatRepository chatRepository, LoginHistoryRepository loginHistoryRepository, VerificationTokenRepository tokenRepository, MessageRepository messageRepository) {
+    public DBService(UserRepository userRepository, ChatRepository chatRepository, LoginHistoryRepository loginHistoryRepository,
+                     VerificationTokenRepository tokenRepository, MessageRepository messageRepository) {
         this.userRepository = userRepository;
         this.chatRepository = chatRepository;
         this.loginHistoryRepository = loginHistoryRepository;
@@ -74,7 +79,22 @@ public class DBService {
     public Optional<User> getUser(Long userId) {
         return userRepository.findById(userId);
     }
-
+    public List<User> getFilteredUsers(String filter, int limit, int offset) {
+        Pageable pageable = PageRequest.of(offset / limit, limit);
+        return userRepository.findFilteredUsers(filter, pageable);
+    }
+    public Boolean existsUser(Long userId) {
+        return userRepository.existsById(userId);
+    }
+    public Optional<User> getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
+    }
+    public Optional<User> getUserByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
+    public List<Chat> getUserChats(Long userId) {
+        return chatRepository.findUserChats(userId);
+    }
 
     // ========== LOGIN HISTORY METHODS ==========
 
@@ -110,7 +130,7 @@ public class DBService {
     }
 
     public void deleteChat(Long chatId) {
-        chatRepository.deleteChat(chatId);
+        chatRepository.softDeleteChat(chatId);
     }
     @Async("dbExecutor")
     public void deleteChatAsync(Long chatId) {
@@ -143,26 +163,36 @@ public class DBService {
 
 
     // Вспомогательные методы
+    public List<PersonalChatDBResult> getAllPersonalChats() {
+        return chatRepository.getAllPersonalChats();
+    }
+    public List<ChatMemberDBResult> getAllChatMembers() {
+        return chatRepository.getAllChatMembers();
+    }
     public List<Chat> getAllChats() {
         return chatRepository.findAll();
     }
     public Optional<Chat> getChat(Long chatId) {
         return chatRepository.findById(chatId);
     }
-    public Optional<List<Chat>> getUserChats(Long userId) {
-        return Optional.ofNullable(null);
-    } // TODO: Реализовать надо метод
 
-
-    // Методы для работы с личными чатами
-    public List<GetPersonalChatDBResult> getAllPersonalChats() {
-        return chatRepository.getAllPersonalChats();
+    public Optional<Long> findPersonalChat(Long userId1, Long userId2) {
+        return chatRepository.findPersonalChat(userId1, userId2);
     }
-
-
-    // Методы для работы с участниками чата
-    public List<GetChatMemberDBResult> getAllChatMembers() {
-        return chatRepository.getAllChatMembers();
+    public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
+        return chatRepository.findDeletedPersonalChat(userId1, userId2);
+    }
+    public List<ChatMemberDBResult> getChatMembers(Long chatId) {
+        return chatRepository.getChatMembers(chatId);
+    }
+    public boolean isUserInChat(Long chatId, Long userId) {
+        return chatRepository.isUserInChat(chatId, userId);
+    }
+    public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
+        return chatRepository.isChatAdmin(chatId, userId);
+    }
+    public Optional<Long> findAnotherAdmin(Long chatId, Long excludeUserId) {
+        return chatRepository.findAnotherAdmin(chatId, excludeUserId);
     }
 
 
@@ -219,13 +249,13 @@ public class DBService {
 
 
     // Вспомогательные методы
-    public List<GetMessageDBResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+    public List<MessageDBResult> getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
         return messageRepository.getChatMessagesFirst(chatId, userId, limit);
     }
-    public List<GetMessageDBResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<MessageDBResult> getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
         return messageRepository.getChatMessagesBefore(chatId, userId, messageId, limit);
     }
-    public List<GetMessageDBResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
+    public List<MessageDBResult> getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
         return messageRepository.getChatMessagesAfter(chatId, userId, messageId, limit);
     }
 
@@ -234,5 +264,14 @@ public class DBService {
     }
     public Integer getVisibleMessagesCount(Long chatId, Long userId) {
         return messageRepository.getVisibleMessagesCount(chatId, userId);
+    }
+
+    public List<Long> getUserChatIds(Long userId) {
+        return chatRepository.getUserChatIds(userId);
+    }
+    public List<Chat> getChatsByIds(Set<Long> chatIds) {
+        if (chatIds.isEmpty())
+            return Collections.emptyList();
+        return chatRepository.findAllById(chatIds);
     }
 }

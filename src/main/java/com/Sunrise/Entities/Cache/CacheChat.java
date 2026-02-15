@@ -2,9 +2,8 @@ package com.Sunrise.Entities.Cache;
 
 import com.Sunrise.Entities.DB.Chat;
 
-import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -13,7 +12,7 @@ import java.util.stream.Collectors;
 @lombok.Setter
 public class CacheChat extends Chat {
 
-    private Map<Long, CacheChatMember> chatMembers = new ConcurrentHashMap<>(); // userId -> CacheChatMember
+    private final Map<Long, CacheChatMember> members = new ConcurrentHashMap<>(); // userId -> CacheChatMember
 
     public CacheChat(Long id, String name, Long createdBy, Boolean isGroup){
         super();
@@ -32,102 +31,73 @@ public class CacheChat extends Chat {
         this.setIsDeleted(chat.getIsDeleted());
     }
 
+    public boolean isPersonalChat() {
+        return !getIsGroup() && getMembersSize() == 2;
+    }
 
-    // Вспомогательные методы
     public void addMember(CacheUser user, Boolean isAdmin) {
-        if (chatMembers.get(user.getId()) instanceof CacheChatMember existingMember)
-        {
-            if (existingMember.getIsDeleted()) {
+        if (members.get(user.getId()) instanceof CacheChatMember existingMember) {
+            existingMember.setUsername(user.getUsername());
+            existingMember.setName(user.getName());
+            existingMember.setIsAdmin(isAdmin);
+            if (existingMember.getIsDeleted())
                 existingMember.restoreMember(isAdmin);
-            }
-            else existingMember.setIsAdmin(isAdmin);
         }
-        else {
-            chatMembers.put(user.getId(), new CacheChatMember(user, isAdmin));
-        }
+        else members.put(user.getId(), new CacheChatMember(user, isAdmin));
     }
     public void removeMember(Long userId) {
-        if (chatMembers.get(userId) instanceof CacheChatMember member)
+        if (members.get(userId) instanceof CacheChatMember member)
             member.markAsDeleted();
     }
+    public void restoreMember(Long userId, Boolean isAdmin) {
+        if (members.get(userId) instanceof CacheChatMember member)
+            member.restoreMember(isAdmin);
+    }
+    public void clearMembers() {
+        members.clear();
+    }
 
-    public boolean hasActiveMember(Long userId) {
-        return chatMembers.get(userId) instanceof CacheChatMember member && !member.getIsDeleted();
+    public Long getOtherMemberId(Long userId) {
+        return members.values().stream().filter(user -> !user.getUserId().equals(userId)).findFirst().map(CacheChatMember::getUserId).orElse(null);
+    }
+    public boolean hasNotDeletedMember(Long userId) {
+        return members.get(userId) instanceof CacheChatMember member && !member.getIsDeleted();
     }
     public boolean hasEverBeenMember(Long userId) {
-        return chatMembers.containsKey(userId);
+        return members.containsKey(userId);
     }
-    public int getActiveMemberCount() {
-        return (int)chatMembers.values().stream()
-                .filter(member -> !member.getIsDeleted())
-                .count();
+
+    public Boolean isMemberAdmin(Long userId) {
+        return members.get(userId) instanceof CacheChatMember member && !member.getIsDeleted() ? member.getIsAdmin() : false;
+    }
+    public void setAdminRights(Long userId, Boolean isAdmin) {
+        if (members.get(userId) instanceof CacheChatMember member && !member.getIsDeleted())
+            member.setIsAdmin(isAdmin);
     }
 
     public Set<Long> getAdminIds() {
-        return chatMembers.entrySet().stream()
+        return members.entrySet().stream()
                 .filter(entry -> !entry.getValue().getIsDeleted() && entry.getValue().getIsAdmin())
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toSet());
     }
-    public Boolean isAdmin(Long userId) {
-        return chatMembers.get(userId) instanceof CacheChatMember member && !member.getIsDeleted() ? member.getIsAdmin() : false;
+    public Set<Long> getMemberIds() {
+        return new HashSet<>(members.keySet());
     }
-    public void setAdminRights(Long userId, Boolean isAdmin) {
-        if (chatMembers.get(userId) instanceof CacheChatMember member && !member.getIsDeleted())
-            member.setIsAdmin(isAdmin);
+    public int getNotDeletedMemberCount() {
+        return (int) members.values().stream()
+                .filter(member -> !member.getIsDeleted())
+                .count();
     }
-
-    // Полезные методы
-    public CacheChatMember getMemberInfo(Long userId) {
-        return chatMembers.get(userId);
-    }
-    public LocalDateTime getMemberJoinedAt(Long userId) {
-        return chatMembers.get(userId) instanceof CacheChatMember member ? member.getJoinedAt() : null;
-    }
-    public LocalDateTime getMemberCurrentJoinDate(Long userId) {
-        return chatMembers.get(userId) instanceof CacheChatMember member ? member.getCurrentJoinDate() : null;
+    public Integer getMembersSize() {
+        return members.size();
     }
 
-    public void restoreMember(Long userId, Boolean isAdmin) {
-        if (chatMembers.get(userId) instanceof CacheChatMember member)
-            member.restoreMember(isAdmin);
-    }
-    public void restoreMember(Long userId) {
-        restoreMember(userId, false);
-    }
-
-    public Set<Long> getActiveMemberIds() {
-        return chatMembers.entrySet().stream()
-                .filter(entry -> !entry.getValue().getIsDeleted())
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-    }
-    public Set<Long> getDeletedMemberIds() {
-        return chatMembers.entrySet().stream()
-                .filter(entry -> entry.getValue().getIsDeleted())
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toSet());
-    }
-
-    public int getMembershipPeriodsCount(Long userId) {
-        return chatMembers.get(userId) instanceof CacheChatMember member ? member.getMembershipHistory().size() : 0;
-    }
-
-
-    // Метод для очистки старых удаленных пользователей
-    public void cleanupOldDeletedMembers(int daysThreshold) {
-        LocalDateTime thresholdDate = LocalDateTime.now().minusDays(daysThreshold);
-        chatMembers.entrySet().removeIf(entry -> {
-            CacheChatMember member = entry.getValue();
-            if (member.getIsDeleted()) {
-                LocalDateTime leftAt = member.getMembershipHistory().stream()
-                        .map(CacheChatMember.MembershipPeriod::getLeftAt)
-                        .filter(Objects::nonNull)
-                        .max(LocalDateTime::compareTo)
-                        .orElse(member.getJoinedAt());
-                return leftAt.isBefore(thresholdDate);
-            }
-            return false;
-        });
+    public void updateFromEntity(Chat chat) {
+        this.setName(chat.getName());
+        this.setCreatedBy(chat.getCreatedBy());
+        this.setIsGroup(chat.getIsGroup());
+        this.setCreatedAt(chat.getCreatedAt());
+        this.setIsDeleted(chat.getIsDeleted());
     }
 }

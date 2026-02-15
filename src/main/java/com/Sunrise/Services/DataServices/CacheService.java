@@ -6,105 +6,122 @@ import com.Sunrise.Entities.DB.VerificationToken;
 import com.Sunrise.Entities.Cache.CacheChat;
 import com.Sunrise.Entities.Cache.CacheChatMember;
 import com.Sunrise.Entities.Cache.CacheUser;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class CacheService {
 
-    // Основные кеши
-    private final Map<Long, CacheUser> userCache = new ConcurrentHashMap<>(); // userId -> CacheUser (пользователи)
+    // кэш пользователей
+    private final Cache<Long, CacheUser> userCache = Caffeine.newBuilder()  // userId -> CacheUser (пользователи)
+            .maximumSize(100_000)
+            .expireAfterAccess(1, TimeUnit.HOURS) // 1 h
+            .recordStats()
+            .build();
 
-    private final Set<Long> notDeletedChatIds = ConcurrentHashMap.newKeySet(); // chatId
-    private final Map<Long, CacheChat> chatInfoCache = new ConcurrentHashMap<>(); // chatId -> CacheChat (чаты)
+    private final Map<String, Long> usernameIndex = new ConcurrentHashMap<>(); // username -> userId (для регистрации)
+    private final Map<String, Long> emailIndex = new ConcurrentHashMap<>(); // email -> userId (для регистрации)
 
-    private final Map<String, VerificationToken> verificationTokenCache = new ConcurrentHashMap<>(); // token -> VerificationToken (токены)
+    private final Cache<String, List<User>> searchIndex = Caffeine.newBuilder() // для getFilteredUsers (Это можно будет заменить потом на ElasticSearch)
+            .maximumSize(1000)
+            .expireAfterWrite(5, TimeUnit.MINUTES) // 5 min
+            .build();
 
-    // Связующие кеши
-    private final Map<String, Long> personalChatCache = new ConcurrentHashMap<>(); // "userId_1:userId_2" -> chatId (личные чаты)
+
+    // кэш чатов
+    private final Cache<Long, CacheChat> chatInfoCache = Caffeine.newBuilder() // chatId -> CacheChat (чаты)
+            .maximumSize(50_000)
+            .expireAfterWrite(12, TimeUnit.HOURS) // 12 h
+            .build();
+
+    private final Map<String, Long> personalChatIndex = new ConcurrentHashMap<>(1000); // "creatorId:userId" -> chatId (личные чаты)
+
+
+    // кеш токенов подтверждения
+    private final Map<String, VerificationToken> verificationTokenCache = new ConcurrentHashMap<>(500); // token -> VerificationToken (токены)
+
 
 
     // ========== USER METHODS ==========
 
     // Основные методы
     public void saveUser(User user) {
-        if (user != null && user.getId() != null)
+        CacheUser existing = userCache.getIfPresent(user.getId());
+        if (existing != null) {
+            existing.updateFromEntity(user);
+        } else {
             userCache.put(user.getId(), new CacheUser(user));
+        }
+
+        usernameIndex.put(user.getUsername().toLowerCase(), user.getId());
+        emailIndex.put(user.getEmail().toLowerCase(), user.getId());
     }
     public void deleteUser(Long userId) {
-        userCache.computeIfPresent(userId, (id, cacheUser) -> {
-            cacheUser.setIsDeleted(true);
-            return cacheUser;
-        });
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsDeleted(true));
     }
     public void restoreUser(Long userId) {
-        userCache.computeIfPresent(userId, (id, cacheUser) -> {
-            cacheUser.setIsDeleted(false);
-            return cacheUser;
-        });
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsDeleted(false));
     }
 
     // Вспомогательные методы
-    public void enableUser(Long userId){
-        userCache.computeIfPresent(userId, (id, cacheChat) -> {
-            cacheChat.setIsEnabled(true);
-            return cacheChat;
-        });
+    public void updateUserChatsIds(Long userId, Set<Long> chatsIds) {
+        getCacheUser(userId).ifPresent(user -> user.setChatsIds(chatsIds));
     }
-    public void updateLastLogin(String username, LocalDateTime lastLogin) {
-        if (username != null && lastLogin != null)
-            userCache.values().stream().filter(user -> username.equals(user.getUsername()))
-                .findFirst().ifPresent(user -> user.setLastLogin(lastLogin));
+    public void updateUserIsEnabled(Long userId, boolean isEnabled){
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsEnabled(isEnabled));
     }
+    public void updateUserLastLogin(String username, LocalDateTime lastLogin) {
+        if (username == null || lastLogin == null) return;
+
+        Long userId = usernameIndex.get(username.toLowerCase());
+        if (userId != null)
+            getCacheUser(userId).ifPresent(user -> user.setLastLogin(lastLogin));
+    }
+
     public Optional<User> getUser(Long userId) {
-        return Optional.ofNullable(userCache.get(userId));
+        return Optional.ofNullable(userCache.getIfPresent(userId));
     }
     public Optional<CacheUser> getCacheUser(Long userId) {
-        return Optional.ofNullable(userCache.get(userId));
+        return Optional.ofNullable(userCache.getIfPresent(userId));
     }
-    public Optional<Set<CacheChatMember>> getFullChatMembers(Long chatId){
-        Set<CacheChatMember> fullChatMembers = new HashSet<>();
-
-        CacheChat chat = chatInfoCache.get(chatId);
-        if (chatInfoCache.get(chatId) == null)
-            return Optional.empty();
-
-        for (Long memberId : getChatMembers(chatId)){
-            fullChatMembers.add(chat.getMemberInfo(memberId));
-        }
-
-        return Optional.of(fullChatMembers);
+    public Optional<Set<CacheChatMember>> getChatMembers(Long chatId) {
+        return getChatCache(chatId).map(chat ->
+            chat.getMembers().values().stream()
+                .filter(member -> !member.getIsDeleted())
+                .collect(Collectors.toSet())
+        );
     }
     public Optional<User> getUserByUsername(String username) {
-        return userCache.values().stream().filter(user -> user.getUsername().equalsIgnoreCase(username)).findFirst().map(user -> (User)user);
+        Long userId = usernameIndex.get(username.toLowerCase());
+        return userId != null ? getCacheUser(userId).map(user -> (User) user) : Optional.empty();
     }
-    public Set<User> getFilteredUsers(String filter, int limit, int offset) {
-        Stream<CacheUser> userStream = userCache.values().stream()
-                .filter(user -> !user.getIsDeleted() && user.getIsEnabled()); // только активные и не удаленные
-
-        if (filter != null && !filter.trim().isEmpty()) {
-            String lowerFilter = filter.toLowerCase();
-            userStream = userStream.filter(user ->
-                user.getUsername().toLowerCase().contains(lowerFilter) ||
-                user.getName().toLowerCase().contains(lowerFilter)
-            );
-        }
-
-        return userStream.skip(offset).limit(limit).map(user -> (User) user).collect(Collectors.toSet());
+    public Optional<User> getUserByEmail(String email) {
+        Long userId = emailIndex.get(email.toLowerCase());
+        return userId != null ? getCacheUser(userId).map(user -> (User) user) : Optional.empty();
+    }
+    public Optional<List<User>> getFilteredUsers(String filter, int limit, int offset) {
+        String cacheKey = getUsersSearchResultKey(filter, limit, offset);
+        return Optional.ofNullable(searchIndex.getIfPresent(cacheKey));
     }
     public boolean existsUser(Long userId) {
-        return userCache.containsKey(userId);
+        return userCache.getIfPresent(userId) != null;
     }
     public Boolean existsUserByUsername(String username) {
-        return userCache.values().stream().anyMatch(user -> user.getUsername().equalsIgnoreCase(username));
+        return usernameIndex.containsKey(username.toLowerCase());
     }
     public Boolean existsUserByEmail(String email) {
-        return userCache.values().stream().anyMatch(user -> user.getEmail().equalsIgnoreCase(email));
+        return emailIndex.containsKey(email.toLowerCase());
+    }
+
+    public void cacheUsersSearchResult(String filter, int limit, int offset, List<User> results) {
+        searchIndex.put(getUsersSearchResultKey(filter, limit, offset), results);
     }
 
 
@@ -113,175 +130,110 @@ public class CacheService {
 
     // Основные методы
     public void saveChat(Chat chat) {
-        if (chat != null && chat.getId() instanceof Long id) {
-            CacheChat cacheChat = new CacheChat(chat);
-            chatInfoCache.put(id, cacheChat);
-
-            if (!cacheChat.getIsDeleted())
-                notDeletedChatIds.add(id);
+        Long id = chat.getId();
+        CacheChat existing = chatInfoCache.getIfPresent(id);
+        if (existing != null) {
+            existing.updateFromEntity(chat);
+        } else {
+            chatInfoCache.put(id, new CacheChat(chat)); // всегда создаем новый CacheChat
         }
     }
     public void deleteChat(Long chatId) {
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
-            cacheChat.setIsDeleted(true);
-            notDeletedChatIds.remove(chatId);
-            return cacheChat;
-        });
-//        personalChatCache.entrySet().removeIf(entry -> entry.getValue().equals(chatId));
+        getChatCache(chatId).ifPresent(cacheChat -> cacheChat.setIsDeleted(true));
     }
     public void restoreChat(Long chatId) {
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
-            cacheChat.setIsDeleted(false);
-            notDeletedChatIds.add(chatId);
-            return cacheChat;
-        });
+        getChatCache(chatId).ifPresent(cacheChat -> cacheChat.setIsDeleted(false));
     }
 
     // Вспомогательные методы
-    public Optional<Boolean> isGroupChat(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Optional.empty();
 
-        return Optional.ofNullable(chatInfoCache.get(chatId)).map(CacheChat::getIsGroup);
+    public boolean existsAndNotDeletedChat(Long chatId) {
+        return chatInfoCache.getIfPresent(chatId) instanceof CacheChat cacheChat && !cacheChat.getIsDeleted();
     }
-    public boolean existsChat(Long chatId) {
-        return notDeletedChatIds.contains(chatId);
-    }
-    public Optional<CacheChat> getChatInfo(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Optional.empty();
-
-        return Optional.ofNullable(chatInfoCache.get(chatId));
+    public Optional<CacheChat> getChatCache(Long chatId) {
+        return Optional.ofNullable(chatInfoCache.getIfPresent(chatId));
     }
     public Optional<String> getChatName(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Optional.empty();
-
-        return Optional.ofNullable(chatInfoCache.get(chatId)).map(CacheChat::getName);
+        return getChatCache(chatId).map(CacheChat::getName);
+    }
+    public Optional<Boolean> getIsGroupChat(Long chatId) {
+        return getChatCache(chatId).map(CacheChat::getIsGroup);
     }
     public Optional<Long> getChatCreator(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Optional.empty();
-
-        return Optional.ofNullable(chatInfoCache.get(chatId)).map(CacheChat::getCreatedBy);
+        return getChatCache(chatId).map(CacheChat::getCreatedBy);
+    }
+    public boolean existsChat(Long chatId) {
+        return chatInfoCache.getIfPresent(chatId) != null;
     }
 
     // Методы для работы с личными чатами
-    public void makePersonalChatCache(Chat chat, Long userId2) {
-        Long id = chat.getId();
-        Long createdBy = chat.getCreatedBy();
-
-        // Сохраняем в кеш
-        CacheChat cacheChat = new CacheChat(id, null, createdBy, false);
-
-        makeChatCache(cacheChat);
-        makePersonalChatCache(createdBy, userId2, id);
-
-        addUserToChat(id, createdBy, true);
-        addUserToChat(id, userId2, true);
-    }
-    public Optional<Long> findExistingPersonalChat(Long userId1, Long userId2) {
-        String key = getPersonalChatKey(userId1, userId2);
-
-        if (personalChatCache.get(key) instanceof Long chatId) {
-            if (chatInfoCache.get(chatId) instanceof CacheChat chat && !chat.getIsDeleted())
-                return Optional.of(chatId);
-        }
-        return Optional.empty();
-    }
-    public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
-        String key = getPersonalChatKey(userId1, userId2);
-
-        if (personalChatCache.get(key) instanceof Long chatId) {
-            if (chatInfoCache.get(chatId) instanceof CacheChat chat && chat.getIsDeleted())
-                return Optional.of(chatId);
-        }
-        return Optional.empty();
-    }
-    public void makePersonalChatCache(Long userId1, Long userId2, Long chatId) {
-        personalChatCache.put(getPersonalChatKey(userId1, userId2), chatId);
-    }
-
-    // Методы для работы с групповыми чатами
     public void saveGroupChat(Chat chat, Set<Long> usersId) {
-        Long id = chat.getId();
-        Long createdBy = chat.getCreatedBy();
+        CacheChat cacheChat = new CacheChat(chat.getId(), chat.getName(), chat.getCreatedBy(), true);
 
-        // Сохраняем в кеш
-        CacheChat cacheChat = new CacheChat(id, chat.getName(), createdBy, true);
+        saveChat(cacheChat);
 
-        makeChatCache(cacheChat);
+        addChatMember(cacheChat.getId(), cacheChat.getCreatedBy(), true);
+        for (Long userId : usersId)
+            addChatMember(cacheChat.getId(), userId, false);
+    }
+    public void savePersonalChat(Chat chat, Long userId2) {
+        CacheChat cacheChat = new CacheChat(chat.getId(), null, chat.getCreatedBy(), false);
 
-        addUserToChat(id, createdBy, true);
-        for(Long userId : usersId)
-            addUserToChat(id, userId, false);
+        saveChat(cacheChat);
+        personalChatIndex.put(getPersonalChatKey(cacheChat.getCreatedBy(), userId2), cacheChat.getId());
+
+        addChatMember(cacheChat.getId(), cacheChat.getCreatedBy(), true);
+        addChatMember(cacheChat.getId(), userId2, true);
+    }
+    public Optional<Long> findPersonalChatByIsDeleted(Long userId1, Long userId2, Boolean isDeleted) {
+        String key = getPersonalChatKey(userId1, userId2);
+        Long chatId = personalChatIndex.get(key);
+        if (chatId == null)
+            return Optional.empty();
+
+        return getChatCache(chatId).filter(chat -> chat.getIsDeleted().equals(isDeleted)).map(chat -> chatId);
     }
 
-    public void makeChatCache(CacheChat cacheChat){
-        chatInfoCache.put(cacheChat.getId(), cacheChat);
-        notDeletedChatIds.add(cacheChat.getId());
+    public void savePersonalChatIndex(Long chatId, Long creatorId, Long userId2) {
+        personalChatIndex.put(getPersonalChatKey(creatorId, userId2), chatId);
     }
-
 
     // ========== CHAT MEMBER METHODS ==========
 
 
     // Основные методы
-    public void addUserToChat(Long chatId, Long userId, Boolean isAdmin) {
-        userCache.computeIfPresent(userId, (id, cacheUser) -> {
-            cacheUser.addChat(chatId);
-            chatInfoCache.computeIfPresent(chatId, (id_, cacheChat) -> {
-                cacheChat.addMember(cacheUser, isAdmin);
-                return cacheChat;
-            });
-            return cacheUser;
+    public void addChatMember(Long chatId, Long userId, Boolean isAdmin) {
+        CacheUser cacheUser = userCache.getIfPresent(userId);
+        if (cacheUser == null)
+            return;
+
+        cacheUser.addChat(chatId);
+        getChatCache(chatId).ifPresent(cacheChat -> {
+            cacheChat.addMember(cacheUser, isAdmin);
         });
     }
-    public void removeUserFromChat(Long userId, Long chatId) {
-        userCache.computeIfPresent(userId, (id, cacheUser) -> {
-            cacheUser.removeChat(chatId);
-            return cacheUser;
-        });
-
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
-            cacheChat.removeMember(userId);
-            return cacheChat;
-        });
+    public void removeChatMember(Long userId, Long chatId) {
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.removeChat(chatId));
 
         deleteAdminRights(chatId, userId);
+        getChatCache(chatId).ifPresent(cacheChat -> cacheChat.removeMember(userId));
+    }
+    public void clearChatMembers(Long chatId) {
+        getChatCache(chatId).ifPresent(CacheChat::clearMembers);
     }
 
     // Вспомогательные методы
-    public Optional<Set<Long>> getUserChats(Long userId) {
+    public Optional<Set<Long>> getUserChatsIds(Long userId) {
+        return getCacheUser(userId).filter(user -> !user.getIsDeleted() && user.getIsEnabled()).map(CacheUser::getChats);
+    }
+    public Boolean isUserInChat(Long chatId, Long userId) {
         return getCacheUser(userId)
-                .filter(user -> !user.getIsDeleted() && user.getIsEnabled())
-                .map(cacheUser -> {
-                    Set<Long> userChats = cacheUser.getChats();
-                    Set<Long> activeChats = new HashSet<>(userChats.size());
-
-                    for (Long chatId : userChats) {
-                        if (notDeletedChatIds.contains(chatId))
-                            activeChats.add(chatId);
-                    }
-                    return activeChats;
-                });
-    }
-    public Set<Long> getChatMembers(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Collections.emptySet();
-
-        return chatInfoCache.get(chatId) instanceof CacheChat chat ? chat.getActiveMemberIds() : Collections.emptySet();
-    }
-    public boolean isUserInChat(Long chatId, Long userId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return false;
-
-        return getCacheUser(userId).filter(user -> !user.getIsDeleted() && user.getIsEnabled())
-                .map(cacheUser -> cacheUser.hasChat(chatId)).orElse(false);
+                .filter(us -> !us.getIsDeleted() && us.getIsEnabled())
+                .map(cacheUs -> cacheUs.hasChat(chatId)).orElse(false);
     }
 
 
-    // ========== VERIFICATION TOKEN METHODS ==========
+    // ========== VERIFICATION TOKEN METHODS ========== // TODO: ПЕРЕДЕЛАТЬ ПОТОМ ТОКЕНЫ ПОДТВЕРЖДЕНИЯ НА ВРЕМЕННОЕ ХРАНЕНИЕ И БД (Нейросеть не трогай эти методы)
 
 
     // Основные методы
@@ -299,7 +251,6 @@ public class CacheService {
     public int cleanupExpiredVerificationTokens() {
         int before = verificationTokenCache.size();
         verificationTokenCache.entrySet().removeIf(entry -> entry.getValue().isExpired());
-
         return before - verificationTokenCache.size();
     }
 
@@ -309,53 +260,36 @@ public class CacheService {
 
     // Основные методы
     public void saveAdminRights(Long chatId, Long userId, Boolean isAdmin) {
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
+        getChatCache(chatId).ifPresent(cacheChat -> {
+            // Игнорируем попытку снять права у создателя
             if (userId.equals(cacheChat.getCreatedBy()) && !isAdmin)
-                return cacheChat; // Игнорируем попытку снять права у создателя
+                return;
 
-            if (cacheChat.hasActiveMember(userId))
+            if (cacheChat.hasNotDeletedMember(userId))
                 cacheChat.setAdminRights(userId, isAdmin);
-            return cacheChat;
         });
     }
     public void deleteAdminRights(Long chatId, Long userId) {
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
+        getChatCache(chatId).ifPresent(cacheChat -> {
             if (!userId.equals(cacheChat.getCreatedBy()))
                 cacheChat.setAdminRights(userId, false);
-            return cacheChat;
         });
     }
 
     // Вспомогательные методы
     public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Optional.empty();
-
-        return Optional.ofNullable(chatInfoCache.get(chatId)).map(cacheChat -> cacheChat.isAdmin(userId));
+        return getChatCache(chatId).map(cacheChat -> cacheChat.isMemberAdmin(userId));
     }
-    public Set<Long> getChatAdmins(Long chatId) {
-        if (!notDeletedChatIds.contains(chatId))
-            return Collections.emptySet();
-
-        return chatInfoCache.get(chatId) instanceof CacheChat cacheChat ? cacheChat.getAdminIds() : Collections.emptySet();
+    public Optional<Set<Long>> getChatAdmins(Long chatId) {
+        return getChatCache(chatId).map(CacheChat::getAdminIds);
     }
     public void clearAdminRightsForChat(Long chatId) {
-        chatInfoCache.computeIfPresent(chatId, (id, cacheChat) -> {
-            if(cacheChat.getIsDeleted())
-                return cacheChat;
-
+        getChatCache(chatId).ifPresent(cacheChat -> {
             Long creatorId = cacheChat.getCreatedBy();
-            cacheChat.getActiveMemberIds().forEach(memberId -> {
+            cacheChat.getMemberIds().forEach(memberId -> {
                 if (!memberId.equals(creatorId)) // Не сбрасываем права создателя
                     cacheChat.setAdminRights(memberId, false);
             });
-            return cacheChat;
-        });
-    }
-    public void clearAdminRightsForUser(Long userId) {
-        chatInfoCache.values().forEach(cacheChat -> {
-            if (!cacheChat.getIsDeleted() && cacheChat.hasActiveMember(userId) && !userId.equals(cacheChat.getCreatedBy())) // Не сбрасываем права создателя
-                cacheChat.setAdminRights(userId, false);
         });
     }
 
@@ -364,28 +298,54 @@ public class CacheService {
 
 
     // Основные методы
-    public CacheStats getStats() {
-        int activatedUserCount = (int)userCache.values().stream().filter(user -> !user.getIsDeleted() && user.getIsEnabled()).count();
-        int totalUserChats = userCache.values().stream().filter(user -> !user.getIsDeleted() && user.getIsEnabled()).mapToInt(CacheUser::getChatsCount).sum();
-        int totalChatMembers = chatInfoCache.values().stream().filter(chat -> !chat.getIsDeleted()).mapToInt(CacheChat::getActiveMemberCount).sum();
-        int totalAdminRights = chatInfoCache.values().stream().filter(chat -> !chat.getIsDeleted())
-                .mapToInt(cacheChat -> (int)cacheChat.getChatMembers().values().stream().filter(CacheChatMember::getIsAdmin).count())
+    public CacheStats getCacheStatus() {
+        Map<Long, CacheUser> userCacheSnapshot = userCache.asMap();
+        Map<Long, CacheChat> chatInfoCacheSnapshot = chatInfoCache.asMap();
+
+        long activatedUserCount = userCacheSnapshot.values().stream().filter(user -> !user.getIsDeleted() && user.getIsEnabled()).count();
+        int totalUserChats = userCacheSnapshot.values().stream().filter(user -> !user.getIsDeleted() && user.getIsEnabled()).mapToInt(CacheUser::getChatsCount).sum();
+        int totalChatMembers = chatInfoCacheSnapshot.values().stream().filter(chat -> !chat.getIsDeleted()).mapToInt(CacheChat::getNotDeletedMemberCount).sum();
+        int totalAdminRights = chatInfoCacheSnapshot.values().stream().filter(chat -> !chat.getIsDeleted())
+                .mapToInt(cacheChat -> (int)cacheChat.getMembers().values().stream().filter(CacheChatMember::getIsAdmin).count())
                 .sum();
 
         return new CacheStats(
             activatedUserCount,
-            0,
-            userCache.size(),
-            notDeletedChatIds.size(),
-            chatInfoCache.size(),
+            userCacheSnapshot.size(),
+            chatInfoCacheSnapshot.values().stream().filter(chat -> !chat.getIsDeleted()).count(),
+            chatInfoCacheSnapshot.size(),
             totalUserChats,
             totalChatMembers,
             totalAdminRights,
             verificationTokenCache.size()
         );
     }
-    public record CacheStats(int activatedUserCount, int activeUserCount, int userCount, int notDeletedChatCount, int chatCount, int userChatsCount, int chatMembersCount, int adminRightsCount, int verificationTokenCount) { }
+    public record CacheStats(long activatedUserCount, int allUserCount, long notDeletedChatCount, int chatCount, int userChatsCount, int chatMembersCount, int adminRightsCount, int verificationTokenCount) { }
+    public Map<String, Object> getDetailedCacheStats() {
+        Map<String, Object> stats = new HashMap<>();
 
+        // статистика кеша пользователей
+        var userStats = userCache.stats();
+        stats.put("userCache.estimatedSize", userCache.estimatedSize());
+        stats.put("userCache.hitRate", userStats.hitRate());
+        stats.put("userCache.missRate", userStats.missRate());
+        stats.put("userCache.evictionCount", userStats.evictionCount());
+
+        // статистика кеша чатов
+        var chatStats = chatInfoCache.stats();
+        stats.put("chatCache.estimatedSize", chatInfoCache.estimatedSize());
+        stats.put("chatCache.hitRate", chatStats.hitRate());
+        stats.put("chatCache.missRate", chatStats.missRate());
+        stats.put("chatCache.evictionCount", chatStats.evictionCount());
+
+        // статистика кеша индексов
+        stats.put("usernameIndex.size", usernameIndex.size());
+        stats.put("emailIndex.size", emailIndex.size());
+        stats.put("personalChatIndex.size", personalChatIndex.size());
+        stats.put("verificationTokenCache.size", verificationTokenCache.size());
+
+        return stats;
+    }
 
     // ========== HELPFUL FUNCTIONS ==========
 
@@ -393,5 +353,8 @@ public class CacheService {
     // Основные методы
     private String getPersonalChatKey(Long userId1, Long userId2) {
         return Math.min(userId1, userId2) + ":" + Math.max(userId1, userId2);
+    }
+    private String getUsersSearchResultKey(String filter, int limit, int offset) {
+        return filter + ":" + limit + ":" + offset;
     }
 }
