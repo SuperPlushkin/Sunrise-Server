@@ -5,6 +5,8 @@ import com.Sunrise.DTO.Responses.ChatMemberDTO;
 import com.Sunrise.DTO.Responses.ChatDTO;
 import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Entities.DB.Chat;
+import com.Sunrise.Entities.DB.ChatMember;
+import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
 import com.Sunrise.Services.DataServices.LockService;
@@ -43,17 +45,20 @@ public class ChatService {
             validator.validateActiveUser(creatorId);
             validator.validateActiveUser(userToAddId);
 
-            if (dataAccessService.getPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
+            if (dataAccessService.getPersonalChatId(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
                 return ChatCreationResult.success(chatId.get());
 
-            if (dataAccessService.getDeletedPersonalChat(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
+            if (dataAccessService.getDeletedPersonalChatId(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
                 dataAccessService.restoreChat(chatId.get());
                 return ChatCreationResult.success(chatId.get());
             }
 
             Chat chat = Chat.createPersonalChat(generateRandomId(), creatorId);
 
-            dataAccessService.savePersonalChatAndAddPerson(chat, userToAddId);
+            var creator = new ChatMember(chat.getId(), creatorId, true);
+            var member = new ChatMember(chat.getId(), userToAddId, false);
+
+            dataAccessService.savePersonalChatAndAddPerson(chat, creator, member);
 
             return ChatCreationResult.success(chat.getId());
         }
@@ -67,7 +72,7 @@ public class ChatService {
             lockService.unlockUsersSafely(usersId, true);
             lockService.unlockGlobalChats();
         }
-    }
+    } // TODO: СЛИШКОМ НАМУДРИЛ, НАДО ПРОЩЕ
     public ChatCreationResult createGroupChat(String chatName, Long creatorId, Set<Long> usersToAddId) {
 
         if (usersToAddId.contains(creatorId))
@@ -82,13 +87,17 @@ public class ChatService {
         {
             validator.validateActiveUser(creatorId);
 
-            for (Long userToAddId : usersToAddId) {
-                validator.validateActiveUser(userToAddId);
-            }
-
             Chat chat = Chat.createGroupChat(generateRandomId(), chatName, creatorId);
 
-            dataAccessService.saveGroupChatAndAddPeople(chat, usersToAddId);
+            List<ChatMember> members = new ArrayList<>(usersToAddId.size() + 1);
+            members.add(new ChatMember(chat.getId(), creatorId, true));
+
+            for (Long userToAddId : usersToAddId) {
+                validator.validateActiveUser(userToAddId);
+                members.add(new ChatMember(chat.getId(), userToAddId, false));
+            }
+
+            dataAccessService.saveGroupChatAndAddPeople(chat, members);
 
             return ChatCreationResult.success(chat.getId());
         }
@@ -104,17 +113,37 @@ public class ChatService {
         }
     } // TODO: ПЕРЕДЕЛАТЬ LOCKs
 
-    public SimpleResult addGroupMember(Long chatId, Long inviterId, Long newUserId) {
+    public SimpleResult addGroupMember(Long chatId, Long inviterId, Long userToAddId) {
 
-        if(inviterId.equals(newUserId))
+        if(inviterId.equals(userToAddId))
             return SimpleResult.error("Tы даун?");
 
         lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
         try
         {
-            validator.validateAddGroupMember(chatId, inviterId, newUserId);
+            validator.validateActiveUser(inviterId);
+            validator.validateActiveUser(userToAddId);
 
-            dataAccessService.addUserToChat(chatId, newUserId, false); // Надо всех уведомить
+            Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);
+
+            if (isGroup.isEmpty())
+                throw new ValidationException("Chat not found");
+
+            if (!isGroup.get())
+                throw new ValidationException("Cannot add members to personal chat");
+
+            var isChatAdmin = dataAccessService.isChatAdmin(chatId, inviterId);
+
+            if (isChatAdmin.isEmpty())
+                throw new ValidationException("User not found");
+
+            if (!isChatAdmin.get())
+                throw new ValidationException("Only admin can add members to group");
+
+            if (dataAccessService.hasChatMember(chatId, userToAddId))
+                throw new ValidationException("User is already a member of this group");
+
+            dataAccessService.saveChatMember(new ChatMember(chatId, userToAddId, false)); // Надо всех уведомить
 
             return SimpleResult.success();
         }
@@ -134,22 +163,22 @@ public class ChatService {
         try
         {
             if (!dataAccessService.existsUser(userId))
-                return SimpleResult.error("User not found");
+                throw new ValidationException("User not found");
 
             if (!dataAccessService.hasChatMember(chatId, userId))
-                return SimpleResult.error("User is not a member of this chat");
+                throw new ValidationException("User is not a member of this chat");
 
             Optional<Boolean> isGroup = dataAccessService.isGroupChat(chatId);
 
             if (isGroup.isEmpty())
-                return SimpleResult.error("Chat not found");
+                throw new ValidationException("Chat not found");
 
             if (isGroup.get())
             {
                 var creatorId = dataAccessService.getChatCreator(chatId);
 
                 if (creatorId.isEmpty())
-                    return SimpleResult.error("Chat not found");
+                    throw new ValidationException("Chat not found");
 
                 if (userId.equals(creatorId.get())){
                     var anotherAdmin = dataAccessService.findAnotherAdmin(chatId, userId);

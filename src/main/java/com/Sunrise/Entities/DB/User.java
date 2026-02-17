@@ -1,5 +1,6 @@
 package com.Sunrise.Entities.DB;
 
+import com.Sunrise.Entities.Cache.CacheUser;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 
@@ -42,6 +43,17 @@ public class User {
     private Boolean isDeleted = false;
 
 
+    public User(CacheUser cacheUser) {
+        this.id = cacheUser.getId();
+        this.username = cacheUser.getUsername();
+        this.name = cacheUser.getName();
+        this.email = cacheUser.getEmail();
+        this.lastLogin = cacheUser.getLastLogin();
+        this.createdAt = cacheUser.getCreatedAt();
+        this.hashPassword = cacheUser.getHashPassword();
+        this.isEnabled = cacheUser.getIsEnabled();
+        this.isDeleted = cacheUser.getIsDeleted();
+    }
     public User(String username, String name, String email, String hashPassword) {
         this.username = username;
         this.name = name;

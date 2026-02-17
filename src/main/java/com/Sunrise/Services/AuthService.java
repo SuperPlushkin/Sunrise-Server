@@ -3,6 +3,7 @@ package com.Sunrise.Services;
 import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
 import com.Sunrise.DTO.ServiceResults.UserLoginResult;
 import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
+import com.Sunrise.Entities.DB.ChatMember;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Entities.DB.VerificationToken;

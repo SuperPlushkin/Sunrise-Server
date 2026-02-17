@@ -1,7 +1,6 @@
 package com.Sunrise.Services.DataServices;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.DTO.DBResults.ChatMemberDBResult;
 import com.Sunrise.DTO.DBResults.PersonalChatDBResult;
 import com.Sunrise.DTO.DBResults.MessageDBResult;
 import com.Sunrise.Entities.DB.*;
@@ -137,13 +136,15 @@ public class DBService {
         deleteChat(chatId);
     }
 
-    public void addUserToChat(Long userId, Long chatId, Boolean isAdmin) {
-        chatRepository.upsertChatMember(chatId, userId, isAdmin);
+    public void upsertChatMember(ChatMember chatMember) {
+        chatRepository.upsertChatMember(chatMember.getUserId(), chatMember.getChatId(), chatMember.getIsAdmin());
     }
     @Async("dbExecutor")
-    public void addUserToChatAsync(Long userId, Long chatId, Boolean isAdmin) {
-        addUserToChat(userId, chatId, isAdmin);
+    public void upsertChatMemberAsync(ChatMember chatMember) {
+        upsertChatMember(chatMember);
     }
+
+
 
     public void removeUserFromChat(Long userId, Long chatId) {
         chatRepository.leaveChat(chatId, userId);
@@ -166,9 +167,6 @@ public class DBService {
     public List<PersonalChatDBResult> getAllPersonalChats() {
         return chatRepository.getAllPersonalChats();
     }
-    public List<ChatMemberDBResult> getAllChatMembers() {
-        return chatRepository.getAllChatMembers();
-    }
     public List<Chat> getAllChats() {
         return chatRepository.findAll();
     }
@@ -182,7 +180,7 @@ public class DBService {
     public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
         return chatRepository.findDeletedPersonalChat(userId1, userId2);
     }
-    public List<ChatMemberDBResult> getChatMembers(Long chatId) {
+    public List<ChatMember> getChatMembers(Long chatId) {
         return chatRepository.getChatMembers(chatId);
     }
     public boolean isUserInChat(Long chatId, Long userId) {
@@ -215,6 +213,9 @@ public class DBService {
     public List<VerificationToken> getAllVerificationTokens() {
         return tokenRepository.findAll();
     }
+    public Optional<VerificationToken> getVerificationToken(String token) {
+        return tokenRepository.findByToken(token);
+    }
 
     public void saveVerificationToken(VerificationToken token) {
         tokenRepository.save(token);
@@ -232,8 +233,8 @@ public class DBService {
         deleteVerificationToken(token);
     }
 
-    public void cleanupExpiredVerificationTokens() {
-        tokenRepository.deleteByExpiryDateBefore(LocalDateTime.now());
+    public int cleanupExpiredVerificationTokens() {
+        return tokenRepository.deleteByExpiryDateBefore(LocalDateTime.now());
     }
 
 

@@ -23,6 +23,7 @@ public class ChatMember {
     @Column(name = "is_deleted",nullable = false)
     private Boolean isDeleted = false;
 
+
     public Long getChatId() {
         return id != null ? id.getChatId() : null;
     }

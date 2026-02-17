@@ -1,9 +1,9 @@
 package com.Sunrise.Repositories;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.DTO.DBResults.ChatMemberDBResult;
 import com.Sunrise.DTO.DBResults.PersonalChatDBResult;
 import com.Sunrise.Entities.DB.Chat;
+import com.Sunrise.Entities.DB.ChatMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -64,16 +64,11 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // ========== ПОЛУЧЕНИЕ УЧАСТНИКОВ ЧАТА ==========
 
-    @Query("SELECT cm.id.chatId as chatId, cm.id.userId as userId, cm.isAdmin as isAdmin " +
-            "FROM ChatMember cm " +
-            "WHERE cm.id.chatId = :chatId AND cm.isDeleted = false")
-    List<ChatMemberDBResult> getChatMembers(@Param("chatId") Long chatId);
+    @Query("SELECT cm FROM ChatMember cm WHERE cm.id.chatId = :chatId")
+    List<ChatMember> getChatMembers(@Param("chatId") Long chatId);
 
 
     // ========== ДЛЯ ТЕСТОВ КЕША ==========
-
-    @Query("SELECT cm.id.chatId as chatId, cm.id.userId as userId, cm.isAdmin as isAdmin FROM ChatMember cm")
-    List<ChatMemberDBResult> getAllChatMembers();
 
     @Query("SELECT c.id as chatId, cm1.id.userId as userId1, cm2.id.userId as userId2 " +
             "FROM Chat c " +

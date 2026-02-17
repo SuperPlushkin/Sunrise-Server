@@ -1,6 +1,7 @@
 package com.Sunrise.Entities.Cache;
 
 import com.Sunrise.Entities.DB.Chat;
+import com.Sunrise.Entities.DB.ChatMember;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -35,15 +36,14 @@ public class CacheChat extends Chat {
         return !getIsGroup() && getMembersSize() == 2;
     }
 
-    public void addMember(CacheUser user, Boolean isAdmin) {
-        if (members.get(user.getId()) instanceof CacheChatMember existingMember) {
-            existingMember.setUsername(user.getUsername());
-            existingMember.setName(user.getName());
-            existingMember.setIsAdmin(isAdmin);
+    public void addMember(ChatMember chatMember) {
+        if (members.get(chatMember.getUserId()) instanceof CacheChatMember existingMember) {
+            existingMember.setJoinedAt(chatMember.getJoinedAt());
+            existingMember.setIsAdmin(chatMember.getIsAdmin());
             if (existingMember.getIsDeleted())
-                existingMember.restoreMember(isAdmin);
+                existingMember.restoreAdminRights(chatMember.getIsAdmin());
         }
-        else members.put(user.getId(), new CacheChatMember(user, isAdmin));
+        else members.put(chatMember.getUserId(), new CacheChatMember(chatMember));
     }
     public void removeMember(Long userId) {
         if (members.get(userId) instanceof CacheChatMember member)
@@ -51,7 +51,7 @@ public class CacheChat extends Chat {
     }
     public void restoreMember(Long userId, Boolean isAdmin) {
         if (members.get(userId) instanceof CacheChatMember member)
-            member.restoreMember(isAdmin);
+            member.restoreAdminRights(isAdmin);
     }
     public void clearMembers() {
         members.clear();
@@ -59,6 +59,9 @@ public class CacheChat extends Chat {
 
     public Long getOtherMemberId(Long userId) {
         return members.values().stream().filter(user -> !user.getUserId().equals(userId)).findFirst().map(CacheChatMember::getUserId).orElse(null);
+    }
+    public Long getOtherMemberAdminId(Long userId) {
+        return members.values().stream().filter(user -> !user.getUserId().equals(userId) && user.getIsAdmin()).findFirst().map(CacheChatMember::getUserId).orElse(null);
     }
     public boolean hasNotDeletedMember(Long userId) {
         return members.get(userId) instanceof CacheChatMember member && !member.getIsDeleted();

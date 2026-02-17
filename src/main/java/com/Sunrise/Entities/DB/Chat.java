@@ -1,5 +1,7 @@
 package com.Sunrise.Entities.DB;
 
+import com.Sunrise.Entities.Cache.CacheChat;
+import com.Sunrise.Entities.Cache.CacheUser;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -36,6 +38,15 @@ public class Chat {
 
     @Column(name = "is_deleted", nullable = false)
     protected Boolean isDeleted = false;
+
+    public Chat(CacheChat cacheChat) {
+        this.id = cacheChat.getId();
+        this.name = cacheChat.getName();
+        this.createdBy = cacheChat.getCreatedBy();
+        this.createdAt = cacheChat.getCreatedAt();
+        this.isGroup = cacheChat.getIsGroup();
+        this.isDeleted = cacheChat.getIsDeleted();
+    }
 
     public static Chat createPersonalChat(Long id, Long createdBy) {
         return new Chat(id, null, createdBy, LocalDateTime.now(), false, false);

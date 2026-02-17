@@ -22,7 +22,7 @@ public class TokenCleanupService {
     public void cleanupExpiredTokens() {
         try
         {
-            int numDeletedTokens = dataAccessService.cleanupExpiredTokensAndWait();
+            int numDeletedTokens = dataAccessService.cleanupExpiredTokensFromDB();
             log.info("✅ Expired tokens cleanup completed");
             log.info("✅ Deleted --> {} tokens", numDeletedTokens);
         }
