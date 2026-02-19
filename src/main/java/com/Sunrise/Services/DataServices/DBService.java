@@ -280,7 +280,7 @@ public class DBService {
     public void updateAdminRightsAsync(Long chatId, Long userId, Boolean isAdmin) {
         return;
     }
-    public List<ChatMember> getChatMembersPage(Long chatId, int offset, int limit) {
+    public ChatMembersPageResult getChatMembersPage(Long chatId, int offset, int limit) {
         return null;
     }
     public Optional<ChatMember> getChatMember(Long chatId, Long userId) {
