@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @lombok.NoArgsConstructor
 public class CacheChatMember extends ChatMember {
     private Long userId;
-    private LocalDateTime joinedAt; // TODO: БАГ, НАДО ИЗ БД БРАТЬ, НО ПОКА ЧТО ПОХЕР
+    private LocalDateTime joinedAt;
     private Boolean isAdmin = false;
     private Boolean isDeleted = false;
 
@@ -20,6 +20,7 @@ public class CacheChatMember extends ChatMember {
         this.isAdmin = chatMember.getIsAdmin();
         this.isDeleted = chatMember.getIsDeleted();
     }
+
     public void markAsDeleted() {
         this.isDeleted = true;
     }

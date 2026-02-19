@@ -1,8 +1,6 @@
 package com.Sunrise.Services.DataServices;
 
-import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.DTO.DBResults.PersonalChatDBResult;
-import com.Sunrise.DTO.DBResults.MessageDBResult;
+import com.Sunrise.DTO.DBResults.*;
 import com.Sunrise.Entities.DB.*;
 import com.Sunrise.Repositories.*;
 import org.springframework.data.domain.PageRequest;
@@ -174,11 +172,8 @@ public class DBService {
         return chatRepository.findById(chatId);
     }
 
-    public Optional<Long> findPersonalChat(Long userId1, Long userId2) {
+    public Optional<Chat> findPersonalChat(Long userId1, Long userId2) {
         return chatRepository.findPersonalChat(userId1, userId2);
-    }
-    public Optional<Long> findDeletedPersonalChat(Long userId1, Long userId2) {
-        return chatRepository.findDeletedPersonalChat(userId1, userId2);
     }
     public List<ChatMember> getChatMembers(Long chatId) {
         return chatRepository.getChatMembers(chatId);
@@ -270,9 +265,56 @@ public class DBService {
     public List<Long> getUserChatIds(Long userId) {
         return chatRepository.getUserChatIds(userId);
     }
-    public List<Chat> getChatsByIds(Set<Long> chatIds) {
+    public List<Chat> getChatsByIds(List<Long> chatIds) {
         if (chatIds.isEmpty())
             return Collections.emptyList();
         return chatRepository.findAllById(chatIds);
+    }
+
+
+
+
+
+
+    // TODO: РЕАЛИЗОВАТЬ МЕТОДЫ
+    public void updateAdminRightsAsync(Long chatId, Long userId, Boolean isAdmin) {
+        return;
+    }
+    public List<ChatMember> getChatMembersPage(Long chatId, int offset, int limit) {
+        return null;
+    }
+    public Optional<ChatMember> getChatMember(Long chatId, Long userId) {
+        return null;
+    }
+    public Optional<ChatMember> getAnotherChatAdmin(Long chatId, Long excludeUserId1) {
+        return null;
+    }
+
+    public int getUserChatsCount(Long userId) {
+        return 0;
+    }
+
+    public List<Long> getChatMemberIds(Long chatId) {
+        return null;
+    }
+
+    public void restoreUserAsync(Long userId) {
+        return;
+    }
+
+    public List<Long> getUserChatIdsPage(Long userId, int offset, int i) {
+        return null;
+    }
+
+    public List<User> getUsersByIds(List<Long> missingIds) {
+        return userRepository.findAllById(missingIds);
+    }
+
+    public UsersPageResult getFilteredUsersPage(String filter, int offset, int limit) {
+        return null;
+    }
+
+    public ChatsPageResult getUserChatsPage(Long userId, int offset, int limit) {
+        return null;
     }
 }

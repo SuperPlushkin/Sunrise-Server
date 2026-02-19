@@ -3,7 +3,7 @@ package com.Sunrise.Services;
 import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
 import com.Sunrise.DTO.ServiceResults.UserLoginResult;
 import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
-import com.Sunrise.Entities.DB.ChatMember;
+import com.Sunrise.Entities.DB.LoginHistory;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Entities.DB.VerificationToken;
@@ -17,6 +17,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+
+import static com.Sunrise.Services.DataServices.DataAccessService.randomId;
 
 @Service
 public class AuthService {
@@ -48,11 +50,11 @@ public class AuthService {
             if (dataAccessService.existsUserByEmail(email.toLowerCase()))
                 return UserRegistrationResult.error("Email already exists");
 
-            User user = new User(DataAccessService.generateRandomId(), username, name, email, passwordEncoder.encode(password), false);
+            var user = new User(randomId(), username, name, email, passwordEncoder.encode(password), false);
 
             dataAccessService.saveUser(user);
 
-            VerificationToken verifToken = new VerificationToken(DataAccessService.generateRandomId(), DataAccessService.generate64CharString(), user.getId(), "email_confirmation");
+            var verifToken = new VerificationToken(randomId(), DataAccessService.generate64CharString(), user.getId(), "email_confirmation");
 
             dataAccessService.saveVerificationToken(verifToken);
             emailService.sendVerificationEmail(email, verifToken.getToken());
@@ -81,7 +83,9 @@ public class AuthService {
 
             if (passwordEncoder.matches(password, user.getHashPassword())) {
                 dataAccessService.updateLastLogin(username, LocalDateTime.now());
-                dataAccessService.saveLoginHistory(user.getId(), extractClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
+
+                var loginHistory = new LoginHistory(randomId(), user.getId(), extractClientIp(httpRequest), httpRequest.getHeader("User-Agent"), LocalDateTime.now());
+                dataAccessService.saveLoginHistory(loginHistory);
 
                 String token = jwtUtil.generateToken(username, user.getId());
 

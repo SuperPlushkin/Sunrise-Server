@@ -1,11 +1,12 @@
 package com.Sunrise.DTO.Responses;
 
 import com.Sunrise.Entities.Cache.CacheChatMember;
+import com.Sunrise.Entities.DB.ChatMember;
+import com.Sunrise.Entities.DB.User;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Setter
 @Getter
@@ -17,14 +18,12 @@ public class ChatMemberDTO {
     private Boolean isAdmin = false;
     private Boolean isDeleted = false;
 
-    public static ChatMemberDTO fromCacheChatMember(CacheChatMember member) {
-        ChatMemberDTO dto = new ChatMemberDTO();
-        dto.setUserId(member.getUserId());
-        dto.setUsername(member.getUsername());
-        dto.setName(member.getName());
-        dto.setJoinedAt(member.getJoinedAt());
-        dto.setIsAdmin(member.getIsAdmin());
-        dto.setIsDeleted(member.getIsDeleted());
-        return dto;
+    public ChatMemberDTO(ChatMember member, User user) {
+        this.setUserId(member.getUserId());
+        this.setUsername(user.getUsername());
+        this.setName(user.getName());
+        this.setJoinedAt(member.getJoinedAt());
+        this.setIsAdmin(member.getIsAdmin());
+        this.setIsDeleted(member.getIsDeleted());
     }
 }

@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Set;
 
-import static com.Sunrise.Services.DataServices.DataAccessService.generateRandomId;
+import static com.Sunrise.Services.DataServices.DataAccessService.randomId;
 
 @Service
 public class MessageService {
@@ -43,7 +43,7 @@ public class MessageService {
             if (text.length() > 10000)
                 return CreateMessageResult.error("Message text is too long");
 
-            Message message = Message.create(generateRandomId(), userId, chatId, text);
+            Message message = Message.create(randomId(), userId, chatId, text);
 
             dataAccessService.saveMessage(message);
 
@@ -75,7 +75,7 @@ public class MessageService {
             if (text.length() > 10000)
                 return CreateMessageResult.error("Message text is too long");
 
-            Message message = Message.create(generateRandomId(), userId, chatId, text);
+            Message message = Message.create(randomId(), userId, chatId, text);
 
             // Отправляем приватное сообщение (при этом оно не хранится на сервере, надо удостовериться, что отослалось. Если нет - то ошибка)
 

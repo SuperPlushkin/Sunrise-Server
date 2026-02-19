@@ -1,12 +1,12 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.Controllers.ChatController;
+import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
 import com.Sunrise.DTO.Responses.ChatMemberDTO;
 import com.Sunrise.DTO.Responses.ChatDTO;
 import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Entities.DB.Chat;
 import com.Sunrise.Entities.DB.ChatMember;
-import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
 import com.Sunrise.Services.DataServices.LockService;
@@ -14,9 +14,8 @@ import com.Sunrise.Subclasses.ValidationException;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
-import static com.Sunrise.Services.DataServices.DataAccessService.generateRandomId;
+import static com.Sunrise.Services.DataServices.DataAccessService.randomId;
 
 @Service
 public class ChatService {
@@ -45,15 +44,16 @@ public class ChatService {
             validator.validateActiveUser(creatorId);
             validator.validateActiveUser(userToAddId);
 
-            if (dataAccessService.getPersonalChatId(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent())
-                return ChatCreationResult.success(chatId.get());
+            Optional<Chat> optChat = dataAccessService.getPersonalChat(creatorId, userToAddId);
+            if (optChat.isPresent()){
+                Chat chat = optChat.get();
+                if (chat.getIsDeleted())
+                    dataAccessService.restoreChat(chat.getId());
 
-            if (dataAccessService.getDeletedPersonalChatId(creatorId, userToAddId) instanceof Optional<Long> chatId && chatId.isPresent()){
-                dataAccessService.restoreChat(chatId.get());
-                return ChatCreationResult.success(chatId.get());
+                return ChatCreationResult.success(chat.getId());
             }
 
-            Chat chat = Chat.createPersonalChat(generateRandomId(), creatorId);
+            Chat chat = Chat.createPersonalChat(randomId(), creatorId);
 
             var creator = new ChatMember(chat.getId(), creatorId, true);
             var member = new ChatMember(chat.getId(), userToAddId, false);
@@ -72,7 +72,7 @@ public class ChatService {
             lockService.unlockUsersSafely(usersId, true);
             lockService.unlockGlobalChats();
         }
-    } // TODO: СЛИШКОМ НАМУДРИЛ, НАДО ПРОЩЕ
+    } // TODO: НАДО ПОДУМАТЬ С УДАЛЕНИЕМ ЛИЧНЫХ ЧАТОВ
     public ChatCreationResult createGroupChat(String chatName, Long creatorId, Set<Long> usersToAddId) {
 
         if (usersToAddId.contains(creatorId))
@@ -87,9 +87,11 @@ public class ChatService {
         {
             validator.validateActiveUser(creatorId);
 
-            Chat chat = Chat.createGroupChat(generateRandomId(), chatName, creatorId);
+            int membersCount = usersToAddId.size() + 1;
 
-            List<ChatMember> members = new ArrayList<>(usersToAddId.size() + 1);
+            Chat chat = Chat.createGroupChat(randomId(), chatName, membersCount, creatorId);
+
+            List<ChatMember> members = new ArrayList<>(membersCount);
             members.add(new ChatMember(chat.getId(), creatorId, true));
 
             for (Long userToAddId : usersToAddId) {
@@ -143,7 +145,8 @@ public class ChatService {
             if (dataAccessService.hasChatMember(chatId, userToAddId))
                 throw new ValidationException("User is already a member of this group");
 
-            dataAccessService.saveChatMember(new ChatMember(chatId, userToAddId, false)); // Надо всех уведомить
+            ChatMember chatMember = new ChatMember(chatId, userToAddId, false);
+            dataAccessService.saveChatMember(chatMember); // Надо всех уведомить
 
             return SimpleResult.success();
         }
@@ -239,12 +242,12 @@ public class ChatService {
         {
             validator.validateActiveUser(userId);
 
-            var result = dataAccessService.getUserChats(userId);
+            Optional<List<ChatDTO>> result = dataAccessService.getUserChats(userId);
 
             if(result.isEmpty())
                 return UserChatsResult.error("Cannot find users chats");
 
-            Set<ChatDTO> chats = result.get().stream().map(ChatDTO::fromCacheChat).collect(Collectors.toSet());
+            List<ChatDTO> chats = result.get();
 
             return UserChatsResult.success(chats, chats.size());
         }
@@ -265,7 +268,7 @@ public class ChatService {
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            var result = dataAccessService.getChatClearStats(chatId, userId);
+            ChatStatsDBResult result = dataAccessService.getChatClearStats(chatId, userId);
 
             return ChatStatsResult.success(result.getTotalMessages(), result.getDeletedForAll(), result.getHiddenByUser(), result.getCanClearForAll());
         }
@@ -286,13 +289,12 @@ public class ChatService {
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            var chatMembersOptional = dataAccessService.getChatMembers(chatId);
+            Optional<List<ChatMemberDTO>> chatMembersOptional = dataAccessService.getChatMembers(chatId);
 
             if(chatMembersOptional.isEmpty())
                 return ChatMembersResult.error("Cannot find chat members");
 
-            var chatMembers = chatMembersOptional.get().stream()
-                                    .map(ChatMemberDTO::fromCacheChatMember).collect(Collectors.toSet());
+            List<ChatMemberDTO> chatMembers = chatMembersOptional.get();
 
             return ChatMembersResult.success(chatMembers, chatMembers.size());
         }

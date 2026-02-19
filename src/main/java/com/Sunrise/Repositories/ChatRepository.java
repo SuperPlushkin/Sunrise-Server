@@ -41,7 +41,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // ========== ПОИСК ЛИЧНЫХ ЧАТОВ ==========
 
-    @Query("SELECT c.id FROM Chat c " +
+    @Query("SELECT c FROM Chat c " +
             "WHERE c.isGroup = false AND c.isDeleted = false AND EXISTS (" +
             "   SELECT cm1 FROM ChatMember cm1 WHERE cm1.id.chatId = c.id " +
             "   AND cm1.id.userId = :userId1 AND cm1.isDeleted = false" +
@@ -49,17 +49,7 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             "   SELECT cm2 FROM ChatMember cm2 WHERE cm2.id.chatId = c.id " +
             "   AND cm2.id.userId = :userId2 AND cm2.isDeleted = false" +
             ")")
-    Optional<Long> findPersonalChat(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
-
-    @Query("SELECT c.id FROM Chat c " +
-            "WHERE c.isGroup = false AND c.isDeleted = true AND EXISTS (" +
-            "   SELECT cm1 FROM ChatMember cm1 WHERE cm1.id.chatId = c.id " +
-            "   AND cm1.id.userId = :userId1" +
-            ") AND EXISTS (" +
-            "   SELECT cm2 FROM ChatMember cm2 WHERE cm2.id.chatId = c.id " +
-            "   AND cm2.id.userId = :userId2" +
-            ")")
-    Optional<Long> findDeletedPersonalChat(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+    Optional<Chat> findPersonalChat(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 
 
     // ========== ПОЛУЧЕНИЕ УЧАСТНИКОВ ЧАТА ==========

@@ -13,7 +13,7 @@ spring:
     activate:
       on-profile: docker-all-stack, docker-only-app, local
 
-  application.name: Server
+  application.name: Sunrise-Server
 
   autoconfigure.exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration # у меня ваще-то jwt используется
 
@@ -49,7 +49,6 @@ spring:
     properties:
       hibernate:
         format_sql: ${SPRING_HIBERNATE_FORMAT_SQL:false}
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         hibernate.transaction.jta.platform: org.hibernate.engine.transaction.jta.platform.internal.NoJtaPlatform # ЭТО ДО ТЕХ ПОР, ПОКА 1 БАЗА ДАННЫХ
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
     open-in-view: false

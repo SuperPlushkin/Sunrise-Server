@@ -3,10 +3,12 @@ package com.Sunrise.Entities.DB;
 import com.Sunrise.Entities.Cache.CacheChat;
 import com.Sunrise.Entities.Cache.CacheUser;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Entity
 @Table(name = "chats")
@@ -26,6 +28,14 @@ public class Chat {
         message = "Chat name can contain letters, digits, spaces, underscores, and hyphens"
     )
     protected String name;
+
+    @Min(0)
+    @Column(name = "members_count", nullable = false)
+    protected Integer membersCount;
+
+    @Min(0)
+    @Column(name = "deleted_members_count", nullable = false)
+    protected Integer deletedMembersCount;
 
     @Column(name = "created_by", nullable = false)
     protected Long createdBy;
@@ -49,12 +59,12 @@ public class Chat {
     }
 
     public static Chat createPersonalChat(Long id, Long createdBy) {
-        return new Chat(id, null, createdBy, LocalDateTime.now(), false, false);
+        return new Chat(id, null, 2, 0, createdBy, LocalDateTime.now(), false, false);
     }
-    public static Chat createGroupChat(Long id, String name, Long createdBy) {
-        return new Chat(id, name, createdBy, LocalDateTime.now(), true, false);
+    public static Chat createGroupChat(Long id, String name, Integer members_count, Long createdBy) {
+        return new Chat(id, name, members_count, 0, createdBy, LocalDateTime.now(), true, false);
     }
     public static Chat copyChat(Chat chat) {
-        return new Chat(chat.id, chat.name, chat.createdBy, chat.createdAt, chat.isGroup, chat.isDeleted);
+        return new Chat(chat.getId(), chat.getName(), chat.getMembersCount(), chat.getDeletedMembersCount(), chat.getCreatedBy(), chat.getCreatedAt(), chat.getIsGroup(), chat.getIsDeleted());
     }
 }
