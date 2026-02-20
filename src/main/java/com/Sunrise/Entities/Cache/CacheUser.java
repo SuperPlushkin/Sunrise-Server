@@ -46,6 +46,5 @@ public class CacheUser extends User {
         this.setLastLogin(user.getLastLogin());
         this.setIsEnabled(user.getIsEnabled());
         this.setIsDeleted(user.getIsDeleted());
-        // chatsIds НЕ ТРОГАЕМ! а то баги будут
     }
 }

@@ -12,16 +12,16 @@ import java.time.LocalDateTime;
 public class ChatMember {
 
     @EmbeddedId
-    private ChatMemberId id;
+    protected ChatMemberId id;
 
     @Column(name = "joined_at", nullable = false)
-    private LocalDateTime joinedAt = LocalDateTime.now();
+    protected LocalDateTime joinedAt = LocalDateTime.now();
 
     @Column(name = "is_admin", nullable = false)
-    private Boolean isAdmin = false;
+    protected Boolean isAdmin = false;
 
     @Column(name = "is_deleted",nullable = false)
-    private Boolean isDeleted = false;
+    protected Boolean isDeleted = false;
 
 
     public Long getChatId() {
@@ -33,6 +33,12 @@ public class ChatMember {
     }
 
     // Конструктор для удобства
+    public ChatMember(Long chatId, Long userId, LocalDateTime joinedAt, Boolean isAdmin, Boolean isDeleted) {
+        this.id = new ChatMemberId(chatId, userId);
+        this.isAdmin = isAdmin;
+        this.joinedAt = joinedAt;
+        this.isDeleted = isDeleted;
+    }
     public ChatMember(Long chatId, Long userId, Boolean isAdmin) {
         this.id = new ChatMemberId(chatId, userId);
         this.isAdmin = isAdmin;

@@ -8,6 +8,8 @@ import com.Sunrise.Entities.Cache.ChatMembersContainer;
 import com.Sunrise.Entities.DB.*;
 import com.Sunrise.Entities.Cache.CacheChat;
 import com.Sunrise.Entities.Cache.CacheChatMember;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,8 +18,6 @@ import org.springframework.stereotype.Service;
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
 @Service
@@ -34,6 +34,16 @@ public class DataAccessService {
 
 
     // ========== CACHE METHODS ==========
+
+
+    @PostConstruct
+    public void warmUpCache() {
+        // подумать чо буду в при старте загружать
+    }
+    @PreDestroy
+    public void onShutdown() {
+        // подумать чо буду в при завершении делать
+    }
 
     public void printCacheStats() {
         CacheService.CacheStats stats = cacheService.getCacheStatus();
@@ -57,21 +67,27 @@ public class DataAccessService {
     public void saveUser(User user) {
         cacheService.saveUser(user); // сохраняем в кеш
 
-        cacheService.invalidateUsersPagination(); // Инвалидируем кеш поиска
+        // инвалидируем кеш поиска
+        cacheService.invalidateUsersPagination();
 
         dbService.saveUserAsync(user); // асинхронно в бд
     }
     public void enableUser(Long userId) {
         cacheService.updateUserIsEnabled(userId, true); // сохраняем в кеш
 
-        cacheService.invalidateUsersPagination(); // Инвалидируем кеш поиска
+        // инвалидируем кеш поиска
+        cacheService.invalidateUsersPagination();
 
         dbService.enableUserAsync(userId); // асинхронно в бд
+    }
+    public void updateLastLogin(String username, LocalDateTime lastLogin) {
+        cacheService.updateUserLastLogin(username, lastLogin); // сохраняем в кеш
+        dbService.updateLastLoginAsync(username, lastLogin); // асинхронно в бд
     }
     public void deleteUser(Long userId) {
         cacheService.deleteUser(userId); // сохраняем в кеш
 
-        // Инвалидируем пагинацию удаленного пользователя
+        // инвалидируем пагинацию удаленного пользователя
         cacheService.invalidateUsersPagination();
         cacheService.invalidateUserChatsPagination(userId);
         log.debug("[⚡] Invalidated pagination cache for deleted user {} | deleteUser", userId);
@@ -81,7 +97,7 @@ public class DataAccessService {
     public void restoreUser(Long userId) {
         cacheService.restoreUser(userId); // сохраняем в кеш
 
-        // Инвалидируем пагинацию восстановленного пользователя
+        // инвалидируем пагинацию восстановленного пользователя
         cacheService.invalidateUsersPagination();
         cacheService.invalidateUserChatsPagination(userId);
         log.debug("[⚡] Invalidated pagination cache for restored user {}", userId);
@@ -89,13 +105,8 @@ public class DataAccessService {
         dbService.restoreUserAsync(userId); // асинхронно в бд
     }
 
-    // UPDATE методы
-    public void updateLastLogin(String username, LocalDateTime lastLogin) {
-        cacheService.updateUserLastLogin(username, lastLogin); // сохраняем в кеш
-        dbService.updateLastLoginAsync(username, lastLogin); // асинхронно в бд
-    }
 
-    // GET методы
+    // Вспомогательные методы
     public Optional<User> getUser(Long userId) {
         // пробуем кеш
         Optional<CacheUser> cached = cacheService.getCacheUser(userId);
@@ -141,76 +152,69 @@ public class DataAccessService {
         });
         return dbUser;
     }
+
     private List<User> getUsersByIds(List<Long> userIds) {
         if (userIds.isEmpty())
             return Collections.emptyList();
 
-        List<User> result = new ArrayList<>();
-        List<Long> missingIds = new ArrayList<>();
+        Map<Long, User> userMap = new HashMap<>();
+        List<Long> missingIds = new ArrayList<>(userIds.size() / 2);
 
-        // Сначала собираем из кеша
+        // получаем из кеша
         for (Long id : userIds) {
             Optional<CacheUser> cachedUser = cacheService.getCacheUser(id);
             if (cachedUser.isPresent()) {
-                result.add(new User(cachedUser.get()));
+                userMap.put(id, new User(cachedUser.get()));
             } else {
                 missingIds.add(id);
             }
         }
 
-        // Загружаем недостающие одним запросом
+        // получаем из бд
         if (!missingIds.isEmpty()) {
             List<User> dbUsers = dbService.getUsersByIds(missingIds);
             for (User user : dbUsers) {
-                cacheService.saveUser(user); // Кешируем
-                result.add(user);
+                cacheService.saveUser(user); // кешируем
+                userMap.put(user.getId(), user);
             }
-            log.debug("[🏛️] Loaded {} missing users from DB: {}", missingIds.size(), missingIds);
+            log.debug("[🏛️] Loaded {} missing users from DB: {} || getUsersByIds", missingIds.size(), missingIds);
         }
 
-        // Восстанавливаем порядок как в userIds
-        Map<Long, User> userMap = result.stream()
-                .collect(Collectors.toMap(User::getId, Function.identity()));
-
-        return userIds.stream()
-                .map(userMap::get)
-                .filter(Objects::nonNull)
-                .toList();
+        // сортируем
+        return userIds.stream().map(userMap::get).filter(Objects::nonNull).toList();
     }
     public Optional<List<User>> getFilteredUsersPage(String filter, int offset, int limit) {
         // Пробуем найти в кеше
         Optional<CacheService.UsersPagination> cached = cacheService.findUsersPagination(filter, offset, limit);
-
         if (cached.isPresent()) {
             CacheService.UsersPagination pagination = cached.get();
-            List<User> users = getUsersByIds(pagination.getUserIds());
+            List<User> users = getUsersByIds(pagination.userIds());
             log.debug("[⚡] Cache hit for users page filter='{}' {}/{}", filter, offset, limit);
             return Optional.of(users);
         }
 
         log.debug("[🏛️] Loading users page filter='{}' {}/{} from DB", filter, offset, limit);
 
-        // ОДИН ЗАПРОС с оконной функцией
+        // получаем пагинацию и сохраняем в кеш
         UsersPageResult pageResult = dbService.getFilteredUsersPage(filter, offset, limit);
-
-        // Сохраняем в кеш (только ID!)
         cacheService.saveUsersPagination(
-                CacheService.UsersPagination.builder()
-                        .id(randomId())
-                        .filter(filter)
-                        .offset(offset)
-                        .limit(limit)
-                        .userIds(pageResult.userIds())
-                        .createdAt(LocalDateTime.now())
-                        .hasMore(pageResult.hasMore())
-                        .totalCount(pageResult.totalCount())
-                        .build()
+            CacheService.UsersPagination.builder()
+                .id(randomId())
+                .filter(filter)
+                .offset(offset)
+                .limit(limit)
+                .userIds(pageResult.userIds())
+                .createdAt(LocalDateTime.now())
+                .hasMore(pageResult.hasMore())
+                .totalCount(pageResult.totalCount())
+                .build()
         );
 
-        // Загружаем пользователей по ID
+        // загружаем пользователей по ID
         List<User> users = getUsersByIds(pageResult.userIds());
         return Optional.of(users);
     }
+
     public boolean existsUser(Long userId) {
         // проверяем в кеше
         if (cacheService.existsUser(userId))
@@ -254,6 +258,7 @@ public class DataAccessService {
         });
         return dbUser.isPresent();
     }
+
 
     // Методы для кеша
     private void loadFullUserToCache(User user){
@@ -379,41 +384,6 @@ public class DataAccessService {
         log.debug("[🏛️] Loaded {} chat {} || reloadChatCache", chat.getIsGroup() ? "group" : "personal", chat.getId());
         return Optional.of(loadChatToCache(chat));
     }
-    private List<Chat> getChatsByIds(List<Long> chatIds) {
-        if (chatIds.isEmpty())
-            return Collections.emptyList();
-
-        List<Chat> result = new ArrayList<>();
-        List<Long> missingIds = new ArrayList<>();
-
-        // Сначала собираем из кеша
-        for (Long id : chatIds) {
-            Optional<CacheChat> cachedChat = cacheService.getChatCache(id);
-            if (cachedChat.isPresent()) {
-                result.add(new Chat(cachedChat.get()));
-            } else {
-                missingIds.add(id);
-            }
-        }
-
-        // Загружаем недостающие одним запросом
-        if (!missingIds.isEmpty()) {
-            List<Chat> dbChats = dbService.getChatsByIds(missingIds);
-            for (Chat chat : dbChats) {
-                cacheService.saveExistingChat(chat);
-                result.add(chat);
-            }
-
-            log.debug("[🏛️] Loaded {} missing chats from DB: {}", missingIds.size(), missingIds);
-        }
-
-        // Восстанавливаем порядок как в chatIds
-        Map<Long, Chat> chatMap = result.stream().collect(Collectors.toMap(Chat::getId, Function.identity()));
-        return chatIds.stream()
-                .map(chatMap::get)
-                .filter(Objects::nonNull)
-                .toList();
-    }
 
     public Optional<List<ChatDTO>> getUserChats(Long userId) {
         // проверяем что пользователь существует
@@ -460,43 +430,71 @@ public class DataAccessService {
 
         return Optional.of(result);
     }
-    public Optional<List<ChatDTO>> getUserChatsPage(Long userId, int offset, int limit) {
-        // Пробуем найти в кеше
-        Optional<CacheService.UserChatsPagination> cached = cacheService.findUserChatsPagination(userId, offset, limit);
+    private List<ChatDTO> getUserChatsBatch(List<Long> chatIds) {
+        if (chatIds.isEmpty())
+            return Collections.emptyList();
 
-        if (cached.isPresent()) {
-            CacheService.UserChatsPagination pagination = cached.get();
-            List<Chat> chats = getChatsByIds(pagination.getChatIds());
-            log.debug("[⚡] Cache hit for user {} chats page {}/{}", userId, offset, limit);
-            return Optional.of(chats.stream().map(ChatDTO::new).toList());
+        Map<Long, ChatDTO> chatMap = new HashMap<>(chatIds.size());
+        List<Long> missingIds = new ArrayList<>(chatIds.size() / 2);
+
+        // получаем из кеша Chat, если есть
+        for (Long chatId : chatIds) {
+            Optional<CacheChat> cachedChat = cacheService.getChatCache(chatId);
+            if (cachedChat.isPresent()) {
+                Chat chat = cachedChat.get();
+                chatMap.put(chat.getId(), new ChatDTO(chat));
+            } else {
+                missingIds.add(chatId);
+            }
         }
 
-        // Проверяем существование пользователя
+        // получаем из бд
+        if (!missingIds.isEmpty()) {
+            List<Chat> dbChats = dbService.getChatsByIds(missingIds);
+            for (Chat chat : dbChats) {
+                cacheService.saveExistingChat(chat); // кешируем
+                chatMap.put(chat.getId(), new ChatDTO(chat));
+            }
+            log.debug("[🏛️] Loaded {} missing chats from DB: {}", missingIds.size(), missingIds);
+        }
+
+        // сортируем
+        return chatIds.stream().map(chatMap::get).filter(Objects::nonNull).toList();
+    }
+    public Optional<List<ChatDTO>> getUserChatsPage(Long userId, int offset, int limit) {
+        // пробуем кеш
+        Optional<CacheService.UserChatsPagination> cached = cacheService.findUserChatsPagination(userId, offset, limit);
+        if (cached.isPresent()) {
+            CacheService.UserChatsPagination pagination = cached.get();
+            List<ChatDTO> chats = getUserChatsBatch(pagination.chatIds());
+            log.debug("[⚡] Cache hit for user {} chats page {}/{}", userId, offset, limit);
+            return Optional.of(chats);
+        }
+
+        // проверяем существование пользователя
         if (!existsUser(userId))
             return Optional.empty();
 
         log.debug("[🏛️] Loading user {} chats page {}/{} from DB", userId, offset, limit);
 
-        // ОДИН ЗАПРОС с оконной функцией
+        // получаем пагинацию и сохраняем в кеш
         ChatsPageResult pageResult = dbService.getUserChatsPage(userId, offset, limit);
-
-        // Сохраняем в кеш пагинации (только ID!)
         cacheService.saveUserChatsPagination(
-                CacheService.UserChatsPagination.builder()
-                        .id(randomId())
-                        .userId(userId)
-                        .offset(offset)
-                        .limit(limit)
-                        .chatIds(pageResult.chatIds())
-                        .createdAt(LocalDateTime.now())
-                        .hasMore(pageResult.hasMore())
-                        .totalCount(pageResult.totalCount())
-                        .build()
+            CacheService.UserChatsPagination.builder()
+                .id(randomId())
+                .userId(userId)
+                .offset(offset)
+                .limit(limit)
+                .chatIds(pageResult.chatIds())
+                .createdAt(LocalDateTime.now())
+                .hasMore(pageResult.hasMore())
+                .totalCount(pageResult.totalCount())
+                .build()
         );
 
-        // Загружаем чаты по ID
-        List<Chat> chats = getChatsByIds(pageResult.chatIds());
-        return Optional.of(chats.stream().map(ChatDTO::new).toList());
+        // загружаем чаты по ID
+        List<ChatDTO> chats = getUserChatsBatch(pageResult.chatIds());
+        return Optional.of(chats);
     }
 
     public Optional<Boolean> isGroupChat(Long chatId) {
@@ -561,17 +559,6 @@ public class DataAccessService {
 
 
     // Методы для кеша
-    private Optional<CacheChat> loadChatToCacheById(Long chatId) {
-        Optional<Chat> dbChat = dbService.getChat(chatId);
-        if (dbChat.isEmpty()) {
-            log.warn("[🏛️] Chat {} not found || loadChatToCacheById", chatId);
-            return Optional.empty();
-        }
-
-        Chat chat = dbChat.get();
-        log.debug("[🏛️] Loaded {} chat {} || loadChatToCacheById", chat.getIsGroup() ? "group" : "personal", chat.getId());
-        return Optional.of(loadChatToCache(chat));
-    }
     private CacheChat loadChatToCache(Chat chat) {
         var cacheChat = cacheService.saveExistingChat(chat); // сохраняем чат в кеш
         log.debug("[⚡] Loaded {} chat {} || loadChatToCache", cacheChat.getIsGroup() ? "group" : "personal", cacheChat.getId());
@@ -636,13 +623,75 @@ public class DataAccessService {
         if (dbMembers.isEmpty())
             return Optional.of(Collections.emptyList());
 
-        // Сохраняем в кэш
+        // сохраняем в кэш
         cacheService.addChatMembers(chat.get(), dbMembers);
         dbMembers.forEach(member ->
             cacheService.getCacheUser(member.getUserId()).ifPresent(user -> user.addChat(chatId))
         );
 
         return Optional.of(chatMembersToDTO(dbMembers));
+    }
+    private List<ChatMemberDTO> getChatMembersBatch(List<Long> userIds, Long chatId) {
+        if (userIds.isEmpty()) return Collections.emptyList();
+
+        Optional<Chat> optChat = getChat(chatId);
+        if (optChat.isEmpty()) return Collections.emptyList();
+
+        List<Long> missingUserIds = new ArrayList<>();
+        List<Long> missingMemberIds = new ArrayList<>();
+
+        Map<Long, User> userMap = new HashMap<>(userIds.size());
+        Map<Long, CacheChatMember> memberMap = new HashMap<>(userIds.size());
+
+        // получаем из кеша User и ChatMember, если есть
+        for (Long userId : userIds) {
+            // User
+            Optional<CacheUser> cachedUser = cacheService.getCacheUser(userId);
+            if (cachedUser.isPresent()) {
+                userMap.put(userId, new User(cachedUser.get()));
+            } else {
+                missingUserIds.add(userId);
+            }
+
+            // ChatMember
+            Optional<CacheChatMember> cachedMember = cacheService.getChatMember(chatId, userId);
+            if (cachedMember.isPresent()) {
+                memberMap.put(userId, cachedMember.get());
+            } else {
+                missingMemberIds.add(userId);
+            }
+        }
+
+        // получаем User из бд
+        if (!missingUserIds.isEmpty()) {
+            List<User> dbUsers = dbService.getUsersByIds(missingUserIds);
+            for (User user : dbUsers) {
+                cacheService.saveUser(user); // Кешируем
+                userMap.put(user.getId(), user);
+            }
+        }
+
+        // получаем ChatMember из бд
+        if (!missingMemberIds.isEmpty()) {
+            List<ChatMember> dbMembers = dbService.getChatMembersByIds(chatId, missingMemberIds);
+            Chat chat = optChat.get();
+            for (ChatMember member : dbMembers) {
+                cacheService.addChatMember(chat, member); // Кешируем
+                memberMap.put(member.getUserId(), new CacheChatMember(member));
+            }
+        }
+
+        // Формируем результат
+        List<ChatMemberDTO> result = new ArrayList<>(userIds.size());
+        for (Long userId : userIds) {
+            User user = userMap.get(userId);
+            CacheChatMember member = memberMap.get(userId);
+            if (user != null && member != null) {
+                result.add(new ChatMemberDTO(member, user));
+            }
+        }
+
+        return result;
     }
     public Optional<List<ChatMemberDTO>> getChatMembersPage(Long chatId, int offset, int limit) {
         // Проверяем существование чата
@@ -651,37 +700,18 @@ public class DataAccessService {
             return Optional.empty();
         }
 
-        // Пробуем найти в кеше
-        Optional<CacheService.ChatMembersPagination> cached = cacheService.findChatMembersPagination(chatId, offset, limit);
-        if (cached.isPresent()) {
-            CacheService.ChatMembersPagination pagination = cached.get();
-            List<User> users = getUsersByIds(pagination.getMemberUserIds());
-
-            // Сортируем пользователей в том же порядке, что и ID в пагинации
-            Map<Long, User> userMap = users.stream()
-                    .collect(Collectors.toMap(User::getId, Function.identity()));
-
-            List<ChatMemberDTO> result = new ArrayList<>();
-            for (Long userId : pagination.getMemberUserIds()) {
-                User user = userMap.get(userId);
-                if (user != null) {
-                    Optional<CacheChatMember> member = cacheService.getChatMember(chatId, userId);
-                    member.ifPresent(m -> result.add(new ChatMemberDTO(m, user)));
-                }
-            }
-
+        // микс с данными из кеша
+        Optional<CacheService.ChatMembersPagination> pagination = cacheService.findChatMembersPagination(chatId, offset, limit);
+        if (pagination.isPresent()) {
+            List<ChatMemberDTO> members = getChatMembersBatch(pagination.get().memberUserIds(), chatId);
             log.debug("[⚡] Cache hit for chat {} members page {}/{}", chatId, offset, limit);
-            return Optional.of(result);
+            return Optional.of(members);
         }
 
-        log.debug("[🏛️] Loading chat {} members page {}/{} from DB", chatId, offset, limit);
+        log.debug("[🏛️] Loading chat {} members page {}/{} from DB || getChatMembersPage", chatId, offset, limit);
 
-        // ОДИН ЗАПРОС с оконной функцией
+        // загружаем с бд и сохраняем пагинацию
         ChatMembersPageResult pageResult = dbService.getChatMembersPage(chatId, offset, limit);
-        if (pageResult.userIds().isEmpty())
-            return Optional.of(Collections.emptyList());
-
-        // Сохраняем в кеш пагинации (только ID!)
         cacheService.saveChatMembersPagination(
             CacheService.ChatMembersPagination.builder()
                     .id(randomId())
@@ -695,34 +725,8 @@ public class DataAccessService {
                     .build()
         );
 
-        // Загружаем пользователей по ID
-        List<User> users = getUsersByIds(pageResult.userIds());
-
-        // Загружаем информацию об участниках в кеш контейнера
-        Optional<Chat> chat = getChat(chatId);
-        if (chat.isPresent()) {
-            List<ChatMember> membersToCache = new ArrayList<>();
-            for (Long userId : pageResult.userIds()) {
-                if (cacheService.getChatMember(chatId, userId).isEmpty())
-                    dbService.getChatMember(chatId, userId).ifPresent(membersToCache::add);
-            }
-            if (!membersToCache.isEmpty())
-                cacheService.addChatMembers(chat.get(), membersToCache);
-        }
-
-        // Формируем результат
-        Map<Long, User> userMap = users.stream()
-                .collect(Collectors.toMap(User::getId, Function.identity()));
-
-        List<ChatMemberDTO> result = new ArrayList<>();
-        for (Long userId : pageResult.userIds()) {
-            User user = userMap.get(userId);
-            if (user != null) {
-                Optional<CacheChatMember> member = cacheService.getChatMember(chatId, userId);
-                member.ifPresent(m -> result.add(new ChatMemberDTO(m, user)));
-            }
-        }
-
+        // загружаем также с бд
+        List<ChatMemberDTO> result = getChatMembersBatch(pageResult.userIds(), chatId);
         return Optional.of(result);
     }
 

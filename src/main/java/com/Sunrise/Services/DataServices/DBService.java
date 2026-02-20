@@ -317,4 +317,8 @@ public class DBService {
     public ChatsPageResult getUserChatsPage(Long userId, int offset, int limit) {
         return null;
     }
+
+    public List<ChatMember> getChatMembersByIds(Long chatId, List<Long> missingIds) {
+        return null;
+    }
 }

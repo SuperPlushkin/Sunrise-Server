@@ -1,14 +1,13 @@
 package com.Sunrise.Entities.DB;
 
 import com.Sunrise.Entities.Cache.CacheChat;
-import com.Sunrise.Entities.Cache.CacheUser;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.time.ZoneId;
 
 @Entity
 @Table(name = "chats")
@@ -46,6 +45,9 @@ public class Chat {
     @Column(name = "is_group", nullable = false)
     protected Boolean isGroup = false;
 
+    @Column(name = "deleted_at")
+    protected LocalDateTime deletedAt;
+
     @Column(name = "is_deleted", nullable = false)
     protected Boolean isDeleted = false;
 
@@ -58,13 +60,15 @@ public class Chat {
         this.isDeleted = cacheChat.getIsDeleted();
     }
 
+    public void setIsDeleted(boolean isDeleted){
+        this.deletedAt = isDeleted ? LocalDateTime.now() : null;
+        this.isDeleted = isDeleted;
+    }
+
     public static Chat createPersonalChat(Long id, Long createdBy) {
-        return new Chat(id, null, 2, 0, createdBy, LocalDateTime.now(), false, false);
+        return new Chat(id, null, 2, 0, createdBy, LocalDateTime.now(), false, null, false);
     }
     public static Chat createGroupChat(Long id, String name, Integer members_count, Long createdBy) {
-        return new Chat(id, name, members_count, 0, createdBy, LocalDateTime.now(), true, false);
-    }
-    public static Chat copyChat(Chat chat) {
-        return new Chat(chat.getId(), chat.getName(), chat.getMembersCount(), chat.getDeletedMembersCount(), chat.getCreatedBy(), chat.getCreatedAt(), chat.getIsGroup(), chat.getIsDeleted());
+        return new Chat(id, name, members_count, 0, createdBy, LocalDateTime.now(), true, null, false);
     }
 }

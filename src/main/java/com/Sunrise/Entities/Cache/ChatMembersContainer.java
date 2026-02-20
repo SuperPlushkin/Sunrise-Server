@@ -12,13 +12,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ChatMembersContainer {
     private final Long chatId;
     private Long chatCreatorId;
-    private final AtomicInteger deletedMemberCount;
-    private final AtomicInteger totalMemberCount;                    // всего участников в БД
+    private final AtomicInteger deletedMemberCount;         // удаленных участников в БД
+    private final AtomicInteger totalMemberCount;           // всего участников в БД
     private final AtomicInteger loadedCount;               // сколько загружено в кэш
     private final LocalDateTime createdAt;                  // когда создан контейнер
+
     private final Map<Long, CacheChatMember> members;      // userId -> CacheChatMember
-    private final Set<Long> adminIds;
-    private final Set<Long> deletedMemberIds;
+    private final Set<Long> adminIds;                      // userId
+    private final Set<Long> deletedMemberIds;              // userId
 
     public ChatMembersContainer(Chat chat) {
         this.chatId = chat.getId();
@@ -123,7 +124,7 @@ public class ChatMembersContainer {
 
         CacheChatMember member = members.get(userId);
         if (member != null) {
-            member.markAsDeleted();
+            member.setIsDeleted(true);
             deletedMemberIds.add(userId);
             deletedMemberCount.incrementAndGet();
             if (member.getIsAdmin())
@@ -133,7 +134,8 @@ public class ChatMembersContainer {
     public void restoreMember(Long userId, Boolean isAdmin) {
         CacheChatMember member = members.get(userId);
         if (member != null) {
-            member.restoreAdminRights(isAdmin);
+            member.setIsAdmin(isAdmin);
+            member.setIsDeleted(false);
             deletedMemberIds.remove(userId);
             deletedMemberCount.decrementAndGet();
             if (isAdmin)

@@ -11,7 +11,7 @@ import com.Sunrise.Entities.Cache.CacheUser;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.Builder;
-import lombok.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -29,16 +29,24 @@ public class CacheService {
             .recordStats()
             .build();
 
-    private final Map<String, Long> usernameIndex = new ConcurrentHashMap<>(); // username -> userId (для регистрации)
-    private final Map<String, Long> emailIndex = new ConcurrentHashMap<>(); // email -> userId (для регистрации)
-
-    private final Cache<Long, UsersPagination> usersPaginationCache = Caffeine.newBuilder() // для getFilteredUsers (Это можно будет заменить потом на ElasticSearch)
-            .maximumSize(5_000) // меньше чем для чатов, т.к. поиск пользователей реже
-            .expireAfterWrite(2, TimeUnit.MINUTES) // более короткий TTL для поиска
+    private final Cache<String, Long> usernameIndex = Caffeine.newBuilder() // username -> userId (для регистрации)
+            .maximumSize(150_000)
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .softValues()  // при нехватке памяти delete-аем
+            .recordStats()
+            .build();
+    private final Cache<String, Long> emailIndex = Caffeine.newBuilder() // email -> userId (для регистрации)
+            .maximumSize(150_000)
+            .expireAfterAccess(1, TimeUnit.HOURS)
+            .softValues()  // при нехватке памяти delete-аем
             .recordStats()
             .build();
 
-    private final Map<String, Long> usersPaginationIndex = new ConcurrentHashMap<>(); // "filter:offset:limit" -> paginationId
+    private final Cache<String, UsersPagination> usersPaginationCache = Caffeine.newBuilder()// "filter:offset:limit" -> paginationId || для getFilteredUsers (Это можно будет заменить потом на ElasticSearch)
+            .maximumSize(5_000)
+            .expireAfterWrite(5, TimeUnit.MINUTES)
+            .recordStats()
+            .build();
 
 
     // кэш чатов
@@ -47,31 +55,34 @@ public class CacheService {
             .expireAfterAccess(12, TimeUnit.HOURS) // 12 h
             .build();
 
-    private final Map<String, Long> personalChatIndex = new ConcurrentHashMap<>(1000); // "creatorId:userId" -> chatId (личные чаты)
+    private final Cache<String, Long> personalChatIndex = Caffeine.newBuilder() // "creatorId:userId" -> chatId (личные чаты)
+            .maximumSize(100_000)
+            .expireAfterAccess(12, TimeUnit.HOURS)
+            .softValues()
+            .recordStats()
+            .build();
 
-    private final Cache<Long, UserChatsPagination> userChatsPaginationCache = Caffeine.newBuilder()
+    private final Cache<String, UserChatsPagination> userChatsPaginationCache = Caffeine.newBuilder() // "userId:offset:limit" -> UserChatsPagination
             .maximumSize(10_000)
             .expireAfterWrite(5, TimeUnit.MINUTES)
             .recordStats()
             .build();
 
-    private final Map<String, Long> userChatsPaginationIndex = new ConcurrentHashMap<>(); // "userId:offset:limit" -> paginationId
+    private final Map<Long, Set<String>> userPaginationKeys = new ConcurrentHashMap<>(); // userId -> Set<UserChatsPaginationKey>
 
 
     // контейнеры участников чата
     private final Cache<Long, ChatMembersContainer> chatMembersContainerCache = Caffeine.newBuilder()
             .maximumSize(200_000)
-            .expireAfterWrite(1, TimeUnit.HOURS) // Всё истекает вместе
+            .expireAfterWrite(1, TimeUnit.HOURS)
             .recordStats()
             .build();
 
-    private final Cache<Long, ChatMembersPagination> chatMembersPaginationCache = Caffeine.newBuilder()
-            .maximumSize(50_000) // Меньше чем для чатов, так как страниц может быть много
-            .expireAfterWrite(2, TimeUnit.MINUTES) // Короткий TTL для актуальности
+    private final Cache<String, ChatMembersPagination> chatMembersPaginationCache = Caffeine.newBuilder() // "chatId:offset:limit" -> paginationId
+            .maximumSize(50_000)
+            .expireAfterWrite(5, TimeUnit.MINUTES)
             .recordStats()
             .build();
-
-    private final Map<String, Long> chatMembersPaginationIndex = new ConcurrentHashMap<>(); // "chatId:offset:limit:sortBy" -> paginationId
 
 
     // кеш токенов подтверждения
@@ -112,8 +123,6 @@ public class CacheService {
         getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsEnabled(isEnabled));
     }
     public void updateUserLastLogin(String username, LocalDateTime lastLogin) {
-        if (username == null || lastLogin == null) return;
-
         getUserByUsername(username).ifPresent(user -> user.setLastLogin(lastLogin));
     }
 
@@ -121,21 +130,35 @@ public class CacheService {
         return Optional.ofNullable(userCache.getIfPresent(userId));
     }
     public Optional<CacheUser> getUserByUsername(String username) {
-        Long userId = usernameIndex.get(username.toLowerCase());
-        return userId != null ? getCacheUser(userId) : Optional.empty();
+        String key = username.toLowerCase();
+        Long userId = usernameIndex.getIfPresent(key);
+        if (userId == null) return Optional.empty();
+
+        Optional<CacheUser> user = getCacheUser(userId);
+        if (user.isEmpty()) {
+            usernameIndex.invalidate(key);
+        }
+        return user;
     }
     public Optional<CacheUser> getUserByEmail(String email) {
-        Long userId = emailIndex.get(email.toLowerCase());
-        return userId != null ? getCacheUser(userId) : Optional.empty();
+        String key = email.toLowerCase();
+        Long userId = emailIndex.getIfPresent(key);
+        if (userId == null) return Optional.empty();
+
+        Optional<CacheUser> user = getCacheUser(userId);
+        if (user.isEmpty()) {
+            emailIndex.invalidate(key);
+        }
+        return user;
     }
     public boolean existsUser(Long userId) {
         return getCacheUser(userId).isPresent();
     }
     public Boolean existsUserByUsername(String username) {
-        return usernameIndex.containsKey(username.toLowerCase());
+        return usernameIndex.getIfPresent(username.toLowerCase()) != null;
     }
     public Boolean existsUserByEmail(String email) {
-        return emailIndex.containsKey(email.toLowerCase());
+        return emailIndex.getIfPresent(email.toLowerCase()) != null;
     }
 
 
@@ -198,11 +221,14 @@ public class CacheService {
     }
     public Optional<CacheChat> getPersonalChat(Long userId1, Long userId2) {
         String key = getPersonalChatKey(userId1, userId2);
-        Long chatId = personalChatIndex.get(key);
-        if (chatId == null)
-            return Optional.empty();
+        Long chatId = personalChatIndex.getIfPresent(key);
+        if (chatId == null) return Optional.empty();
 
-        return getChatCache(chatId);
+        CacheChat chat = chatInfoCache.getIfPresent(chatId);
+        if (chat == null) {
+            personalChatIndex.invalidate(key);
+        }
+        return Optional.ofNullable(chat);
     }
     public Optional<String> getChatName(Long chatId) {
         return getChatCache(chatId).map(CacheChat::getName);
@@ -216,8 +242,23 @@ public class CacheService {
 
 
     // Методы для сохранения индекса личного чата TODO: НАДО ПОДУМАТЬ ЧТО СДЕЛАТЬ
+    private String getPersonalChatKey(Long userId1, Long userId2) {
+        return Math.min(userId1, userId2) + ":" + Math.max(userId1, userId2);
+    }
     public void savePersonalChatIndex(Long chatId, Long creatorId, Long userId2) {
         personalChatIndex.put(getPersonalChatKey(creatorId, userId2), chatId);
+    }
+
+
+    // cache методы
+    public void invalidateAfterChatAdded(List<Long> membersIds) {
+        membersIds.forEach(this::invalidateUserChatsPagination);
+    }
+    public void invalidateAfterChatDeleted(List<Long> membersIds) {
+        membersIds.forEach(this::invalidateUserChatsPagination);
+    }
+    public void invalidateAfterChatRestored(List<Long> membersIds) {
+        membersIds.forEach(this::invalidateUserChatsPagination);
     }
 
 
@@ -243,7 +284,7 @@ public class CacheService {
     public void addNewChatMembers(Chat chat, List<ChatMember> members) {
         // Обновляем контейнер
         List<CacheChatMember> cacheMembers = members.stream().map(CacheChatMember::new).toList();
-        getOrCreateChatMembersContainer(chat).addMembers(cacheMembers);
+        getOrCreateChatMembersContainer(chat).addNewMembers(cacheMembers);
 
         // Обновляем кэш пользователя
         members.forEach(member -> getCacheUser(member.getUserId()).ifPresent(user -> user.addChat(chat.getId())));
@@ -287,17 +328,12 @@ public class CacheService {
     public Optional<List<CacheChatMember>> getActiveChatMembers(Long chatId) {
         return getChatMembersContainer(chatId).map(ChatMembersContainer::getActiveMembers);
     }
-    public Optional<List<CacheChatMember>> getChatMembersPage(Long chatId, int offset, int limit) {
-//        return getChatMembersContainer(chatId).map(container -> container.getMembersPage(offset, limit));
-        return null;
-    }
     public Optional<CacheChatMember> getChatMember(Long chatId, Long userId) {
         return getChatMembersContainer(chatId).flatMap(c -> c.getMember(userId));
     }
     public Optional<Boolean> hasChatMember(Long chatId, Long userId) {
         return getChatMembersContainer(chatId).map(c -> c.hasMember(userId));
     }
-
 
     public Optional<Set<Long>> getUserChatsIds(Long userId) {
         return getCacheUser(userId).map(CacheUser::getChats);
@@ -308,8 +344,8 @@ public class CacheService {
                 .or(() -> getCacheUser(userId).map(user -> user.hasChat(chatId)));
     }
 
-    // cache методы
 
+    // cache методы
     public void invalidateAfterMemberAdded(Long chatId, Long userId) {
         invalidateChatMembersPagination(chatId);
         invalidateUserChatsPagination(userId);
@@ -319,143 +355,89 @@ public class CacheService {
         invalidateUserChatsPagination(userId);
     }
 
-    public void invalidateAfterChatAdded(List<Long> membersIds) {
-        membersIds.forEach(this::invalidateUserChatsPagination);
-    }
-    public void invalidateAfterChatDeleted(List<Long> membersIds) {
-        membersIds.forEach(this::invalidateUserChatsPagination);
-    }
-    public void invalidateAfterChatRestored(List<Long> membersIds) {
-        membersIds.forEach(this::invalidateUserChatsPagination);
-    }
-
 
     // ========== PAGINATION METHODS ==========
 
-    @Value
+
+    // пагинация для выдачи пользователей
     @Builder
-    public static class UserChatsPagination {
-        long id;
-        long userId;
-        int offset;
-        int limit;
-        List<Long> chatIds;
-        LocalDateTime createdAt;
-        boolean hasMore;
-        int totalCount;
+    public record UsersPagination(
+        long id, String filter,
+        int offset, int limit,
+        List<Long> userIds,
+        LocalDateTime createdAt,
+        boolean hasMore, int totalCount) { }
+
+    private String getUsersPaginationKey(String filter, int offset, int limit) {
+        String normalizedFilter = filter == null ? "" : filter.toLowerCase().trim();
+        return normalizedFilter + ":" + offset + ":" + limit;
     }
-
-    public void saveUserChatsPagination(UserChatsPagination pagination) {
-        userChatsPaginationCache.put(pagination.getId(), pagination);
-
-        String key = getUserChatsPaginationKey(pagination.getUserId(), pagination.getOffset(), pagination.getLimit());
-        userChatsPaginationIndex.put(key, pagination.getId());
-    }
-    public Optional<UserChatsPagination> findUserChatsPagination(long userId, int offset, int limit) {
-        String key = getUserChatsPaginationKey(userId, offset, limit);
-        Long paginationId = userChatsPaginationIndex.get(key);
-        if (paginationId == null)
-            return Optional.empty();
-
-        UserChatsPagination pagination = userChatsPaginationCache.getIfPresent(paginationId);
-        if (pagination == null) {
-            userChatsPaginationIndex.remove(key); // Очищаем битую ссылку
-            return Optional.empty();
-        }
-
-        return Optional.of(pagination);
-    }
-    public void invalidateUserChatsPagination(long userId) {
-        userChatsPaginationIndex.entrySet().removeIf(entry -> {
-            if (entry.getKey().startsWith(userId + ":")) {
-                userChatsPaginationCache.invalidate(entry.getValue());
-                return true;
-            }
-            return false;
-        });
-    }
-
-
-    @Value
-    @Builder
-    public static class UsersPagination {
-        long id;
-        String filter;           // поисковый фильтр (может быть пустым)
-        int offset;
-        int limit;
-        List<Long> userIds;      // храним только ID пользователей
-        LocalDateTime createdAt;
-        boolean hasMore;
-        int totalCount;
-    }
-
     public void saveUsersPagination(UsersPagination pagination) {
-        usersPaginationCache.put(pagination.getId(), pagination);
-
-        String key = getUsersPaginationKey(pagination.getFilter(), pagination.getOffset(), pagination.getLimit());
-        usersPaginationIndex.put(key, pagination.getId());
+        String key = getUsersPaginationKey(pagination.filter(), pagination.offset(), pagination.limit());
+        usersPaginationCache.put(key, pagination);
     }
     public Optional<UsersPagination> findUsersPagination(String filter, int offset, int limit) {
         String key = getUsersPaginationKey(filter, offset, limit);
-        Long paginationId = usersPaginationIndex.get(key);
-        if (paginationId == null)
-            return Optional.empty();
-
-        UsersPagination pagination = usersPaginationCache.getIfPresent(paginationId);
-        if (pagination == null) {
-            usersPaginationIndex.remove(key); // Очищаем битую ссылку
-            return Optional.empty();
-        }
-
-        return Optional.of(pagination);
+        return Optional.ofNullable(usersPaginationCache.getIfPresent(key));
     }
     public void invalidateUsersPagination() {
         // При изменении пользователей инвалидируем весь кеш поиска
         usersPaginationCache.invalidateAll();
-        usersPaginationIndex.clear();
     }
 
 
-    @Value
+    // пагинация для выдачи чатов пользователей
     @Builder
-    public static class ChatMembersPagination {
-        long id;
-        long chatId;
-        int offset;
-        int limit;
-        List<Long> memberUserIds; // храним только ID пользователей
-        LocalDateTime createdAt;
-        boolean hasMore;
-        int totalCount;
+    public record UserChatsPagination(
+            long id, long userId,
+            int offset, int limit,
+            List<Long> chatIds,
+            LocalDateTime createdAt,
+            boolean hasMore, int totalCount) { }
+
+    private String getUserChatsPaginationKey(long userId, int offset, int limit) {
+        return userId + ":" + offset + ":" + limit;
+    }
+    public void saveUserChatsPagination(UserChatsPagination pagination) {
+        String key = getUserChatsPaginationKey(pagination.userId(), pagination.offset(), pagination.limit());
+        userChatsPaginationCache.put(key, pagination);
+        userPaginationKeys.computeIfAbsent(pagination.userId(), k -> ConcurrentHashMap.newKeySet()).add(key);
+    }
+    public Optional<UserChatsPagination> findUserChatsPagination(long userId, int offset, int limit) {
+        String key = getUserChatsPaginationKey(userId, offset, limit);
+        return Optional.ofNullable(userChatsPaginationCache.getIfPresent(key));
+    }
+    public void invalidateUserChatsPagination(long userId) {
+        Set<String> keys = userPaginationKeys.remove(userId);
+        if (keys != null)
+            keys.forEach(userChatsPaginationCache::invalidate);
     }
 
-    public void saveChatMembersPagination(ChatMembersPagination pagination) {
-        chatMembersPaginationCache.put(pagination.getId(), pagination);
 
-        String key = getChatMembersPaginationKey(
-            pagination.getChatId(),
-            pagination.getOffset(),
-            pagination.getLimit()
-        );
-        chatMembersPaginationIndex.put(key, pagination.getId());
+    // пагинация для выдачи участников чата
+    @Builder
+    public record ChatMembersPagination(
+        long id, long chatId,
+        int offset, int limit,
+        List<Long> memberUserIds,
+        LocalDateTime createdAt,
+        boolean hasMore, int totalCount) { }
+
+    private String getChatMembersPaginationKey(long chatId, int offset, int limit) {
+        return chatId + ":" + offset + ":" + limit;
+    }
+    public void saveChatMembersPagination(ChatMembersPagination pagination) {
+        String key = getChatMembersPaginationKey(pagination.chatId(), pagination.offset(), pagination.limit());
+        chatMembersPaginationCache.put(key, pagination);
     }
     public Optional<ChatMembersPagination> findChatMembersPagination(long chatId, int offset, int limit) {
         String key = getChatMembersPaginationKey(chatId, offset, limit);
-        Long paginationId = chatMembersPaginationIndex.get(key);
-
-        if (paginationId == null)
-            return Optional.empty();
-
-        ChatMembersPagination pagination = chatMembersPaginationCache.getIfPresent(paginationId);
-        if (pagination == null)
-            chatMembersPaginationIndex.remove(key); // Очищаем битую ссылку
-
-        return Optional.ofNullable(pagination);
+        return Optional.ofNullable(chatMembersPaginationCache.getIfPresent(key));
     }
     public void invalidateChatMembersPagination(long chatId) {
-        chatMembersPaginationIndex.entrySet().removeIf(entry -> {
+        chatMembersPaginationCache.asMap().entrySet().removeIf(entry -> {
             if (entry.getKey().startsWith(chatId + ":")) {
-                chatMembersPaginationCache.invalidate(entry.getValue());
+                chatMembersPaginationCache.invalidate(entry.getKey());
                 return true;
             }
             return false;
@@ -581,14 +563,12 @@ public class CacheService {
         stats.put("usersPaginationCache.hitRate", usersPaginationStats.hitRate());
         stats.put("usersPaginationCache.missRate", usersPaginationStats.missRate());
         stats.put("usersPaginationCache.evictionCount", usersPaginationStats.evictionCount());
-        stats.put("usersPaginationIndex.size", usersPaginationIndex.size());
 
         var userChatsPaginationStats = userChatsPaginationCache.stats();
         stats.put("userChatsPaginationCache.estimatedSize", userChatsPaginationCache.estimatedSize());
         stats.put("userChatsPaginationCache.hitRate", userChatsPaginationStats.hitRate());
         stats.put("userChatsPaginationCache.missRate", userChatsPaginationStats.missRate());
         stats.put("userChatsPaginationCache.evictionCount", userChatsPaginationStats.evictionCount());
-        stats.put("userChatsPaginationIndex.size", userChatsPaginationIndex.size());
 
         // статистика кеша чатов
         var chatStats = chatInfoCache.stats();
@@ -610,29 +590,28 @@ public class CacheService {
         stats.put("tokenCache.evictionCount", tokenStats.evictionCount());
 
         // статистика кеша индексов
-        stats.put("usernameIndex.size", usernameIndex.size());
-        stats.put("emailIndex.size", emailIndex.size());
-        stats.put("personalChatIndex.size", personalChatIndex.size());
+        stats.put("usernameIndex.size", usernameIndex.estimatedSize());
+        stats.put("emailIndex.size", emailIndex.estimatedSize());
+        stats.put("personalChatIndex.size", personalChatIndex.estimatedSize());
 
         return stats;
     }
 
+    @Scheduled(fixedDelay = 3_600_000) // 1000 * 60 * 60
+    public void cleanupUserPaginationKeys() {
+        userPaginationKeys.entrySet().removeIf(entry -> {
+            // Если пользователь больше не в кеше - чистим его ключи
+            if (userCache.getIfPresent(entry.getKey()) == null) {
+                entry.getValue().forEach(userChatsPaginationCache::invalidate);
+                return true;
+            }
 
-    // ========== HELPFUL FUNCTIONS ==========
+            // Удаляем конкретные ключи, которые уже вытеснены из кеша
+            entry.getValue().removeIf(key ->
+                userChatsPaginationCache.getIfPresent(key) == null
+            );
 
-
-    // Основные методы
-    private String getPersonalChatKey(Long userId1, Long userId2) {
-        return Math.min(userId1, userId2) + ":" + Math.max(userId1, userId2);
-    }
-    private String getUsersPaginationKey(String filter, int offset, int limit) {
-        String normalizedFilter = filter == null ? "" : filter.toLowerCase().trim();
-        return normalizedFilter + ":" + offset + ":" + limit;
-    }
-    private String getUserChatsPaginationKey(long userId, int offset, int limit) {
-        return userId + ":" + offset + ":" + limit;
-    }
-    private String getChatMembersPaginationKey(long chatId, int offset, int limit) {
-        return chatId + ":" + offset + ":" + limit;
+            return entry.getValue().isEmpty();
+        });
     }
 }
