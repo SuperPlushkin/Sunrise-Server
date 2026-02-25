@@ -63,7 +63,6 @@
 
 ```
 Sunrise-Server/
-├── .gradle/              # 🛠️  Кэш Gradle
 ├── gradle/wrapper/       # 📦 Gradle Wrapper файлы
 ├── src/                  # 📁 Исходный код приложения
 ├── .dockerignore         # 🐳 Исключения для Docker
