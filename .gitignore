@@ -1,6 +1,7 @@
 # Файлы, сгенерированные сборщиками (Maven, Gradle)
 target/
 build/
+.gradle/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
