@@ -37,10 +37,10 @@ public class User {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "enabled", nullable = false)
-    private Boolean isEnabled = true;
+    private boolean isEnabled = true;
 
     @Column(name = "is_deleted", nullable = false)
-    private Boolean isDeleted = false;
+    private boolean isDeleted = false;
 
 
     public User(CacheUser cacheUser) {
@@ -51,8 +51,8 @@ public class User {
         this.lastLogin = cacheUser.getLastLogin();
         this.createdAt = cacheUser.getCreatedAt();
         this.hashPassword = cacheUser.getHashPassword();
-        this.isEnabled = cacheUser.getIsEnabled();
-        this.isDeleted = cacheUser.getIsDeleted();
+        this.isEnabled = cacheUser.isEnabled();
+        this.isDeleted = cacheUser.isDeleted();
     }
     public User(String username, String name, String email, String hashPassword) {
         this.username = username;

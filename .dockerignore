@@ -10,4 +10,7 @@ build/
 .idea/
 .vscode/
 DocumentationAPI.html
+tables.sql
+functions.sql
 grants.sql
+test-chats.sql

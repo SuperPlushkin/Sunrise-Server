@@ -1,6 +1,7 @@
 package com.Sunrise.Entities.Cache;
 
 import com.Sunrise.Entities.DB.Chat;
+import com.Sunrise.Entities.DB.ChatMember;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -34,17 +35,8 @@ public class ChatMembersContainer {
         this.adminIds.add(chat.getCreatedBy());
     }
 
-    public List<CacheChatMember> getMembersPage(int offset, int limit) {
-        return members.values().stream()
-                .skip(offset)
-                .filter(m -> !m.getIsDeleted())
-                .limit(limit)
-                .toList();
-    }
     public List<CacheChatMember> getActiveMembers() {
-        return members.values().stream()
-                .filter(m -> !m.getIsDeleted())
-                .toList();
+        return members.values().stream().filter(m -> !m.isDeleted()).toList();
     }
     public Set<Long> getChatAdminsIds(Long chatId) {
         return new HashSet<>(adminIds);
@@ -63,10 +55,10 @@ public class ChatMembersContainer {
     public void addMembers(Collection<CacheChatMember> newMembers)  {
         for (CacheChatMember member : newMembers) {
             members.put(member.getUserId(), member);
-            if (member.getIsAdmin()) {
+            if (member.isAdmin()) {
                 adminIds.add(member.getUserId());
             }
-            if (member.getIsDeleted()) {
+            if (member.isDeleted()) {
                 deletedMemberIds.add(member.getUserId());
                 deletedMemberCount.incrementAndGet();  // <-- Добавляем
             }
@@ -79,10 +71,10 @@ public class ChatMembersContainer {
     }
     public void addMember(CacheChatMember member) {
         members.put(member.getUserId(), member);
-        if (member.getIsAdmin()) {
+        if (member.isAdmin()) {
             adminIds.add(member.getUserId());
         }
-        if (member.getIsDeleted()) {
+        if (member.isDeleted()) {
             deletedMemberIds.add(member.getUserId());
             deletedMemberCount.incrementAndGet();
         }
@@ -94,7 +86,7 @@ public class ChatMembersContainer {
             return;
 
         CacheChatMember member = members.get(userId);
-        if (member != null && !member.getIsDeleted()) {
+        if (member != null && !member.isDeleted()) {
             member.setIsAdmin(isAdmin);
             if (isAdmin) {
                 adminIds.add(userId);
@@ -127,7 +119,7 @@ public class ChatMembersContainer {
             member.setIsDeleted(true);
             deletedMemberIds.add(userId);
             deletedMemberCount.incrementAndGet();
-            if (member.getIsAdmin())
+            if (member.isAdmin())
                 adminIds.remove(userId);
         }
     }
@@ -145,6 +137,9 @@ public class ChatMembersContainer {
 
     public boolean hasMember(Long userId) {
         return members.containsKey(userId);
+    }
+    public boolean hasActiveMember(Long userId) {
+        return !getMember(userId).map(ChatMember::isDeleted).orElse(true);
     }
     public Optional<Boolean> isAdmin(Long userId) {
         if (adminIds.contains(userId))

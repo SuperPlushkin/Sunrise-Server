@@ -2,4 +2,8 @@ package com.Sunrise.DTO.DBResults;
 
 import java.util.List;
 
-public record ChatsPageResult(List<Long> chatIds, boolean hasMore, int totalCount) {}
+public interface ChatsPageResult{
+    List<Long> getChatIds();
+    Integer getTotalCount();
+    Boolean getHasMore();
+}

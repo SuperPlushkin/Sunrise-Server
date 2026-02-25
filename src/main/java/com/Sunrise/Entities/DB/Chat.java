@@ -7,7 +7,6 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 
 @Entity
 @Table(name = "chats")
@@ -18,7 +17,7 @@ import java.time.ZoneId;
 public class Chat {
 
     @Id
-    protected Long id;
+    protected long id;
 
     @Column(name = "name", length = 50)
     @Size(min = 4, max = 50)
@@ -30,36 +29,39 @@ public class Chat {
 
     @Min(0)
     @Column(name = "members_count", nullable = false)
-    protected Integer membersCount;
+    protected int membersCount;
 
     @Min(0)
     @Column(name = "deleted_members_count", nullable = false)
-    protected Integer deletedMembersCount;
+    protected int deletedMembersCount;
 
     @Column(name = "created_by", nullable = false)
-    protected Long createdBy;
+    protected long createdBy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     protected LocalDateTime createdAt = LocalDateTime.now();
 
     @Column(name = "is_group", nullable = false)
-    protected Boolean isGroup = false;
+    protected boolean isGroup = false;
 
     @Column(name = "deleted_at")
     protected LocalDateTime deletedAt;
 
     @Column(name = "is_deleted", nullable = false)
-    protected Boolean isDeleted = false;
+    protected boolean isDeleted = false;
 
     public Chat(CacheChat cacheChat) {
         this.id = cacheChat.getId();
         this.name = cacheChat.getName();
         this.createdBy = cacheChat.getCreatedBy();
         this.createdAt = cacheChat.getCreatedAt();
-        this.isGroup = cacheChat.getIsGroup();
-        this.isDeleted = cacheChat.getIsDeleted();
+        this.isGroup = cacheChat.isGroup();
+        this.isDeleted = cacheChat.isDeleted();
     }
 
+    public void setIsGroup(boolean isGroup){
+        this.isGroup = isGroup;
+    }
     public void setIsDeleted(boolean isDeleted){
         this.deletedAt = isDeleted ? LocalDateTime.now() : null;
         this.isDeleted = isDeleted;

@@ -1,22 +1,23 @@
 package com.Sunrise.Entities.DB;
+
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
+
 import java.io.Serializable;
 import java.util.Objects;
 
+@NoArgsConstructor
+@AllArgsConstructor
 public class MessageReadStatusId implements Serializable {
     private Long message;
     private Long user;
 
-    public MessageReadStatusId() {}
-    public MessageReadStatusId(Long message, Long user) {
-        this.message = message;
-        this.user = user;
-    }
-
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof MessageReadStatusId)) return false;
-        MessageReadStatusId that = (MessageReadStatusId) o;
+        if (this == o)
+            return true;
+        if (!(o instanceof MessageReadStatusId that))
+            return false;
         return Objects.equals(message, that.message) && Objects.equals(user, that.user);
     }
 

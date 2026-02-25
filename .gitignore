@@ -24,6 +24,7 @@ Thumbs.db
 .env
 *.key
 *.cert
-init.sql
+tables.sql
+functions.sql
 grants.sql
 test-chats.sql

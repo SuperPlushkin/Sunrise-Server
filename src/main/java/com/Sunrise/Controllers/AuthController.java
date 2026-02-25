@@ -2,16 +2,16 @@ package com.Sunrise.Controllers;
 
 import com.Sunrise.DTO.Requests.LoginRequest;
 import com.Sunrise.DTO.Requests.RegisterRequest;
+import com.Sunrise.DTO.ServiceResults.UserLoginResult;
+import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
 import com.Sunrise.Services.AuthService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 import jakarta.validation.constraints.Size;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
 import org.springframework.http.ResponseEntity;
-import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,8 +21,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-
-    private static final Logger log = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthService authService;
 
@@ -34,16 +32,17 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
 
-        String username = request.getUsername().trim();
-
-        var result = authService.registerUser(username, request.getName().trim(), request.getEmail().trim(), request.getPassword().trim());
+        UserRegistrationResult result = authService.registerUser(
+            request.getUsername().trim(),
+            request.getName().trim(),
+            request.getEmail().trim(),
+            request.getPassword().trim()
+        );
 
         if (result.isSuccess()) {
-            log.info("User registered successfully --> {}", username);
             return ResponseEntity.ok("User registered successfully. Check your mail to activate your account!!!");
         }
         else {
-            log.warn(result.getErrorMessage());
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
@@ -52,20 +51,19 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
 
-        String username = request.getUsername().trim();
-        String password = request.getPassword().trim();
-
-        var result = authService.authenticateUser(username, password, httpRequest);
+        UserLoginResult result = authService.authenticateUser(
+            request.getUsername().trim(),
+            request.getPassword().trim(),
+            httpRequest
+        );
 
         if (result.isSuccess()) {
-            log.info("User login successfully --> {}", username);
             return ResponseEntity.ok(Map.of(
                 "token", result.getJwtToken(),
                 "expiration", result.getExpiration()
             ));
         }
         else {
-            log.warn(result.getErrorMessage());
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
@@ -84,7 +82,6 @@ public class AuthController {
 
     @GetMapping("/test-html")
     public String testHtml(Model model) {
-        log.info("Test HTML page accessed");
         model.addAttribute("isSuccess", true);
         model.addAttribute("message", "Тестовая страница работает!");
         return "email-confirmation";

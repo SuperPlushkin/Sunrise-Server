@@ -3,13 +3,10 @@ package com.Sunrise.Services.DataServices;
 import com.Sunrise.DTO.DBResults.*;
 import com.Sunrise.Entities.DB.*;
 import com.Sunrise.Repositories.*;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -19,17 +16,19 @@ public class DBService {
 
     private final UserRepository userRepository;
     private final ChatRepository chatRepository;
+    private final ChatMemberRepository chatMemberRepository;
     private final LoginHistoryRepository loginHistoryRepository;
     private final VerificationTokenRepository tokenRepository;
     private final MessageRepository messageRepository;
 
     public DBService(UserRepository userRepository, ChatRepository chatRepository, LoginHistoryRepository loginHistoryRepository,
-                     VerificationTokenRepository tokenRepository, MessageRepository messageRepository) {
+                     VerificationTokenRepository tokenRepository, MessageRepository messageRepository, ChatMemberRepository chatMemberRepository) {
         this.userRepository = userRepository;
         this.chatRepository = chatRepository;
         this.loginHistoryRepository = loginHistoryRepository;
         this.tokenRepository = tokenRepository;
         this.messageRepository = messageRepository;
+        this.chatMemberRepository = chatMemberRepository;
     }
 
 
@@ -37,51 +36,34 @@ public class DBService {
 
 
     // Основные методы
-    public void saveUser(User user) {
-        userRepository.save(user);
-    }
     @Async("dbExecutor")
     public void saveUserAsync(User user) {
-        saveUser(user);
+        userRepository.save(user);
     }
 
-    public void deleteUser(Long userId) {
+    @Async("dbExecutor")
+    public void deleteUserAsync(Long userId) {
         userRepository.deleteById(userId);
     }
     @Async("dbExecutor")
-    public void deleteUserAsync(Long userId) {
-        deleteUser(userId);
+    public void restoreUserAsync(Long userId) {
+        userRepository.restoreUser(userId);
     }
 
-    public void updateLastLogin(String username, LocalDateTime lastLogin) {
-        userRepository.updateLastLogin(username, lastLogin);
-    }
     @Async("dbExecutor")
     public void updateLastLoginAsync(String username, LocalDateTime lastLogin) {
-        updateLastLogin(username, lastLogin);
+        userRepository.updateLastLogin(username, lastLogin);
     }
 
-    public void enableUser(Long userId) {
-        userRepository.enableUser(userId);
-    }
     @Async("dbExecutor")
     public void enableUserAsync(Long userId) {
-        enableUser(userId);
+        userRepository.enableUser(userId);
     }
 
+
     // Вспомогательные методы
-    public List<User> getAllUsers() {
-        return userRepository.findAll();
-    }
     public Optional<User> getUser(Long userId) {
         return userRepository.findById(userId);
-    }
-    public List<User> getFilteredUsers(String filter, int limit, int offset) {
-        Pageable pageable = PageRequest.of(offset / limit, limit);
-        return userRepository.findFilteredUsers(filter, pageable);
-    }
-    public Boolean existsUser(Long userId) {
-        return userRepository.existsById(userId);
     }
     public Optional<User> getUserByUsername(String username) {
         return userRepository.findByUsername(username);
@@ -89,20 +71,24 @@ public class DBService {
     public Optional<User> getUserByEmail(String email) {
         return userRepository.findByEmail(email);
     }
+    public List<User> getUsersByIds(List<Long> missingIds) {
+        return userRepository.findAllById(missingIds);
+    }
+    public UsersPageResult getFilteredUsersPage(String filter, int offset, int limit){
+        return userRepository.getUsersPage(filter, offset, limit);
+    }
     public List<Chat> getUserChats(Long userId) {
         return chatRepository.findUserChats(userId);
     }
+
 
     // ========== LOGIN HISTORY METHODS ==========
 
 
     // Основные методы
-    public void saveLoginHistory(LoginHistory loginHistory) {
-        loginHistoryRepository.save(loginHistory);
-    }
     @Async("dbExecutor")
     public void saveLoginHistoryAsync(LoginHistory loginHistory) {
-        saveLoginHistory(loginHistory);
+        loginHistoryRepository.save(loginHistory);
     }
 
 
@@ -110,82 +96,51 @@ public class DBService {
 
 
     // Основные методы
-    public void saveChat(Chat chat) {
-        chatRepository.save(chat);
-    }
     @Async("dbExecutor")
-    public void saveChatAsync(Chat chat) {
-        saveChat(chat);
+    public void saveGroupChatAsync(Chat chat, Long[] memberIds) {
+        chatRepository.createGroupChat(chat.getId(), chat.getName(), chat.getCreatedBy(), memberIds);
     }
 
-    public void restoreChat(Long chatId) {
-        chatRepository.restoreChat(chatId);
-    }
     @Async("dbExecutor")
-    public void restoreChatAsync(Long chatId) {
-        restoreChat(chatId);
+    public void savePersonalChatAsync(Long chatId, Long creator, Long member) {
+        chatRepository.createPersonalChat(chatId, creator, member);
     }
 
-    public void deleteChat(Long chatId) {
-        chatRepository.softDeleteChat(chatId);
-    }
-    @Async("dbExecutor")
-    public void deleteChatAsync(Long chatId) {
-        deleteChat(chatId);
-    }
-
-    public void upsertChatMember(ChatMember chatMember) {
-        chatRepository.upsertChatMember(chatMember.getUserId(), chatMember.getChatId(), chatMember.getIsAdmin());
-    }
-    @Async("dbExecutor")
-    public void upsertChatMemberAsync(ChatMember chatMember) {
-        upsertChatMember(chatMember);
-    }
-
-
-
-    public void removeUserFromChat(Long userId, Long chatId) {
-        chatRepository.leaveChat(chatId, userId);
-    }
-    @Async("dbExecutor")
-    public void removeUserFromChatAsync(Long userId, Long chatId) {
-        removeUserFromChat(userId, chatId);
-    }
-
-    public void updateChatCreator(Long chatId, Long newCreatorId) {
-        chatRepository.updateChatCreator(chatId, newCreatorId);
-    }
     @Async("dbExecutor")
     public void updateChatCreatorAsync(Long chatId, Long newCreatorId) {
-        updateChatCreator(chatId, newCreatorId);
+        chatRepository.updateChatCreator(chatId, newCreatorId);
+    }
+
+    @Async("dbExecutor")
+    public void restoreChatAsync(Long chatId) {
+        chatRepository.restoreChat(chatId);
+    }
+
+    @Async("dbExecutor")
+    public void deleteChatAsync(Long chatId) {
+        chatRepository.deleteChat(chatId);
     }
 
 
     // Вспомогательные методы
-    public List<PersonalChatDBResult> getAllPersonalChats() {
-        return chatRepository.getAllPersonalChats();
-    }
-    public List<Chat> getAllChats() {
-        return chatRepository.findAll();
+    public List<Long> getAllActiveChatIds() {
+        return chatRepository.findAllActiveChatIds();
     }
     public Optional<Chat> getChat(Long chatId) {
         return chatRepository.findById(chatId);
     }
-
     public Optional<Chat> findPersonalChat(Long userId1, Long userId2) {
         return chatRepository.findPersonalChat(userId1, userId2);
     }
-    public List<ChatMember> getChatMembers(Long chatId) {
-        return chatRepository.getChatMembers(chatId);
+
+    public List<Chat> getChatsByIds(List<Long> chatIds) {
+        return chatRepository.findAllById(chatIds);
     }
-    public boolean isUserInChat(Long chatId, Long userId) {
-        return chatRepository.isUserInChat(chatId, userId);
+    public ChatsPageResult getUserChatPage(Long userId, int offset, int limit) {
+        return chatMemberRepository.getUserChatsPage(userId, offset, limit);
     }
-    public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
-        return chatRepository.isChatAdmin(chatId, userId);
-    }
-    public Optional<Long> findAnotherAdmin(Long chatId, Long excludeUserId) {
-        return chatRepository.findAnotherAdmin(chatId, excludeUserId);
+    public void syncChatCounters(Long chatId) {
+        chatRepository.syncChatCounters(chatId);
     }
 
 
@@ -201,31 +156,73 @@ public class DBService {
     }
 
 
+    // ========== CHAT MEMBER METHODS ==========
+
+
+    @Async("dbExecutor")
+    public void updateUserAdminRightsAsync(Long chatId, Long userId, Boolean isAdmin) {
+        chatMemberRepository.addChatMember(chatId, userId, isAdmin);
+    }
+
+    @Async("dbExecutor")
+    public void upsertChatMemberAsync(ChatMember chatMember) {
+        chatMemberRepository.addChatMember(chatMember.getUserId(), chatMember.getChatId(), chatMember.isAdmin());
+    }
+
+    @Async("dbExecutor")
+    public void removeUserFromChatAsync(Long userId, Long chatId) {
+        chatMemberRepository.removeChatMember(chatId, userId);
+    }
+
+    public Optional<ChatMember> getChatMember(Long chatId, Long userId) {
+        return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
+    }
+    public List<Long> getUserChatIds(Long userId) {
+        return chatMemberRepository.getUserChatIds(userId);
+    }
+    public List<Long> getMisingUserChatIds(Long userId, Set<Long> chatIds) {
+        return chatMemberRepository.findMissingUserChatIds(userId, chatIds);
+    }
+    public List<Long> getChatMemberIds(Long chatId) {
+        return chatMemberRepository.findChatMemberIds(chatId);
+    }
+    public List<ChatMember> getChatMembersByIds(Long chatId, List<Long> missingIds) {
+        return chatMemberRepository.findChatMembersByIds(chatId, missingIds);
+    }
+    public ChatMembersPageResult getChatMembersPage(Long chatId, int offset, int limit) {
+        return chatMemberRepository.getChatMembersPage(chatId, offset, limit);
+    }
+
+    public Optional<ChatMember> findAnotherChatAdmin(Long chatId, Long excludeUserId1) {
+        return chatMemberRepository.findAnotherAdmin(chatId, excludeUserId1);
+    }
+    public Optional<Long> findAnotherChatAdminId(Long chatId, Long excludeUserId) {
+        return chatMemberRepository.findAnotherAdminId(chatId, excludeUserId);
+    }
+    public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
+        return chatMemberRepository.isChatAdmin(chatId, userId);
+    }
+    public boolean isUserInChat(Long chatId, Long userId) {
+        return chatMemberRepository.isUserInChat(chatId, userId);
+    }
+
+
     // ========== VERIFICATION TOKEN METHODS ==========
 
 
     // Основные методы
-    public List<VerificationToken> getAllVerificationTokens() {
-        return tokenRepository.findAll();
-    }
     public Optional<VerificationToken> getVerificationToken(String token) {
         return tokenRepository.findByToken(token);
     }
 
-    public void saveVerificationToken(VerificationToken token) {
-        tokenRepository.save(token);
-    }
     @Async("dbExecutor")
     public void saveVerificationTokenAsync(VerificationToken token) {
-        saveVerificationToken(token);
+        tokenRepository.save(token);
     }
 
-    public void deleteVerificationToken(String token) {
-        tokenRepository.deleteByToken(token);
-    }
     @Async("dbExecutor")
     public void deleteVerificationTokenAsync(String token) {
-        deleteVerificationToken(token);
+        tokenRepository.deleteByToken(token);
     }
 
     public int cleanupExpiredVerificationTokens() {
@@ -235,12 +232,10 @@ public class DBService {
 
     // =========== MESSAGE METHODS ==========
 
-    public void saveMessage(Message message) {
-        messageRepository.save(message);
-    }
+
     @Async("dbExecutor")
     public void saveMessageAsync(Message message) {
-        saveMessage(message);
+        messageRepository.save(message);
     }
 
 
@@ -260,65 +255,5 @@ public class DBService {
     }
     public Integer getVisibleMessagesCount(Long chatId, Long userId) {
         return messageRepository.getVisibleMessagesCount(chatId, userId);
-    }
-
-    public List<Long> getUserChatIds(Long userId) {
-        return chatRepository.getUserChatIds(userId);
-    }
-    public List<Chat> getChatsByIds(List<Long> chatIds) {
-        if (chatIds.isEmpty())
-            return Collections.emptyList();
-        return chatRepository.findAllById(chatIds);
-    }
-
-
-
-
-
-
-    // TODO: РЕАЛИЗОВАТЬ МЕТОДЫ
-    public void updateAdminRightsAsync(Long chatId, Long userId, Boolean isAdmin) {
-        return;
-    }
-    public ChatMembersPageResult getChatMembersPage(Long chatId, int offset, int limit) {
-        return null;
-    }
-    public Optional<ChatMember> getChatMember(Long chatId, Long userId) {
-        return null;
-    }
-    public Optional<ChatMember> getAnotherChatAdmin(Long chatId, Long excludeUserId1) {
-        return null;
-    }
-
-    public int getUserChatsCount(Long userId) {
-        return 0;
-    }
-
-    public List<Long> getChatMemberIds(Long chatId) {
-        return null;
-    }
-
-    public void restoreUserAsync(Long userId) {
-        return;
-    }
-
-    public List<Long> getUserChatIdsPage(Long userId, int offset, int i) {
-        return null;
-    }
-
-    public List<User> getUsersByIds(List<Long> missingIds) {
-        return userRepository.findAllById(missingIds);
-    }
-
-    public UsersPageResult getFilteredUsersPage(String filter, int offset, int limit) {
-        return null;
-    }
-
-    public ChatsPageResult getUserChatsPage(Long userId, int offset, int limit) {
-        return null;
-    }
-
-    public List<ChatMember> getChatMembersByIds(Long chatId, List<Long> missingIds) {
-        return null;
     }
 }

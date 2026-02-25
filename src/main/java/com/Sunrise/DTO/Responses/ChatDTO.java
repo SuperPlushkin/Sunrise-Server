@@ -21,7 +21,7 @@ public class ChatDTO {
         this.setName(chat.getName());
         this.setCreatedBy(chat.getCreatedBy());
         this.setCreatedAt(chat.getCreatedAt());
-        this.setIsGroup(chat.getIsGroup());
-        this.setIsDeleted(chat.getIsDeleted());
+        this.setIsGroup(chat.isGroup());
+        this.setIsDeleted(chat.isDeleted());
     }
 }

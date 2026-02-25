@@ -18,10 +18,10 @@ public class ChatMember {
     protected LocalDateTime joinedAt = LocalDateTime.now();
 
     @Column(name = "is_admin", nullable = false)
-    protected Boolean isAdmin = false;
+    protected boolean isAdmin = false;
 
     @Column(name = "is_deleted",nullable = false)
-    protected Boolean isDeleted = false;
+    protected boolean isDeleted = false;
 
 
     public Long getChatId() {
@@ -31,6 +31,14 @@ public class ChatMember {
     public Long getUserId() {
         return id != null ? id.getUserId() : null;
     }
+
+    public void setIsAdmin(boolean isAdmin){
+        this.isAdmin = isAdmin;
+    }
+    public void setIsDeleted(boolean isDeleted){
+        this.isDeleted = isDeleted;
+    }
+
 
     // Конструктор для удобства
     public ChatMember(Long chatId, Long userId, LocalDateTime joinedAt, Boolean isAdmin, Boolean isDeleted) {

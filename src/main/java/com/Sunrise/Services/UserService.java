@@ -1,34 +1,46 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.DTO.ServiceResults.FilteredUsersResult;
-
 import com.Sunrise.DTO.Responses.UserDTO;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
+import com.Sunrise.Services.DataServices.DataValidator;
+import com.Sunrise.Subclasses.ValidationException;
+
+import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class UserService {
     private final DataAccessService dataAccessService;
+    private final DataValidator validator;
 
-    public UserService(DataAccessService dataAccessService){
+    public UserService(DataAccessService dataAccessService, DataValidator validator){
         this.dataAccessService = dataAccessService;
+        this.validator = validator;
     }
 
-    public FilteredUsersResult getFilteredUsers(int limit, int offset, String filter) {
+    public FilteredUsersResult getFilteredUsers(Long userId, String filter, int offset, int limit) {
         try
         {
-            List<User> users = dataAccessService.getFilteredUsers(filter,  limit, offset);
+            validator.validateActiveUser(userId);
 
-            List<UserDTO> userDTOSet = users.stream().map(UserDTO::new).toList();
+            List<User> users = dataAccessService.getFilteredUsersPage(filter, offset, limit);
+            List<UserDTO> userDTOs = users.stream().map(UserDTO::new).toList();
 
-            return FilteredUsersResult.success(userDTOSet);
+            log.debug("[🔧] ✅ Get {} users with filter='{}' (offset={}, limit={})", users.size(), filter, offset, limit);
+            return FilteredUsersResult.success(userDTOs);
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to getFilteredUsers: {}", e.getMessage());
+            return FilteredUsersResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error during getFilteredUsers: {}", e.getMessage());
             return FilteredUsersResult.error("Error during getFilteredUsers: " + e.getMessage());
         }
     }

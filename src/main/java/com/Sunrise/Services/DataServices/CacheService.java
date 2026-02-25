@@ -1,24 +1,34 @@
 package com.Sunrise.Services.DataServices;
 
-import com.Sunrise.Entities.Cache.ChatMembersContainer;
 import com.Sunrise.Entities.DB.ChatMember;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Entities.DB.Chat;
 import com.Sunrise.Entities.DB.VerificationToken;
+import com.Sunrise.Entities.Cache.CacheUser;
 import com.Sunrise.Entities.Cache.CacheChat;
 import com.Sunrise.Entities.Cache.CacheChatMember;
-import com.Sunrise.Entities.Cache.CacheUser;
+import com.Sunrise.Entities.Cache.ChatMembersContainer;
+
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+
 import lombok.Builder;
+
+import lombok.extern.log4j.Log4j;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+@SuppressWarnings("NullableProblems")
+@Slf4j
 @Service
 public class CacheService {
 
@@ -84,6 +94,7 @@ public class CacheService {
             .recordStats()
             .build();
 
+    private final Map<Long, Set<String>> chatMembersPaginationKeys = new ConcurrentHashMap<>();
 
     // кеш токенов подтверждения
     private final Cache<String, VerificationToken> verificationTokenCache = Caffeine.newBuilder() // token -> VerificationToken (токены подтверждения)
@@ -108,19 +119,22 @@ public class CacheService {
         emailIndex.put(user.getEmail().toLowerCase(), user.getId());
     }
     public void deleteUser(Long userId) {
-        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsDeleted(true));
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setDeleted(true));
     }
     public void restoreUser(Long userId) {
-        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsDeleted(false));
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setDeleted(false));
     }
 
 
     // Вспомогательные методы
-    public void updateUserChatsIds(Long userId, Set<Long> chatsIds) {
-        getCacheUser(userId).ifPresent(user -> user.setChatsIds(chatsIds));
+    public void addUserChatsBatch(Long userId, Set<Long> newChatsIds, boolean isFullyLoadedNow) {
+        getCacheUser(userId).ifPresent(user -> user.addChats(newChatsIds, isFullyLoadedNow));
+    }
+    public void setUserChatsIds(Long userId, Set<Long> chatsIds, boolean isFullLoaded) {
+        getCacheUser(userId).ifPresent(user -> user.setChatsIds(chatsIds, isFullLoaded));
     }
     public void updateUserIsEnabled(Long userId, boolean isEnabled){
-        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setIsEnabled(isEnabled));
+        getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setEnabled(isEnabled));
     }
     public void updateUserLastLogin(String username, LocalDateTime lastLogin) {
         getUserByUsername(username).ifPresent(user -> user.setLastLogin(lastLogin));
@@ -161,6 +175,10 @@ public class CacheService {
         return emailIndex.getIfPresent(email.toLowerCase()) != null;
     }
 
+    public boolean areUserChatsFullyLoaded(Long userId) {
+        return getCacheUser(userId).map(CacheUser::isChatsIdsFullyLoaded).orElse(false);
+    }
+
 
     // ========== CHAT METHODS ==========
 
@@ -190,16 +208,19 @@ public class CacheService {
     public void saveNewPersonalChat(Chat chat, ChatMember creator, ChatMember member) {
         saveExistingChat(chat);
 
-        if (!chat.getIsGroup()) {
+        if (!chat.isGroup()) {
             savePersonalChatIndex(creator.getUserId(), member.getUserId(), chat.getId());
         }
 
+        List<ChatMember> members = List.of(creator, member);
+
         // Сохраняем участников как Map
-        addChatMembers(chat, List.of(creator, member));
+        addChatMembers(chat, members);
 
         // Обновляем кэши пользователей
-        getCacheUser(creator.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
-        getCacheUser(member.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
+        members.forEach(m -> {
+            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
+        });
     }
 
     public void deleteChat(Long chatId) {
@@ -213,7 +234,7 @@ public class CacheService {
 
     // Вспомогательные методы
     public boolean existsAndNotDeletedChat(Long chatId) {
-        return chatInfoCache.getIfPresent(chatId) instanceof CacheChat cacheChat && !cacheChat.getIsDeleted();
+        return chatInfoCache.getIfPresent(chatId) instanceof CacheChat cacheChat && !cacheChat.isDeleted();
     }
 
     public Optional<CacheChat> getChatCache(Long chatId) {
@@ -234,7 +255,7 @@ public class CacheService {
         return getChatCache(chatId).map(CacheChat::getName);
     }
     public Optional<Boolean> getIsGroupChat(Long chatId) {
-        return getChatCache(chatId).map(CacheChat::getIsGroup);
+        return getChatCache(chatId).map(CacheChat::isGroup);
     }
     public Optional<Long> getChatCreator(Long chatId) {
         return getChatCache(chatId).map(CacheChat::getCreatedBy);
@@ -251,8 +272,10 @@ public class CacheService {
 
 
     // cache методы
-    public void invalidateAfterChatAdded(List<Long> membersIds) {
-        membersIds.forEach(this::invalidateUserChatsPagination);
+    public void invalidateAfterChatAdded(Long[] membersIds) {
+        for (Long membersId : membersIds) {
+            invalidateUserChatsPagination(membersId);
+        }
     }
     public void invalidateAfterChatDeleted(List<Long> membersIds) {
         membersIds.forEach(this::invalidateUserChatsPagination);
@@ -279,7 +302,9 @@ public class CacheService {
         getOrCreateChatMembersContainer(chat).addMembers(cacheMembers);
 
         // Обновляем кэш пользователя
-        members.forEach(member -> getCacheUser(member.getUserId()).ifPresent(user -> user.addChat(chat.getId())));
+        members.forEach(m -> {
+            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
+        });
     }
     public void addNewChatMembers(Chat chat, List<ChatMember> members) {
         // Обновляем контейнер
@@ -287,7 +312,9 @@ public class CacheService {
         getOrCreateChatMembersContainer(chat).addNewMembers(cacheMembers);
 
         // Обновляем кэш пользователя
-        members.forEach(member -> getCacheUser(member.getUserId()).ifPresent(user -> user.addChat(chat.getId())));
+        members.forEach(m -> {
+            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
+        });
     }
 
     public void addChatMember(Chat chat, ChatMember chatMember) {
@@ -332,16 +359,15 @@ public class CacheService {
         return getChatMembersContainer(chatId).flatMap(c -> c.getMember(userId));
     }
     public Optional<Boolean> hasChatMember(Long chatId, Long userId) {
-        return getChatMembersContainer(chatId).map(c -> c.hasMember(userId));
-    }
-
-    public Optional<Set<Long>> getUserChatsIds(Long userId) {
-        return getCacheUser(userId).map(CacheUser::getChats);
-    }
-    public Optional<Boolean> isUserInChat(Long chatId, Long userId) {
         return getChatMembersContainer(chatId)
                 .map(cont -> cont.hasMember(userId))
                 .or(() -> getCacheUser(userId).map(user -> user.hasChat(chatId)));
+    }
+    public Optional<Boolean> hasActiveChatMember(Long chatId, Long userId) {
+        return getChatMembersContainer(chatId).map(c -> c.hasActiveMember(userId));
+    }
+    public Optional<SimpleEntry<Set<Long>, Boolean>> getUserChatsIds(Long userId) {
+        return getCacheUser(userId).map(CacheUser::getChatsIdsAndIsFullyLoaded);
     }
 
 
@@ -429,19 +455,16 @@ public class CacheService {
     public void saveChatMembersPagination(ChatMembersPagination pagination) {
         String key = getChatMembersPaginationKey(pagination.chatId(), pagination.offset(), pagination.limit());
         chatMembersPaginationCache.put(key, pagination);
+        chatMembersPaginationKeys.computeIfAbsent(pagination.chatId(), k -> ConcurrentHashMap.newKeySet()).add(key);
     }
     public Optional<ChatMembersPagination> findChatMembersPagination(long chatId, int offset, int limit) {
         String key = getChatMembersPaginationKey(chatId, offset, limit);
         return Optional.ofNullable(chatMembersPaginationCache.getIfPresent(key));
     }
     public void invalidateChatMembersPagination(long chatId) {
-        chatMembersPaginationCache.asMap().entrySet().removeIf(entry -> {
-            if (entry.getKey().startsWith(chatId + ":")) {
-                chatMembersPaginationCache.invalidate(entry.getKey());
-                return true;
-            }
-            return false;
-        });
+        Set<String> keys = chatMembersPaginationKeys.remove(chatId);
+        if (keys != null)
+            keys.forEach(chatMembersPaginationCache::invalidate);
     }
 
 
@@ -505,11 +528,11 @@ public class CacheService {
         Map<Long, ChatMembersContainer> containersSnapshot = chatMembersContainerCache.asMap();
 
         long activatedUserCount = userCacheSnapshot.values().stream()
-                .filter(user -> !user.getIsDeleted() && user.getIsEnabled())
+                .filter(user -> !user.isDeleted() && user.isEnabled())
                 .count();
 
         int totalUserChats = userCacheSnapshot.values().stream()
-                .filter(user -> !user.getIsDeleted() && user.getIsEnabled())
+                .filter(user -> !user.isDeleted() && user.isEnabled())
                 .mapToInt(CacheUser::getChatsCount)
                 .sum();
 
@@ -528,7 +551,7 @@ public class CacheService {
         return new CacheStats(
             activatedUserCount,
             userCacheSnapshot.size(),
-            chatInfoCacheSnapshot.values().stream().filter(chat -> !chat.getIsDeleted()).count(),
+            chatInfoCacheSnapshot.values().stream().filter(chat -> !chat.isDeleted()).count(),
             chatInfoCacheSnapshot.size(),
             totalUserChats,
             totalChatMembers,
@@ -578,10 +601,10 @@ public class CacheService {
         stats.put("chatCache.evictionCount", chatStats.evictionCount());
 
         var containerStats = chatMembersContainerCache.stats();
-        stats.put("chatContainerCache.estimatedSize", chatMembersContainerCache.estimatedSize());
-        stats.put("chatContainerCache.hitRate", containerStats.hitRate());
-        stats.put("chatContainerCache.missRate", containerStats.missRate());
-        stats.put("chatContainerCache.evictionCount", containerStats.evictionCount());
+        stats.put("chatMembersContainerCache.estimatedSize", chatMembersContainerCache.estimatedSize());
+        stats.put("chatMembersContainerCache.hitRate", containerStats.hitRate());
+        stats.put("chatMembersContainerCache.missRate", containerStats.missRate());
+        stats.put("chatMembersContainerCache.evictionCount", containerStats.evictionCount());
 
         var tokenStats = verificationTokenCache.stats();
         stats.put("tokenCache.estimatedSize", verificationTokenCache.estimatedSize());
@@ -596,22 +619,87 @@ public class CacheService {
 
         return stats;
     }
+    public void printCacheStats() {
+        CacheService.CacheStats stats = getCacheStatus();
+        log.info("📊 Cache Statistics:");
+        log.info("   ├─ Active Users: {}", stats.allUserCount());
+        log.info("   ├─ Activated Users: {}", stats.activatedUserCount());
+        log.info("   ├─ Users: {}", stats.allUserCount());
+        log.info("   ├─ Active Chats: {}", stats.chatCount());
+        log.info("   ├─ Active Sessions: {}", stats.allUserCount());
+        log.info("   ├─ Verification Tokens: {}", stats.verificationTokenCount());
+        log.info("   ├─ User-Chat Relations: {}", stats.userChatsCount());
+        log.info("   ├─ Chat Members: {}", stats.chatMembersCount());
+        log.info("   └─ Admin Rights: {}", stats.adminRightsCount());
+    }
 
-    @Scheduled(fixedDelay = 3_600_000) // 1000 * 60 * 60
-    public void cleanupUserPaginationKeys() {
+    @Scheduled(fixedDelay = 3_600_000, initialDelay = 10_000) // 1000 * 60 * 60
+    public void cleanupPaginationKeys() {
+        int beforeUserKeys = userPaginationKeys.values().stream().mapToInt(Set::size).sum();
+        int beforeChatKeys = chatMembersPaginationKeys.values().stream().mapToInt(Set::size).sum();
+
         userPaginationKeys.entrySet().removeIf(entry -> {
-            // Если пользователь больше не в кеше - чистим его ключи
-            if (userCache.getIfPresent(entry.getKey()) == null) {
-                entry.getValue().forEach(userChatsPaginationCache::invalidate);
-                return true;
-            }
-
             // Удаляем конкретные ключи, которые уже вытеснены из кеша
             entry.getValue().removeIf(key ->
                 userChatsPaginationCache.getIfPresent(key) == null
             );
-
             return entry.getValue().isEmpty();
         });
+        chatMembersPaginationKeys.entrySet().removeIf(entry -> {
+            // Удаляем конкретные ключи, которые уже вытеснены из кеша
+            entry.getValue().removeIf(key ->
+                chatMembersPaginationCache.getIfPresent(key) == null
+            );
+            return entry.getValue().isEmpty();
+        });
+
+        int afterUserKeys = userPaginationKeys.values().stream().mapToInt(Set::size).sum();
+        int afterChatKeys = chatMembersPaginationKeys.values().stream().mapToInt(Set::size).sum();
+
+        if (beforeUserKeys != afterUserKeys || beforeChatKeys != afterChatKeys) {
+            log.debug("[🧹] Pagination cleanup: user keys {}→{}, chat keys {}→{}", beforeUserKeys, afterUserKeys, beforeChatKeys, afterChatKeys);
+        }
+    }
+
+    @Scheduled(fixedDelay = 3_600_000, initialDelay = 10_000) // Каждые 1 час
+    public void logCacheStats() {
+
+        var cacheStats = getDetailedCacheStats();
+
+        log.info("---------------------------");
+
+        printCacheStats(); // Выводим основную статистику
+
+        log.info("📊 Cache Statistics Report");
+        log.info("   ├─ User Cache: size={}, hitRate={}, missRate={}, evictions={}",
+                cacheStats.get("userCache.estimatedSize"),
+                (Double)cacheStats.get("userCache.hitRate") * 100,
+                (Double)cacheStats.get("userCache.missRate") * 100,
+                cacheStats.get("userCache.evictionCount"));
+
+        log.info("   ├─ Chat Cache: size={}, hitRate={}, missRate={}, evictions={}",
+                cacheStats.get("chatCache.estimatedSize"),
+                (Double)cacheStats.get("chatCache.hitRate") * 100,
+                (Double)cacheStats.get("chatCache.missRate") * 100,
+                cacheStats.get("chatCache.evictionCount"));
+
+        log.info("   ├─ Chat Member Cache: size={}, hitRate={}%, missRate={}%, evictions={}",
+                cacheStats.get("chatMembersContainerCache.estimatedSize"),
+                Math.round((Double)cacheStats.get("chatMembersContainerCache.hitRate") * 100),
+                Math.round((Double)cacheStats.get("chatMembersContainerCache.missRate") * 100),
+                cacheStats.get("chatMembersContainerCache.evictionCount"));
+
+        log.info("   ├─ Token Cache: size={}, hitRate={}, missRate={}, evictions={}",
+                cacheStats.get("tokenCache.estimatedSize"),
+                (Double)cacheStats.get("tokenCache.hitRate") * 100,
+                (Double)cacheStats.get("tokenCache.missRate") * 100,
+                cacheStats.get("tokenCache.evictionCount"));
+
+        log.info("   ├─ Indexes: username={}, email={}, personalChats={}",
+                cacheStats.get("usernameIndex.size"),
+                cacheStats.get("emailIndex.size"),
+                cacheStats.get("personalChatIndex.size"));
+
+        log.info("---------------------------");
     }
 }

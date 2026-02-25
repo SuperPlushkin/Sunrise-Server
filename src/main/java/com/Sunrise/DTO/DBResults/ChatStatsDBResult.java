@@ -5,8 +5,4 @@ public interface ChatStatsDBResult {
     Integer getDeletedForAll();
     Integer getHiddenByUser();
     Boolean getCanClearForAll();
-
-    interface GetUserResult {
-
-    }
 }

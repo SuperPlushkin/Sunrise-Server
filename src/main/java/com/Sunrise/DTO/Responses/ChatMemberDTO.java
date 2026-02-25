@@ -23,7 +23,7 @@ public class ChatMemberDTO {
         this.setUsername(user.getUsername());
         this.setName(user.getName());
         this.setJoinedAt(member.getJoinedAt());
-        this.setIsAdmin(member.getIsAdmin());
-        this.setIsDeleted(member.getIsDeleted());
+        this.setIsAdmin(member.isAdmin());
+        this.setIsDeleted(member.isDeleted());
     }
 }

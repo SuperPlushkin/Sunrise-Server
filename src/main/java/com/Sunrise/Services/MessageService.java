@@ -10,6 +10,7 @@ import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
 import com.Sunrise.Services.DataServices.LockService;
 import com.Sunrise.Subclasses.ValidationException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,6 +18,7 @@ import java.util.Set;
 
 import static com.Sunrise.Services.DataServices.DataAccessService.randomId;
 
+@Slf4j
 @Service
 public class MessageService {
 
@@ -52,9 +54,11 @@ public class MessageService {
             return CreateMessageResult.success(message.getId(), message.getSentAt());
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed making public message: {}", e.getMessage());
             return CreateMessageResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error making public message: {}", e.getMessage());
             return CreateMessageResult.error("createPublicMessage failed due to server error");
         }
         finally {
@@ -82,9 +86,11 @@ public class MessageService {
             return CreateMessageResult.success(message.getId(), message.getSentAt());
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed making private message: {}", e.getMessage());
             return CreateMessageResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error making private message: {}", e.getMessage());
             return CreateMessageResult.error("createPrivateMessage failed due to server error");
         }
         finally {
@@ -92,22 +98,24 @@ public class MessageService {
         }
     }
 
-    public ChatMessagesResult getChatMessagesFirst(Long chatId, Long userId, Integer limit) {
+    public ChatMessagesResult getChatMessagesUpToDate(Long chatId, Long userId, Integer limit) {
 
         lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
         try
         {
             validator.validateActiveUserInChat(chatId, userId);
 
-            List<MessageDBResult> messages = dataAccessService.getChatMessagesFirst(chatId, userId, limit);
+            List<MessageDBResult> messages = dataAccessService.getChatMessagesUpToDate(chatId, userId, limit);
 
             return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed getting messages up-to-date: {}", e.getMessage());
             return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return ChatMessagesResult.error("getChatMessagesFirst failed due to server error");
+            log.error("[🔧] ⚠️ Error getting messages up-to-date: {}", e.getMessage());
+            return ChatMessagesResult.error("getChatMessagesUpToDate failed due to server error");
         }
         finally {
             lockService.unlockReadChat(chatId);
@@ -125,9 +133,11 @@ public class MessageService {
             return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed getting messages before: {}", e.getMessage());
             return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting messages before: {}", e.getMessage());
             return ChatMessagesResult.error("getChatMessagesBefore failed due to server error");
         }
         finally {
@@ -146,9 +156,11 @@ public class MessageService {
             return ChatMessagesResult.success(messages);
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed getting messages after: {}", e.getMessage());
             return ChatMessagesResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting messages after: {}", e.getMessage());
             return ChatMessagesResult.error("getChatMessagesAfter failed due to server error");
         }
         finally {
@@ -168,9 +180,11 @@ public class MessageService {
             return new VisibleMessagesCountResult(true, null, count);
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed getting visible messages count: {}", e.getMessage());
             return VisibleMessagesCountResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting visible messages count: {}", e.getMessage());
             return VisibleMessagesCountResult.error("GetVisibleMessagesCount failed due to server error");
         }
         finally{
@@ -189,9 +203,11 @@ public class MessageService {
             return SimpleResult.success();
         }
         catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed marking message as read: {}", e.getMessage());
             return SimpleResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Error marking message as read: {}", e.getMessage());
             return SimpleResult.error("MarkMessageAsRead failed due to server error");
         }
         finally {

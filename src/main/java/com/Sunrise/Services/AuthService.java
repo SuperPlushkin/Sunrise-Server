@@ -8,9 +8,12 @@ import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Entities.DB.VerificationToken;
 import com.Sunrise.JWT.JwtUtil;
-
 import com.Sunrise.Services.DataServices.LockService;
+import com.Sunrise.Subclasses.ValidationException;
+
 import jakarta.servlet.http.HttpServletRequest;
+
+import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ import java.util.Optional;
 
 import static com.Sunrise.Services.DataServices.DataAccessService.randomId;
 
+@Slf4j
 @Service
 public class AuthService {
 
@@ -43,12 +47,11 @@ public class AuthService {
 
         try
         {
-            // проверка на уникальность
             if (dataAccessService.existsUserByUsername(username.trim()))
-                return UserRegistrationResult.error("Username already exists");
+                throw new ValidationException("Username already exists");
 
             if (dataAccessService.existsUserByEmail(email.toLowerCase()))
-                return UserRegistrationResult.error("Email already exists");
+                throw new ValidationException("Email already exists");
 
             var user = new User(randomId(), username, name, email, passwordEncoder.encode(password), false);
 
@@ -59,71 +62,87 @@ public class AuthService {
             dataAccessService.saveVerificationToken(verifToken);
             emailService.sendVerificationEmail(email, verifToken.getToken());
 
+            log.info("[🔧] ✅ User registered successfully --> {}", username);
             return UserRegistrationResult.success(verifToken.getToken());
         }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to register user: {}", e.getMessage());
+            return UserRegistrationResult.error(e.getMessage());
+        }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Registration failed for user {}: {}", username, e.getMessage());
             return UserRegistrationResult.error("Registration failed due to server error");
         }
         finally {
             lockService.unlockRegistration(username, email);
         }
     }
+
     public UserLoginResult authenticateUser(String username, String password, HttpServletRequest httpRequest) {
         try
         {
             Optional<User> userOpt = dataAccessService.getUserByUsername(username);
-
             if (userOpt.isEmpty())
-                return UserLoginResult.error("Invalid username or password");
+                throw new ValidationException("Invalid username or password");
 
             User user = userOpt.get();
+            if (!user.isEnabled())
+                throw new ValidationException("Please verify your email first");
 
-            if (!user.getIsEnabled())
-                return UserLoginResult.error("Please verify your email first");
+            if(!passwordEncoder.matches(password, user.getHashPassword()))
+                throw new ValidationException("Invalid username or password");
 
-            if (passwordEncoder.matches(password, user.getHashPassword())) {
-                dataAccessService.updateLastLogin(username, LocalDateTime.now());
+            dataAccessService.updateLastLogin(username, LocalDateTime.now());
 
-                var loginHistory = new LoginHistory(randomId(), user.getId(), extractClientIp(httpRequest), httpRequest.getHeader("User-Agent"), LocalDateTime.now());
-                dataAccessService.saveLoginHistory(loginHistory);
+            var loginHistory = new LoginHistory(randomId(), user.getId(), extractClientIp(httpRequest), httpRequest.getHeader("User-Agent"), LocalDateTime.now());
+            dataAccessService.saveLoginHistory(loginHistory);
 
-                String token = jwtUtil.generateToken(username, user.getId());
+            String token = jwtUtil.generateToken(username, user.getId());
 
-                return UserLoginResult.success(token, jwtUtil.getTokenExpirationTime(token));
-            }
-            else return UserLoginResult.error("Invalid username or password");
+            log.info("[🔧] ✅ User logged in successfully --> {}", username);
+            return UserLoginResult.success(token, jwtUtil.getTokenExpirationTime(token));
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to authenticate user: {}", e.getMessage());
+            return UserLoginResult.error(e.getMessage());
         }
         catch (Exception e) {
+            log.error("[🔧] ⚠️ Authentication failed for user {}: {}", username, e.getMessage());
             return UserLoginResult.error("Authentication failed");
         }
     }
+
     public TokenConfirmationResult confirmToken(String type, String token) {
         try
         {
             if (token == null || token.trim().isEmpty())
-                return new TokenConfirmationResult(false, "Token cannot be empty");
+                throw new ValidationException("Token cannot be empty");
 
             Optional<VerificationToken> tokenOpt = dataAccessService.getVerificationToken(token);
-
             if (tokenOpt.isEmpty())
-                return new TokenConfirmationResult(false, "Invalid token");
+                throw new ValidationException("Invalid token");
 
             VerificationToken verificationToken = tokenOpt.get();
-
             if (!type.equals(verificationToken.getTokenType()))
-                return new TokenConfirmationResult(false, "Invalid token");
+                throw new ValidationException("Invalid token");
 
             dataAccessService.deleteVerificationToken(token);
 
             if (verificationToken.isExpired())
-                return new TokenConfirmationResult(false, "Token expired");
+                throw new ValidationException("Token expired");
 
             dataAccessService.enableUser(verificationToken.getUser_id());
 
-            return new TokenConfirmationResult(true, "Email successfully verified");
+            log.info("[🔧] ✅ Email verified successfully for user {}", verificationToken.getUser_id());
+            return TokenConfirmationResult.success("Email successfully verified");
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to confirm token: {}", e.getMessage());
+            return TokenConfirmationResult.error(e.getMessage());
         }
         catch (Exception e) {
-            return new TokenConfirmationResult(false, "Error during Token Confirmation: " + e.getMessage());
+            log.error("[🔧] ⚠️ Token confirmation error: {}", e.getMessage());
+            return TokenConfirmationResult.error("Error during Token Confirmation: " + e.getMessage());
         }
     }
 

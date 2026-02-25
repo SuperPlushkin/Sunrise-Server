@@ -20,6 +20,7 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
+    // Пока что почта не гарантирована
     @Async
     public void sendVerificationEmail(String to, String token) {
 
