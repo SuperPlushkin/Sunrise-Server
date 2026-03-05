@@ -1,16 +1,15 @@
 package com.Sunrise.Services;
 
 import com.Sunrise.DTO.DBResults.MessageDBResult;
-import com.Sunrise.DTO.ServiceResults.CreateMessageResult;
-import com.Sunrise.DTO.ServiceResults.ChatMessagesResult;
-import com.Sunrise.DTO.ServiceResults.SimpleResult;
-import com.Sunrise.DTO.ServiceResults.VisibleMessagesCountResult;
+import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Entities.DB.Message;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
 import com.Sunrise.Services.DataServices.LockService;
 import com.Sunrise.Subclasses.ValidationException;
+
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -34,10 +33,12 @@ public class MessageService {
 
     public CreateMessageResult makePublicMessage(Long chatId, Long userId, String text){
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ (ЗАПИСЬ)
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return CreateMessageResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             if (text == null || text.trim().isEmpty())
                 return CreateMessageResult.error("Message text cannot be empty");
@@ -62,15 +63,17 @@ public class MessageService {
             return CreateMessageResult.error("createPublicMessage failed due to server error");
         }
         finally {
-            lockService.unlockWriteChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
     public CreateMessageResult makePrivateMessage(Long chatId, Long userId, Long userToSend, String text) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ (ЗАПИСЬ)
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return CreateMessageResult.error("Try again later");
+
         try {
-            if (validator.validateUsersInChatAndGetIsGroup(chatId, Set.of(userId, userToSend)))
-                return CreateMessageResult.error("Chat is a personal chat");
+            validator.validateActiveUsersInActiveChatAndChatIsPersonal(chatId, Set.of(userId, userToSend));
 
             // Валидация текста сообщения
             if (text == null || text.trim().isEmpty())
@@ -94,16 +97,18 @@ public class MessageService {
             return CreateMessageResult.error("createPrivateMessage failed due to server error");
         }
         finally {
-            lockService.unlockWriteChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
 
     public ChatMessagesResult getChatMessagesUpToDate(Long chatId, Long userId, Integer limit) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return ChatMessagesResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             List<MessageDBResult> messages = dataAccessService.getChatMessagesUpToDate(chatId, userId, limit);
 
@@ -118,15 +123,17 @@ public class MessageService {
             return ChatMessagesResult.error("getChatMessagesUpToDate failed due to server error");
         }
         finally {
-            lockService.unlockReadChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
     public ChatMessagesResult getChatMessagesBefore(Long chatId, Long userId, Long messageId, Integer limit) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return ChatMessagesResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             List<MessageDBResult> messages = dataAccessService.getChatMessagesBefore(chatId, userId, messageId, limit);
 
@@ -141,15 +148,17 @@ public class MessageService {
             return ChatMessagesResult.error("getChatMessagesBefore failed due to server error");
         }
         finally {
-            lockService.unlockReadChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
     public ChatMessagesResult getChatMessagesAfter(Long chatId, Long userId, Long messageId, Integer limit) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return ChatMessagesResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             List<MessageDBResult> messages = dataAccessService.getChatMessagesAfter(chatId, userId, messageId, limit);
 
@@ -164,16 +173,18 @@ public class MessageService {
             return ChatMessagesResult.error("getChatMessagesAfter failed due to server error");
         }
         finally {
-            lockService.unlockReadChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
 
     public VisibleMessagesCountResult getVisibleMessagesCount(Long chatId, Long userId) {
 
-        lockService.lockReadChat(chatId); // БЛОКИРУЕМ ЧАТ (ЧТЕНИЕ)
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return VisibleMessagesCountResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             int count = dataAccessService.getVisibleMessagesCount(chatId, userId);
 
@@ -188,15 +199,17 @@ public class MessageService {
             return VisibleMessagesCountResult.error("GetVisibleMessagesCount failed due to server error");
         }
         finally{
-            lockService.unlockReadChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
     public SimpleResult markMessageAsRead(Long chatId, Long messageId, Long userId) {
 
-        lockService.lockWriteChat(chatId); // БЛОКИРУЕМ ЧАТ
-        try
-        {
-            validator.validateActiveUserInChat(chatId, userId);
+        // READ на чат + READ на пользователя
+        if (!lockService.tryLockChatReadUserRead(chatId, userId))
+            return SimpleResult.error("Try again later");
+
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             dataAccessService.markMessageAsRead(messageId, userId); // уведомить всех надо об этом
 
@@ -211,7 +224,7 @@ public class MessageService {
             return SimpleResult.error("MarkMessageAsRead failed due to server error");
         }
         finally {
-            lockService.unlockWriteChat(chatId);
+            lockService.unLockChatReadUserRead(chatId, userId);
         }
     }
 }

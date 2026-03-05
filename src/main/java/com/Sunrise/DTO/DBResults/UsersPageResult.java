@@ -1,9 +1,7 @@
 package com.Sunrise.DTO.DBResults;
 
-import java.util.List;
+import com.Sunrise.Entities.DTO.LightUserDTO;
 
-public interface UsersPageResult {
-    List<Long> getUserIds();
-    Integer getTotalCount();
-    Boolean getHasMore();
-}
+import java.util.Map;
+
+public record UsersPageResult(Map<Long, LightUserDTO> users, Integer totalCount, Boolean hasMore) { }

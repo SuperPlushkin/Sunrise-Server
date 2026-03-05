@@ -2,7 +2,6 @@ package com.Sunrise.Controllers;
 
 import com.Sunrise.Controllers.Annotations.CurrentUserId;
 import com.Sunrise.DTO.Requests.FilteredUsersRequest;
-import com.Sunrise.DTO.Responses.UserDTO;
 import com.Sunrise.Services.UserService;
 
 import jakarta.validation.Valid;
@@ -10,11 +9,8 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-import java.util.Map;
-
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/users")
 public class UserController {
 
     private final UserService userService;
@@ -23,17 +19,13 @@ public class UserController {
         this.userService = userService;
     }
 
-    @GetMapping("/getmany")
-    public ResponseEntity<?> getManyUsers(@Valid @ModelAttribute FilteredUsersRequest request, @CurrentUserId Long userId) {
+    @GetMapping
+    public ResponseEntity<?> getManyUsers(@ModelAttribute @Valid FilteredUsersRequest request, @CurrentUserId Long userId) {
 
-        var result = userService.getFilteredUsers(userId, request.getFilter(), request.getOffset(), request.getLimited());
+        var result = userService.getFilteredUsers(userId, request.getFilter(), request.getOffset(), request.getLimit());
 
         if (result.isSuccess()) {
-            List<UserDTO> users = result.getUsers();
-            return ResponseEntity.ok(Map.of(
-                "users", users,
-                "count", users.size()
-            ));
+            return ResponseEntity.ok(result.getPage());
         }
         else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());

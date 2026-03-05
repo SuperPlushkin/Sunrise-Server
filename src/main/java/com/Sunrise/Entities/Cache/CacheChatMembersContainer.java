@@ -1,7 +1,5 @@
 package com.Sunrise.Entities.Cache;
 
-import com.Sunrise.Entities.DB.Chat;
-import com.Sunrise.Entities.DB.ChatMember;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
@@ -10,42 +8,35 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
-public class ChatMembersContainer {
+public class CacheChatMembersContainer {
     private final Long chatId;
     private Long chatCreatorId;
-    private final AtomicInteger deletedMemberCount;         // удаленных участников в БД
-    private final AtomicInteger totalMemberCount;           // всего участников в БД
-    private final AtomicInteger loadedCount;               // сколько загружено в кэш
-    private final LocalDateTime createdAt;                  // когда создан контейнер
+    private final AtomicInteger deletedMemberCount;                 // удаленных участников в БД
+    private final AtomicInteger totalMemberCount;                   // всего участников в БД
+    private final AtomicInteger loadedCount;                        // сколько загружено в кэш
+    private final LocalDateTime createdAt = LocalDateTime.now();    // когда создан контейнер
 
-    private final Map<Long, CacheChatMember> members;      // userId -> CacheChatMember
-    private final Set<Long> adminIds;                      // userId
-    private final Set<Long> deletedMemberIds;              // userId
+    private final Map<Long, CacheChatMember> members = new ConcurrentHashMap<>();   // userId -> CacheChatMember
+    private final Set<Long> adminIds = ConcurrentHashMap.newKeySet();               // userId
+    private final Set<Long> deletedMemberIds = ConcurrentHashMap.newKeySet();       // userId
 
-    public ChatMembersContainer(Chat chat) {
+    public CacheChatMembersContainer(CacheChat chat) {
         this.chatId = chat.getId();
         this.chatCreatorId = chat.getCreatedBy();
         this.deletedMemberCount = new AtomicInteger(chat.getDeletedMembersCount());
         this.totalMemberCount = new AtomicInteger(chat.getMembersCount());
         this.loadedCount = new AtomicInteger(0);
-        this.createdAt = LocalDateTime.now();
-        this.members = new ConcurrentHashMap<>();
-        this.adminIds = ConcurrentHashMap.newKeySet();
-        this.deletedMemberIds = ConcurrentHashMap.newKeySet();
         this.adminIds.add(chat.getCreatedBy());
     }
 
-    public List<CacheChatMember> getActiveMembers() {
-        return members.values().stream().filter(m -> !m.isDeleted()).toList();
-    }
-    public Set<Long> getChatAdminsIds(Long chatId) {
-        return new HashSet<>(adminIds);
-    }
     public List<CacheChatMember> getChatAdmins() {
         return adminIds.stream().map(members::get).toList();
     }
     public Optional<CacheChatMember> getMember(Long userId) {
         return Optional.ofNullable(members.get(userId));
+    }
+    public Optional<CacheChatMember> getActiveMember(Long userId) {
+        return getMember(userId).filter(CacheChatMember::isActive);
     }
 
     public void addNewMembers(Collection<CacheChatMember> newMembers) {
@@ -135,14 +126,14 @@ public class ChatMembersContainer {
         }
     }
 
-    public boolean hasMember(Long userId) {
-        return members.containsKey(userId);
-    }
     public boolean hasActiveMember(Long userId) {
-        return !getMember(userId).map(ChatMember::isDeleted).orElse(true);
+        return getActiveMember(userId).isPresent();
+    }
+    public Optional<Boolean> hasMemberAndGetIsActive(Long userId) {
+        return getMember(userId).map(CacheChatMember::isActive);
     }
     public Optional<Boolean> isAdmin(Long userId) {
-        if (adminIds.contains(userId))
+        if (adminIds.contains(userId) && hasActiveMember(userId))
             return Optional.of(true);
 
         if (members.containsKey(userId))
@@ -151,7 +142,7 @@ public class ChatMembersContainer {
         return Optional.empty();
     }
     public Optional<Long> getAnotherAdmin(Long excludeUserId) {
-        return adminIds.stream().filter(us -> !us.equals(excludeUserId)).findFirst();
+        return adminIds.stream().filter(us -> hasActiveMember(us) && !us.equals(excludeUserId)).findFirst();
     }
     public Optional<Boolean> isDeleted(Long userId) {
         if (deletedMemberIds.contains(userId))

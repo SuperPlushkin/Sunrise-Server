@@ -60,7 +60,7 @@ public class User {
         this.email = email;
         this.hashPassword = hashPassword;
     }
-    public User(Long id, String username, String name, String email, String hashPassword, Boolean isEnabled) {
+    public User(long id, String username, String name, String email, String hashPassword, boolean isEnabled) {
         this.id = id;
         this.username = username;
         this.name = name;

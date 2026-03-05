@@ -1,6 +1,6 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.DBResults.UsersPageResult;
+import com.Sunrise.DTO.DBResults.UserResult;
 import com.Sunrise.Entities.DB.User;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -13,7 +13,6 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -45,18 +44,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
 
-    boolean existsByUsername(String username);
-    boolean existsByEmail(String email);
-
 
     // ========== ПОИСК И ФИЛЬТРАЦИЯ С ПАГИНАЦИЕЙ (ПОКА ЧТО НОРМ, НО ПОТОМ НЕ НОРМ) ==========
 
-    @Query("SELECT u FROM User u WHERE u.isEnabled = true AND u.isDeleted = false")
-    List<User> findAllActive();
-
-    @Query("SELECT u.id FROM User u WHERE u.isEnabled = true AND u.isDeleted = false")
-    Set<Long> findAllActiveUserIds();
-
     @Query(value = "SELECT * FROM get_users_page(:filter, :offset, :limit)", nativeQuery = true)
-    UsersPageResult getUsersPage(@Param("filter") String filter, @Param("offset") int offset, @Param("limit") int limit);
+    List<UserResult> getFullFilteredUsersPage(@Param("filter") String filter, @Param("offset") int offset, @Param("limit") int limit);
 }

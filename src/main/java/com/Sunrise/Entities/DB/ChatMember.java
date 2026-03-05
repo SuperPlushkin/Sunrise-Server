@@ -38,6 +38,9 @@ public class ChatMember {
     public void setIsDeleted(boolean isDeleted){
         this.isDeleted = isDeleted;
     }
+    public boolean isActive() {
+        return !isDeleted;
+    }
 
 
     // Конструктор для удобства

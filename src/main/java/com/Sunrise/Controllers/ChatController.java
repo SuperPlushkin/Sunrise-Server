@@ -99,8 +99,8 @@ public class ChatController {
             return ResponseEntity.ok(Map.of(
                 "total_messages", result.getTotalMessages(),
                 "deleted_for_all", result.getDeletedForAll(),
-                "hidden_by_user", result.getHiddenByUser(),
-                "can_clear_for_all", result.getCanClearForAll()
+                "deleted_for_user", result.getDeletedForUser(),
+                "can_delete_for_all", result.getCanDeleteForAll()
             ));
         }
         else {
@@ -108,10 +108,10 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/clear-history")
+    @PostMapping("/{chatId}/delete-all-messages")
     public ResponseEntity<?> clearChatHistory(@PathVariable @ValidId Long chatId, @RequestParam(defaultValue = "FOR_SELF") ClearType clearType, @CurrentUserId Long userId) {
 
-        HistoryOperationResult result = chatService.clearChatHistory(chatId, clearType, userId);
+        HistoryOperationResult result = chatService.deleteAllChatMessages(chatId, clearType, userId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
@@ -141,9 +141,9 @@ public class ChatController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getUserChats(@CurrentUserId Long userId) {
+    public ResponseEntity<?> getUserChats(@RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "10") int limit, @CurrentUserId Long userId) {
 
-        UserChatsResult result = chatService.getUserChats(userId);
+        UserChatsResult result = chatService.getUserChats(userId, offset, limit);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(

@@ -4,6 +4,8 @@ import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
 import com.Sunrise.DTO.ServiceResults.UserLoginResult;
 import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
 import com.Sunrise.Entities.DB.LoginHistory;
+import com.Sunrise.Entities.DTO.FullUserDTO;
+import com.Sunrise.Entities.DTO.VerificationTokenDTO;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Entities.DB.VerificationToken;
@@ -42,28 +44,39 @@ public class AuthService {
 
     public UserRegistrationResult registerUser(String username, String name, String email, String password) {
 
-        if (!lockService.lockRegistration(username, email))
+        // пытаемся заблокировать регистрацию
+        if (!lockService.tryLockRegistration(username, email))
             return UserRegistrationResult.error("Try again later");
 
-        try
-        {
+        long newUserId = -1;
+
+        try {
             if (dataAccessService.existsUserByUsername(username.trim()))
                 throw new ValidationException("Username already exists");
 
             if (dataAccessService.existsUserByEmail(email.toLowerCase()))
                 throw new ValidationException("Email already exists");
 
-            var user = new User(randomId(), username, name, email, passwordEncoder.encode(password), false);
+            newUserId = randomId();
 
-            dataAccessService.saveUser(user);
+            // пытаемся заблокировать профиль юзера
+            if (!lockService.tryLockUserProfileForWrite(newUserId))
+                throw new RuntimeException("Try later");
 
-            var verifToken = new VerificationToken(randomId(), DataAccessService.generate64CharString(), user.getId(), "email_confirmation");
+            dataAccessService.saveUser(newUserId, username, name, email, passwordEncoder.encode(password), false);
 
-            dataAccessService.saveVerificationToken(verifToken);
-            emailService.sendVerificationEmail(email, verifToken.getToken());
+            var verificationTokenDTO = new VerificationTokenDTO(
+                randomId(),
+                DataAccessService.generate64CharString(),
+                newUserId,
+                "email_confirmation"
+            );
+
+            dataAccessService.saveVerificationToken(verificationTokenDTO);
+            emailService.sendVerificationEmail(email, verificationTokenDTO.getToken());
 
             log.info("[🔧] ✅ User registered successfully --> {}", username);
-            return UserRegistrationResult.success(verifToken.getToken());
+            return UserRegistrationResult.success(verificationTokenDTO.getToken());
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to register user: {}", e.getMessage());
@@ -74,18 +87,21 @@ public class AuthService {
             return UserRegistrationResult.error("Registration failed due to server error");
         }
         finally {
-            lockService.unlockRegistration(username, email);
+            if (newUserId != -1) {
+                lockService.unLockUserProfileForWrite(newUserId); // разблокируем профиль юзера
+            }
+            lockService.unLockRegistration(username, email); // разблокируем регистрацию
         }
     }
 
     public UserLoginResult authenticateUser(String username, String password, HttpServletRequest httpRequest) {
         try
         {
-            Optional<User> userOpt = dataAccessService.getUserByUsername(username);
+            Optional<FullUserDTO> userOpt = dataAccessService.getUserByUsername(username);
             if (userOpt.isEmpty())
                 throw new ValidationException("Invalid username or password");
 
-            User user = userOpt.get();
+            FullUserDTO user = userOpt.get();
             if (!user.isEnabled())
                 throw new ValidationException("Please verify your email first");
 
@@ -113,27 +129,35 @@ public class AuthService {
     }
 
     public TokenConfirmationResult confirmToken(String type, String token) {
-        try
-        {
+
+        long userId = -1;
+
+        try {
             if (token == null || token.trim().isEmpty())
                 throw new ValidationException("Token cannot be empty");
 
-            Optional<VerificationToken> tokenOpt = dataAccessService.getVerificationToken(token);
+            Optional<VerificationTokenDTO> tokenOpt = dataAccessService.getVerificationToken(token);
             if (tokenOpt.isEmpty())
                 throw new ValidationException("Invalid token");
 
-            VerificationToken verificationToken = tokenOpt.get();
+            VerificationTokenDTO verificationToken = tokenOpt.get();
             if (!type.equals(verificationToken.getTokenType()))
                 throw new ValidationException("Invalid token");
+
+            userId = verificationToken.getUserId();
+
+            // пытаемся заблокировать профиль юзера
+            if (!lockService.tryLockUserProfileForWrite(userId))
+                throw new RuntimeException("Try later");
 
             dataAccessService.deleteVerificationToken(token);
 
             if (verificationToken.isExpired())
                 throw new ValidationException("Token expired");
 
-            dataAccessService.enableUser(verificationToken.getUser_id());
+            dataAccessService.enableUser(verificationToken.getUserId());
 
-            log.info("[🔧] ✅ Email verified successfully for user {}", verificationToken.getUser_id());
+            log.info("[🔧] ✅ Email verified successfully for user {}", verificationToken.getUserId());
             return TokenConfirmationResult.success("Email successfully verified");
         }
         catch (ValidationException e) {
@@ -143,6 +167,11 @@ public class AuthService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Token confirmation error: {}", e.getMessage());
             return TokenConfirmationResult.error("Error during Token Confirmation: " + e.getMessage());
+        }
+        finally {
+            if(userId != -1){
+                lockService.unLockUserProfileForWrite(userId); // разблокируем профиль юзера
+            }
         }
     }
 

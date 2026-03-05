@@ -5,16 +5,16 @@ package com.Sunrise.DTO.ServiceResults;
 public class ChatStatsResult extends ServiceResultTemplate {
     private final Integer totalMessages;
     private final Integer deletedForAll;
-    private final Integer hiddenByUser;
-    private final Boolean canClearForAll;
+    private final Integer deletedForUser;
+    private final Boolean canDeleteForAll;
 
-    public ChatStatsResult(Boolean success, String errorMessage, Integer totalMessages, Integer deletedForAll, Integer hiddenByUser, Boolean canClearForAll) {
+    public ChatStatsResult(Boolean success, String errorMessage, Integer totalMessages, Integer deletedForAll, Integer deletedForUser, Boolean canDeleteForAll) {
         super(success, errorMessage);
 
         this.totalMessages = totalMessages;
         this.deletedForAll = deletedForAll;
-        this.hiddenByUser = hiddenByUser;
-        this.canClearForAll = canClearForAll;
+        this.deletedForUser = deletedForUser;
+        this.canDeleteForAll = canDeleteForAll;
     }
 
     public static ChatStatsResult success(Integer totalMessages, Integer deletedForAll, Integer hiddenByUser, Boolean canClearForAll) {

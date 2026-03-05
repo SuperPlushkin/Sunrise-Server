@@ -2,6 +2,7 @@ package com.Sunrise.Repositories;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
 import com.Sunrise.Entities.DB.Chat;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -9,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -19,12 +21,14 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     // ========== ОПЕРАЦИИ С ЧАТОМ ==========
 
 
-    @Query(value = "SELECT create_personal_chat(:chatId, :user1Id, :user2Id)", nativeQuery = true)
-    void createPersonalChat(@Param("chatId") Long chatId, @Param("user1Id") Long user1Id, @Param("user2Id") Long user2Id);
+    @Query(value = "SELECT create_personal_chat(:chatId, :user1Id, :user2Id, :createdAt)", nativeQuery = true)
+    void createPersonalChat(@Param("chatId") Long chatId, @Param("user1Id") Long user1Id,
+                            @Param("user2Id") Long user2Id, @Param("createdAt") LocalDateTime createdAt);
 
-    @Query(value = "SELECT create_group_chat(:chatId, :name, :creatorId, :memberIds)", nativeQuery = true)
+    @Query(value = "SELECT create_group_chat(:chatId, :name, :creatorId, :memberIds, :createdAt)", nativeQuery = true)
     void createGroupChat(@Param("chatId") Long chatId, @Param("name") String name,
-                         @Param("creatorId") Long creatorId, @Param("memberIds") Long[] memberIds);
+                         @Param("creatorId") Long creatorId, @Param("memberIds") Long[] memberIds,
+                         @Param("createdAt") LocalDateTime createdAt);
 
     @Modifying
     @Transactional
@@ -77,16 +81,15 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // Удаление всех сообщений (для всех) | админ
     @Query(value = "SELECT * FROM clear_chat_history_for_all(:chatId, :userId)", nativeQuery = true)
-    Integer clearChatHistoryForAll(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    Integer deleteAllChatMessagesForAll(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
 
     // Удаление всех сообщений (для себя)
     @Query(value = "SELECT * FROM clear_chat_history_for_self(:chatId, :userId)", nativeQuery = true)
-    Integer clearChatHistoryForSelf(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    Integer deleteAllChatMessagesForSelf(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
 
     // Статистика
-    @Query(value = "SELECT total_messages, hidden_for_all, hidden_by_user, can_clear_for_all " +
-            "FROM get_chat_clear_stats(:chatId, :userId)", nativeQuery = true)
+    @Query(value = "SELECT * FROM get_chat_clear_stats(:chatId, :userId)", nativeQuery = true)
     ChatStatsDBResult getChatClearStats(@Param("chatId") Long chatId, @Param("userId") Long userId);
 }

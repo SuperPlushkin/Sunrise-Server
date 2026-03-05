@@ -1,9 +1,7 @@
 package com.Sunrise.DTO.DBResults;
 
-import java.util.List;
+import com.Sunrise.Entities.DTO.FullChatMemberDTO;
 
-public interface ChatMembersPageResult{
-    List<Long> getUserIds();
-    Integer getTotalCount();
-    Boolean getHasMore();
-}
+import java.util.Map;
+
+public record ChatMembersPageResult(Map<Long, FullChatMemberDTO> chatMembers, Integer totalCount, Boolean hasMore) { }

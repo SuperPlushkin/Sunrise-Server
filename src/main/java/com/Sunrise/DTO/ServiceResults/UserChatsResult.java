@@ -1,6 +1,6 @@
 package com.Sunrise.DTO.ServiceResults;
 
-import com.Sunrise.DTO.Responses.ChatDTO;
+import com.Sunrise.Entities.DTO.ChatDTO;
 
 import java.util.List;
 

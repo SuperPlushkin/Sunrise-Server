@@ -1,15 +1,16 @@
 package com.Sunrise.Services.DataServices;
 
 import com.Sunrise.DTO.DBResults.*;
+import com.Sunrise.Entities.DTO.FullChatMemberDTO;
 import com.Sunrise.Entities.DB.*;
+import com.Sunrise.Entities.DTO.LightUserDTO;
 import com.Sunrise.Repositories.*;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class DBService {
@@ -74,8 +75,26 @@ public class DBService {
     public List<User> getUsersByIds(List<Long> missingIds) {
         return userRepository.findAllById(missingIds);
     }
-    public UsersPageResult getFilteredUsersPage(String filter, int offset, int limit){
-        return userRepository.getUsersPage(filter, offset, limit);
+    public UsersPageResult getFullFilteredUsersPage(String filter, int offset, int limit){
+        List<UserResult> rows = userRepository.getFullFilteredUsersPage(filter, offset, limit);
+        if (rows.isEmpty())
+            return new UsersPageResult(Collections.emptyMap(), 0, false);
+
+        Map<Long, LightUserDTO> users = rows.stream()
+                .collect(Collectors.toMap(
+                    UserResult::getUserId,
+                    row -> new LightUserDTO(
+                        row.getUserId(),
+                        row.getUsername(),
+                        row.getName()
+                    )
+                ));
+
+        return new UsersPageResult(
+            users,
+            rows.getFirst().getTotalCount(),
+            rows.getFirst().getHasMore()
+        );
     }
     public List<Chat> getUserChats(Long userId) {
         return chatRepository.findUserChats(userId);
@@ -98,12 +117,12 @@ public class DBService {
     // Основные методы
     @Async("dbExecutor")
     public void saveGroupChatAsync(Chat chat, Long[] memberIds) {
-        chatRepository.createGroupChat(chat.getId(), chat.getName(), chat.getCreatedBy(), memberIds);
+        chatRepository.createGroupChat(chat.getId(), chat.getName(), chat.getCreatedBy(), memberIds, chat.getCreatedAt());
     }
 
     @Async("dbExecutor")
-    public void savePersonalChatAsync(Long chatId, Long creator, Long member) {
-        chatRepository.createPersonalChat(chatId, creator, member);
+    public void savePersonalChatAsync(Chat chat, Long opponentId) {
+        chatRepository.createPersonalChat(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
     }
 
     @Async("dbExecutor")
@@ -144,17 +163,6 @@ public class DBService {
     }
 
 
-    // Методы для работы с историей чата
-    public Integer clearChatHistoryForAll(Long chatId, Long userId) {
-        return chatRepository.clearChatHistoryForAll(chatId, userId);
-    }
-    public Integer clearChatHistoryForSelf(Long chatId, Long userId) {
-        return chatRepository.clearChatHistoryForSelf(chatId, userId);
-    }
-    public ChatStatsDBResult getChatClearStats(Long chatId, Long userId) {
-        return chatRepository.getChatClearStats(chatId, userId);
-    }
-
 
     // ========== CHAT MEMBER METHODS ==========
 
@@ -177,8 +185,8 @@ public class DBService {
     public Optional<ChatMember> getChatMember(Long chatId, Long userId) {
         return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
     }
-    public List<Long> getUserChatIds(Long userId) {
-        return chatMemberRepository.getUserChatIds(userId);
+    public Optional<ChatMember> getActiveChatMember(Long chatId, Long userId) {
+        return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
     }
     public List<Long> getMisingUserChatIds(Long userId, Set<Long> chatIds) {
         return chatMemberRepository.findMissingUserChatIds(userId, chatIds);
@@ -186,24 +194,36 @@ public class DBService {
     public List<Long> getChatMemberIds(Long chatId) {
         return chatMemberRepository.findChatMemberIds(chatId);
     }
-    public List<ChatMember> getChatMembersByIds(Long chatId, List<Long> missingIds) {
-        return chatMemberRepository.findChatMembersByIds(chatId, missingIds);
+    public List<ChatMember> getActiveChatMembersByIds(Long chatId, List<Long> missingIds) {
+        return chatMemberRepository.findActiveChatMembersByIds(chatId, missingIds);
     }
-    public ChatMembersPageResult getChatMembersPage(Long chatId, int offset, int limit) {
-        return chatMemberRepository.getChatMembersPage(chatId, offset, limit);
-    }
+    public ChatMembersPageResult getFullChatMembersPage(Long chatId, int offset, int limit) {
+        List<ChatMemberResult> rows = chatMemberRepository.findFullChatMembersPage(chatId, offset, limit);
+        if (rows.isEmpty())
+            return new ChatMembersPageResult(Collections.emptyMap(), 0, false);
 
-    public Optional<ChatMember> findAnotherChatAdmin(Long chatId, Long excludeUserId1) {
-        return chatMemberRepository.findAnotherAdmin(chatId, excludeUserId1);
+        Map<Long, FullChatMemberDTO> members = rows.stream()
+            .collect(Collectors.toMap(
+                ChatMemberResult::getUserId,
+                row -> new FullChatMemberDTO(
+                    row.getUserId(),
+                    row.getUsername(),
+                    row.getName(),
+                    row.getJoinedAt(),
+                    row.getIsAdmin(),
+                    row.getIsDeleted(),
+                    row.getUserIsDeleted()
+                )
+            ));
+
+        return new ChatMembersPageResult(
+            members,
+            rows.getFirst().getTotalCount(),
+            rows.getFirst().getHasMore()
+        );
     }
-    public Optional<Long> findAnotherChatAdminId(Long chatId, Long excludeUserId) {
-        return chatMemberRepository.findAnotherAdminId(chatId, excludeUserId);
-    }
-    public Optional<Boolean> isChatAdmin(Long chatId, Long userId) {
-        return chatMemberRepository.isChatAdmin(chatId, userId);
-    }
-    public boolean isUserInChat(Long chatId, Long userId) {
-        return chatMemberRepository.isUserInChat(chatId, userId);
+    public Optional<ChatMember> findAnotherActiveChatAdmin(Long chatId, Long excludeUserId1) {
+        return chatMemberRepository.findAnotherActiveAdmin(chatId, excludeUserId1);
     }
 
 
@@ -255,5 +275,16 @@ public class DBService {
     }
     public Integer getVisibleMessagesCount(Long chatId, Long userId) {
         return messageRepository.getVisibleMessagesCount(chatId, userId);
+    }
+
+    public Integer deleteAllChatMessagesForAll(Long chatId, Long userId) {
+        return chatRepository.deleteAllChatMessagesForAll(chatId, userId);
+    }
+    public Integer deleteAllChatMessagesForSelf(Long chatId, Long userId) {
+        return chatRepository.deleteAllChatMessagesForSelf(chatId, userId);
+    }
+
+    public ChatStatsDBResult getChatMessagesDeletedStats(Long chatId, Long userId) {
+        return chatRepository.getChatClearStats(chatId, userId);
     }
 }

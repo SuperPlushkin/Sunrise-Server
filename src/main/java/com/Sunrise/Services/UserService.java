@@ -1,8 +1,7 @@
 package com.Sunrise.Services;
 
+import com.Sunrise.DTO.DBResults.UsersPageResult;
 import com.Sunrise.DTO.ServiceResults.FilteredUsersResult;
-import com.Sunrise.DTO.Responses.UserDTO;
-import com.Sunrise.Entities.DB.User;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
 import com.Sunrise.Subclasses.ValidationException;
@@ -10,8 +9,6 @@ import com.Sunrise.Subclasses.ValidationException;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Slf4j
 @Service
@@ -25,15 +22,13 @@ public class UserService {
     }
 
     public FilteredUsersResult getFilteredUsers(Long userId, String filter, int offset, int limit) {
-        try
-        {
+        try {
             validator.validateActiveUser(userId);
 
-            List<User> users = dataAccessService.getFilteredUsersPage(filter, offset, limit);
-            List<UserDTO> userDTOs = users.stream().map(UserDTO::new).toList();
+            UsersPageResult usersPage = dataAccessService.getUsersPage(filter, offset, limit);
 
-            log.debug("[🔧] ✅ Get {} users with filter='{}' (offset={}, limit={})", users.size(), filter, offset, limit);
-            return FilteredUsersResult.success(userDTOs);
+            log.debug("[🔧] ✅ Get {} users with filter='{}' (offset={}, limit={})", usersPage.totalCount(), filter, offset, limit);
+            return FilteredUsersResult.success(usersPage);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to getFilteredUsers: {}", e.getMessage());

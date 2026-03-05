@@ -24,7 +24,7 @@ public class HealthTestController {
         );
     }
 
-    @GetMapping("/cash-status")
+    @GetMapping("/cache-status")
     public ResponseEntity<?> getCashStatus() {
         return ResponseEntity.ok(dataAccessService.getCacheStatus());
     }

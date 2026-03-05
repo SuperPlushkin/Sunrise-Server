@@ -1,5 +1,6 @@
 package com.Sunrise.Repositories;
 
+import com.Sunrise.DTO.DBResults.ChatMemberResult;
 import com.Sunrise.DTO.DBResults.ChatMembersPageResult;
 import com.Sunrise.DTO.DBResults.ChatsPageResult;
 import com.Sunrise.Entities.DB.ChatMember;
@@ -28,12 +29,12 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
     @Query(value = "SELECT remove_chat_member(:chatId, :userId)", nativeQuery = true)
     void removeChatMember(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
-    @Query("SELECT cm FROM ChatMember cm WHERE cm.id.chatId = :chatId")
-    List<ChatMember> getChatMembers(@Param("chatId") Long chatId);
+    @Query("SELECT cm FROM ChatMember cm WHERE cm.id.chatId = :chatId AND cm.isDeleted = false")
+    List<ChatMember> getActiveChatMember(@Param("chatId") Long chatId);
 
     @Query("SELECT cm.isAdmin FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false")
-    Optional<Boolean> isChatAdmin(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    Optional<Boolean> isActiveChatAdmin(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
     @Query("SELECT EXISTS (SELECT 1 FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false)")
@@ -47,7 +48,7 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
     @Query("SELECT cm FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.isAdmin = true AND cm.isDeleted = false " +
             "AND cm.id.userId != :excludeUserId")
-    Optional<ChatMember> findAnotherAdmin(@Param("chatId") Long chatId, @Param("excludeUserId") Long excludeUserId);
+    Optional<ChatMember> findAnotherActiveAdmin(@Param("chatId") Long chatId, @Param("excludeUserId") Long excludeUserId);
 
     @Query("SELECT cm.id.chatId FROM ChatMember cm WHERE cm.id.userId = :userId AND cm.isDeleted = false")
     List<Long> getUserChatIds(@Param("userId") Long userId);
@@ -62,8 +63,8 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
     List<Long> findChatMemberIds(@Param("chatId") Long chatId);
 
     @Query("SELECT cm FROM ChatMember cm " +
-            "WHERE cm.id.chatId = :chatId AND cm.id.userId IN :userIds")
-    List<ChatMember> findChatMembersByIds(@Param("chatId") Long chatId, @Param("userIds") List<Long> userIds);
+            "WHERE cm.id.chatId = :chatId AND cm.id.userId IN :userIds AND cm.isDeleted = false")
+    List<ChatMember> findActiveChatMembersByIds(@Param("chatId") Long chatId, @Param("userIds") List<Long> userIds);
 
     @Query(value = "SELECT cm.chat_id FROM chat_members cm " +
                     "WHERE cm.user_id = :userId " +
@@ -77,4 +78,7 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
     @Query("SELECT COUNT(cm) FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.isDeleted = false")
     int countActiveMembers(@Param("chatId") Long chatId);
+
+    @Query(value = "SELECT * FROM get_chat_members_page(:chatId, :offset, :limit)", nativeQuery = true)
+    List<ChatMemberResult> findFullChatMembersPage(@Param("chatId") Long chatId, @Param("offset") int offset, @Param("limit") int limit);
 }

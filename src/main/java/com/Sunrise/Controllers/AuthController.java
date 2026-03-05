@@ -2,6 +2,7 @@ package com.Sunrise.Controllers;
 
 import com.Sunrise.DTO.Requests.LoginRequest;
 import com.Sunrise.DTO.Requests.RegisterRequest;
+import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
 import com.Sunrise.DTO.ServiceResults.UserLoginResult;
 import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
 import com.Sunrise.Services.AuthService;
@@ -71,7 +72,7 @@ public class AuthController {
     @GetMapping("/confirm")
     public String confirmEmail(@RequestParam("type") String type, @RequestParam("token") @Size(min = 64, max = 64) String token, Model model) {
 
-        var result = authService.confirmToken(type, token);
+        TokenConfirmationResult result = authService.confirmToken(type, token);
 
         model.addAttribute("isSuccess", result.isSuccess());
         model.addAttribute("message", result.getOperationText());

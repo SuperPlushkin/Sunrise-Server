@@ -1,28 +1,48 @@
 package com.Sunrise.Entities.Cache;
 
-import com.Sunrise.Entities.DB.Chat;
+import java.time.LocalDateTime;
 
-public class CacheChat extends Chat {
-    public CacheChat(Chat chat) {
-        super();
-        this.setId(chat.getId());
-        this.setName(chat.getName());
-        this.setDeletedMembersCount(chat.getDeletedMembersCount());
-        this.setMembersCount(chat.getMembersCount());
-        this.setCreatedBy(chat.getCreatedBy());
-        this.setIsGroup(chat.isGroup());
-        this.setCreatedAt(chat.getCreatedAt());
-        this.setDeletedAt(chat.getDeletedAt());
-        this.setIsDeleted(chat.isDeleted());
+@lombok.Getter
+@lombok.Setter
+@lombok.AllArgsConstructor
+public class CacheChat {
+    private long id;
+    private String name;
+    private int membersCount;
+    private int deletedMembersCount;
+    private long createdBy;
+    private LocalDateTime createdAt;
+    private boolean isGroup;
+    private LocalDateTime deletedAt;
+    private boolean isDeleted;
+
+    public void setIsGroup(boolean isGroup){
+        this.isGroup = isGroup;
     }
-    public void updateFromEntity(Chat chat) {
-        this.setName(chat.getName());
-        this.setDeletedMembersCount(chat.getDeletedMembersCount());
-        this.setMembersCount(chat.getMembersCount());
-        this.setCreatedBy(chat.getCreatedBy());
-        this.setIsGroup(chat.isGroup());
-        this.setCreatedAt(chat.getCreatedAt());
-        this.setDeletedAt(chat.getDeletedAt());
-        this.setIsDeleted(chat.isDeleted());
+    public void setIsDeleted(boolean isDeleted){
+        this.deletedAt = isDeleted ? LocalDateTime.now() : null;
+        this.isDeleted = isDeleted;
+    }
+    public boolean isActive() {
+        return !isDeleted;
+    }
+    public void delete(){
+        this.deletedAt = LocalDateTime.now();
+        this.isDeleted = true;
+    }
+    public void restore(){
+        this.deletedAt = null;
+        this.isDeleted = false;
+    }
+
+    public void updateFromCache(CacheChat cacheChat){
+        setName(cacheChat.getName());
+        setDeletedMembersCount(cacheChat.getDeletedMembersCount());
+        setMembersCount(cacheChat.getMembersCount());
+        setCreatedBy(cacheChat.getCreatedBy());
+        setIsGroup(cacheChat.isGroup());
+        setCreatedAt(cacheChat.getCreatedAt());
+        setDeletedAt(cacheChat.getDeletedAt());
+        setIsDeleted(cacheChat.isDeleted());
     }
 }
