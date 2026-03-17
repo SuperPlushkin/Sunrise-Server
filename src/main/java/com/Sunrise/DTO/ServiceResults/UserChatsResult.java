@@ -1,24 +1,20 @@
 package com.Sunrise.DTO.ServiceResults;
 
-import com.Sunrise.Entities.DTO.ChatDTO;
-
-import java.util.List;
+import com.Sunrise.DTO.DBResults.UserChatsPageResult;
 
 @lombok.Getter
 public class UserChatsResult extends ServiceResultTemplate {
-    private final List<ChatDTO> userChats;
-    private final Integer userChatsCount;
+    private final UserChatsPageResult pagination;
 
-    public UserChatsResult(boolean success, String errorMessage, List<ChatDTO> userChats, Integer userChatsCount) {
+    public UserChatsResult(boolean success, String errorMessage, UserChatsPageResult pagination) {
         super(success, errorMessage);
-        this.userChats = userChats;
-        this.userChatsCount = userChatsCount;
+        this.pagination = pagination;
     }
 
-    public static UserChatsResult success(List<ChatDTO> userChats, Integer userChatsCount) {
-        return new UserChatsResult(true, null, userChats, userChatsCount);
+    public static UserChatsResult success(UserChatsPageResult pagination) {
+        return new UserChatsResult(true, null, pagination);
     }
     public static UserChatsResult error(String errorMessage) {
-        return new UserChatsResult(false, errorMessage, null, null);
+        return new UserChatsResult(false, errorMessage, null);
     }
 }

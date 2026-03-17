@@ -3,7 +3,8 @@ package com.Sunrise.Services;
 import com.Sunrise.Controllers.ChatController;
 import com.Sunrise.DTO.DBResults.ChatMembersPageResult;
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.Entities.DTO.ChatDTO;
+import com.Sunrise.DTO.DBResults.UserChatsPageResult;
+import com.Sunrise.Entities.DTO.LightChatDTO;
 import com.Sunrise.DTO.ServiceResults.*;
 import com.Sunrise.Services.DataServices.DataAccessService;
 import com.Sunrise.Services.DataServices.DataValidator;
@@ -49,9 +50,9 @@ public class ChatService {
             validator.validateActiveUser(creatorId);
             validator.validateActiveUser(userToAddId);
 
-            Optional<ChatDTO> optChat = dataAccessService.getPersonalChat(creatorId, userToAddId);
+            Optional<LightChatDTO> optChat = dataAccessService.getPersonalChat(creatorId, userToAddId);
             if (optChat.isPresent()){
-                ChatDTO chat = optChat.get();
+                LightChatDTO chat = optChat.get();
                 if (chat.isDeleted()) {
                     dataAccessService.restoreChat(chat.getId());
                     log.info("[🔧] ✅ Restored personal chat {} between users {} and {}", chat.getId(), creatorId, userToAddId);
@@ -152,7 +153,7 @@ public class ChatService {
             return SimpleResult.error("Try again later");
 
         try {
-            ChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
+            LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
 
             if (chat.isGroup()) {
                 if (chat.isMoreThenOneMember()) {
@@ -241,39 +242,6 @@ public class ChatService {
         }
     }
 
-    public HistoryOperationResult deleteAllChatMessages(Long chatId, ChatController.ClearType clearType, Long userId) {
-
-        // WRITE на чат + READ на профиль пользователя
-        if (!lockService.tryLockChatWriteUserRead(chatId, userId))
-            return HistoryOperationResult.error("Try again later");
-
-        try {
-            validator.validateActiveChatMemberInActiveChat(chatId, userId);
-
-            if (clearType.equals(ChatController.ClearType.FOR_ALL)) {
-                validator.validateCanClearForAll(chatId, userId);
-            }
-
-            var messagesCount = switch (clearType) {
-                case FOR_ALL -> dataAccessService.deleteAllChatMessagesForAll(chatId, userId);
-                case FOR_SELF -> dataAccessService.deleteAllChatMessagesForSelf(chatId, userId);
-            };
-
-            log.info("[🔧] ✅ User {} cleared chat {} history ({} messages) for {}", userId, chatId, messagesCount, clearType);
-            return HistoryOperationResult.success(messagesCount);
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to clear chat {} history: {}", chatId, e.getMessage());
-            return HistoryOperationResult.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error clearing chat {} history: {}", chatId, e.getMessage());
-            return HistoryOperationResult.error("ClearChatHistory failed due to server error");
-        }
-        finally {
-            lockService.unLockChatWriteUserRead(chatId, userId);
-        }
-    }
 
     public UserChatsResult getUserChats(Long userId, int offset, int limit) {
 
@@ -284,10 +252,10 @@ public class ChatService {
         try {
             validator.validateActiveUser(userId);
 
-            List<ChatDTO> chats = dataAccessService.getUserChatsPage(userId, offset, limit);
+            UserChatsPageResult chats = dataAccessService.getUserChatsPage(userId, offset, limit);
 
-            log.debug("[🔧] ✅ User {} has {} chats", userId, chats.size());
-            return UserChatsResult.success(chats, chats.size());
+            log.debug("[🔧] ✅ User {} has {} chats", userId, chats.totalCount());
+            return UserChatsResult.success(chats);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get user {} chats: {}", userId, e.getMessage());

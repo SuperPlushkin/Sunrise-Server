@@ -1,25 +1,23 @@
 package com.Sunrise.Entities.DTO;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-
 import java.time.LocalDateTime;
 
 @lombok.Setter
 @lombok.Getter
 @lombok.AllArgsConstructor
-public class ChatDTO {
+public class FullChatDTO {
     private long id;
     private String name;
     private int membersCount;
     private int deletedMembersCount;
+    private boolean isGroup;
     private long createdBy;
     private LocalDateTime createdAt;
-    private boolean isGroup;
-    private LocalDateTime deletedAt;
+    private Long otherUserId; // Только для личных чатов
+    private LightMessageDTO lastMessage;
+    //private Integer unreadCount;
     private boolean isDeleted;
+    private LocalDateTime deletedAt;
 
-    @JsonIgnore
-    public boolean isMoreThenOneMember() {
-        return membersCount > 1;
-    }
+
 }

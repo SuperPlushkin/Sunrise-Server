@@ -10,11 +10,12 @@ import java.time.LocalDateTime;
 @Getter
 @AllArgsConstructor
 public class FullChatMemberDTO {
-    private Long userId;
+    private long userId;
+    private long chatId;
     private String username;
     private String name;
     private LocalDateTime joinedAt;
-    private Boolean isAdmin;
-    private Boolean isDeleted;        // Статус членства в чате
-    private Boolean userIsDeleted;    // Статус пользователя
+    private boolean isAdmin;
+    private boolean isDeleted;        // Статус членства в чате
+    private boolean userIsDeleted;    // Статус пользователя
 }

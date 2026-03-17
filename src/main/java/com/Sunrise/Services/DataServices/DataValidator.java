@@ -1,8 +1,7 @@
 package com.Sunrise.Services.DataServices;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.Entities.DTO.ChatDTO;
-import com.Sunrise.Entities.DB.User;
+import com.Sunrise.Entities.DTO.LightChatDTO;
 import com.Sunrise.Entities.DTO.FullUserDTO;
 import com.Sunrise.Subclasses.ValidationException;
 import lombok.AllArgsConstructor;
@@ -48,9 +47,9 @@ public class DataValidator {
         validateActiveChat(chatId);
         validateActiveChatMemberIsAdmin(chatId, adminId);
     }
-    public ChatDTO validateActiveUserInActiveChatAndGetChat(long chatId, long userId) {
+    public LightChatDTO validateActiveUserInActiveChatAndGetChat(long chatId, long userId) {
         validateActiveUser(userId);
-        ChatDTO chat = validateActiveChatAndGet(chatId);
+        LightChatDTO chat = validateActiveChatAndGet(chatId);
         validateActiveChatMember(chatId, userId);
         return chat;
     }
@@ -101,8 +100,8 @@ public class DataValidator {
         }
         return isGroup.get();
     }
-    private ChatDTO validateActiveChatAndGet(long chatId) {
-        Optional<ChatDTO> chatOpt = dataAccessService.getActiveChat(chatId);
+    private LightChatDTO validateActiveChatAndGet(long chatId) {
+        Optional<LightChatDTO> chatOpt = dataAccessService.getActiveChat(chatId);
         if (chatOpt.isEmpty()) {
             throw new ValidationException("Chat does not exist or is deleted: " + chatId);
         }

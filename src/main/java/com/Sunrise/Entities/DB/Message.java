@@ -34,7 +34,7 @@ public class Message {
     private Long readCount = 0L;
 
     @Column(name = "hidden_by_admin", nullable = false)
-    private Boolean hiddenByAdmin = false;
+    private boolean hiddenByAdmin = false;
 
     public static Message create(Long id, Long senderId, Long chatId, String text) {
         return new Message(id, senderId, chatId, text, LocalDateTime.now(), 0L, false);

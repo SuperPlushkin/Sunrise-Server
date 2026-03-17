@@ -10,10 +10,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Getter
 public class CacheChatMembersContainer {
     private final Long chatId;
-    private Long chatCreatorId;
+    private volatile Long chatCreatorId;
     private final AtomicInteger deletedMemberCount;                 // удаленных участников в БД
     private final AtomicInteger totalMemberCount;                   // всего участников в БД
-    private final AtomicInteger loadedCount;                        // сколько загружено в кэш
     private final LocalDateTime createdAt = LocalDateTime.now();    // когда создан контейнер
 
     private final Map<Long, CacheChatMember> members = new ConcurrentHashMap<>();   // userId -> CacheChatMember
@@ -25,7 +24,6 @@ public class CacheChatMembersContainer {
         this.chatCreatorId = chat.getCreatedBy();
         this.deletedMemberCount = new AtomicInteger(chat.getDeletedMembersCount());
         this.totalMemberCount = new AtomicInteger(chat.getMembersCount());
-        this.loadedCount = new AtomicInteger(0);
         this.adminIds.add(chat.getCreatedBy());
     }
 
@@ -43,7 +41,7 @@ public class CacheChatMembersContainer {
         addMembers(newMembers);
         totalMemberCount.addAndGet(newMembers.size());
     }
-    public void addMembers(Collection<CacheChatMember> newMembers)  {
+    public void addMembers(Iterable<CacheChatMember> newMembers)  {
         for (CacheChatMember member : newMembers) {
             members.put(member.getUserId(), member);
             if (member.isAdmin()) {
@@ -54,7 +52,6 @@ public class CacheChatMembersContainer {
                 deletedMemberCount.incrementAndGet();  // <-- Добавляем
             }
         }
-        loadedCount.addAndGet(newMembers.size());
     }
     public void addNewMember(CacheChatMember member) {
         addMember(member);
@@ -69,7 +66,6 @@ public class CacheChatMembersContainer {
             deletedMemberIds.add(member.getUserId());
             deletedMemberCount.incrementAndGet();
         }
-        loadedCount.incrementAndGet();
     }
     public void updateAdminRights(Long userId, Boolean isAdmin) {
         // Нельзя убрать права у создателя
@@ -158,13 +154,13 @@ public class CacheChatMembersContainer {
         return totalMemberCount.get() - deletedMemberCount.get();
     }
     public int getActiveLoadedCount() {
-        return loadedCount.get() - deletedMemberCount.get();
+        return members.size() - deletedMemberCount.get();
     }
 
     public boolean isFullyLoaded() {
-        return loadedCount.get() >= totalMemberCount.get();
+        return members.size() >= totalMemberCount.get();
     }
     public double getLoadPercentage() {
-        return (loadedCount.get() * 100.0) / totalMemberCount.get();
+        return (members.size() * 100.0) / totalMemberCount.get();
     }
 }

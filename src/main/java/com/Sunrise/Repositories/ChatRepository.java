@@ -1,8 +1,10 @@
 package com.Sunrise.Repositories;
 
 import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTO.DBResults.FullChatResult;
 import com.Sunrise.Entities.DB.Chat;
 
+import com.Sunrise.Entities.DB.ChatMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -54,6 +56,28 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // ========== ПОИСК ==========
 
+    @Query(value = """
+        SELECT
+            c as chat,
+            msg_stats.newest_message_id as newestMessageId,
+            msg_stats.visible_count as visibleCount,
+            msg_stats.hidden_count as hiddenCount,
+            msg_stats.total_count as totalCount
+        FROM chats c
+        LEFT JOIN (
+            SELECT
+                chat_id,
+                MAX(id) as newest_message_id,
+                COUNT(CASE WHEN hidden_by_admin = false THEN 1 END) as visible_count,
+                COUNT(CASE WHEN hidden_by_admin = true THEN 1 END) as hidden_count,
+                COUNT(*) as total_count
+            FROM messages
+            WHERE chat_id = :chatId
+            GROUP BY chat_id
+        ) msg_stats ON msg_stats.chat_id = c.id
+        WHERE c.id = :chatId
+        """, nativeQuery = true)
+    Optional<FullChatResult> findFullChat(@Param("chatId") Long chatId);
 
     @Query("SELECT c FROM Chat c WHERE c.id IN " +
             "(SELECT cm.id.chatId FROM ChatMember cm WHERE cm.id.userId = :userId AND cm.isDeleted = false)")
@@ -69,24 +93,15 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
             ")")
     Optional<Chat> findPersonalChat(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
 
+    @Query("SELECT c FROM Chat c " +
+            "WHERE c.id = :chatId AND c.id IN :chatIds AND cm.isDeleted = false")
+    List<ChatMember> findActiveChatsWithUsersForPersonalChatsByIds(@Param("chatId") Long chatId, @Param("chatIds") List<Long> chatIds);
+
     @Query("SELECT c.id FROM Chat c WHERE c.isDeleted = false")
     List<Long> findAllActiveChatIds();
 
-    @Query("SELECT c.id FROM Chat c WHERE c.createdBy = :userId AND c.isDeleted = false")
-    List<Long> findChatIdsByCreator(@Param("userId") Long userId);
-
 
     // ========== ДЕЙСТВИЯ С ИСТОРИЕЙ ЧАТОВ ==========
-
-
-    // Удаление всех сообщений (для всех) | админ
-    @Query(value = "SELECT * FROM clear_chat_history_for_all(:chatId, :userId)", nativeQuery = true)
-    Integer deleteAllChatMessagesForAll(@Param("chatId") Long chatId, @Param("userId") Long userId);
-
-
-    // Удаление всех сообщений (для себя)
-    @Query(value = "SELECT * FROM clear_chat_history_for_self(:chatId, :userId)", nativeQuery = true)
-    Integer deleteAllChatMessagesForSelf(@Param("chatId") Long chatId, @Param("userId") Long userId);
 
 
     // Статистика

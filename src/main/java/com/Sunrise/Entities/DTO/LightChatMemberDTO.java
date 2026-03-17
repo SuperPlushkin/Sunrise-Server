@@ -6,8 +6,9 @@ import java.time.LocalDateTime;
 @lombok.Getter
 @lombok.AllArgsConstructor
 public class LightChatMemberDTO {
-    private Long userId;
+    private long userId;
+    private long chatId;
     private LocalDateTime joinedAt;
-    private Boolean isAdmin;
-    private Boolean isDeleted;
+    private boolean isAdmin;
+    private boolean isDeleted;
 }

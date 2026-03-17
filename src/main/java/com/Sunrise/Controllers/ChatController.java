@@ -108,21 +108,6 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/delete-all-messages")
-    public ResponseEntity<?> clearChatHistory(@PathVariable @ValidId Long chatId, @RequestParam(defaultValue = "FOR_SELF") ClearType clearType, @CurrentUserId Long userId) {
-
-        HistoryOperationResult result = chatService.deleteAllChatMessages(chatId, clearType, userId);
-
-        if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "cleared_messages", result.getAffectedMessages()
-            ));
-        }
-        else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
-
 
     @GetMapping("/{chatId}/members")
     public ResponseEntity<?> getChatMembers(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {

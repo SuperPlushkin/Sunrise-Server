@@ -15,17 +15,21 @@ import java.util.List;
 public interface MessageRepository extends JpaRepository<Message, Long> {
 
     // ========== ОПЕРАЦИИ С СООБЩЕНИЯМИ ==========
-    @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
-            "FROM get_first_messages(:chatId, :userId, :limit)", nativeQuery = true)
+
+    @Query(value = "SELECT * FROM get_messages_in_range(:chatId, :userId, :fromId, :toId)", nativeQuery = true)
+    List<MessageDBResult> getChatMessagesInRange(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("fromId") Long fromId, @Param("toId") Long toId);
+
+    @Query(value = "SELECT * FROM get_first_messages(:chatId, :userId, :limit)", nativeQuery = true)
     List<MessageDBResult> getChatMessagesFirst(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("limit") Integer limit);
 
-    @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
-            "FROM get_messages_before(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
+    @Query(value = "SELECT * FROM get_messages_before(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
     List<MessageDBResult> getChatMessagesBefore(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
 
-    @Query(value = "SELECT message_id, sender_id, sender_username, text, sent_at, read_count, is_read_by_user, is_hidden_by_user, is_hidden_by_admin " +
-            "FROM get_messages_after(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
+    @Query(value = "SELECT * FROM get_messages_after(:chatId, :userId, :messageId, :limit)", nativeQuery = true)
     List<MessageDBResult> getChatMessagesAfter(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("messageId") Long messageId, @Param("limit") Integer limit);
+
+    @Query(value = "SELECT * FROM get_messages_after_smart(:chatId, :userId, :afterId, :lastKnownId, :limit, :maxGap)", nativeQuery = true)
+    List<MessageDBResult> getChatMessagesAfterAndSomeBefore(@Param("chatId") Long chatId, @Param("userId") Long userId, @Param("afterId") Long afterMessageId, @Param("lastKnownId") Long lastKnownId, @Param("limit") Integer limit, @Param("maxGap") Integer maxGap);
 
     @Modifying
     @Transactional
@@ -33,7 +37,6 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
             "VALUES (:messageId, :userId, NOW()) ON CONFLICT (message_id, user_id) DO NOTHING", nativeQuery = true)
     void markMessageAsRead(@Param("messageId") Long messageId, @Param("userId") Long userId);
 
-    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatId = :chatId AND m.hiddenByAdmin = false " +
-            "AND m.id NOT IN (SELECT uhm.messageId FROM UserHiddenMessage uhm WHERE uhm.userId = :userId)")
-    Integer getVisibleMessagesCount(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    @Query("SELECT COUNT(m) FROM Message m WHERE m.chatId = :chatId AND m.hiddenByAdmin = false")
+    int getVisibleMessagesCount(@Param("chatId") Long chatId, @Param("userId") Long userId);
 }
