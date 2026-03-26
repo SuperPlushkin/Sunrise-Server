@@ -4,6 +4,7 @@ import com.Sunrise.Configurations.Annotations.CurrentUserId;
 import com.Sunrise.DTOs.Requests.AddGroupMemberRequest;
 import com.Sunrise.DTOs.Requests.CreateGroupChatRequest;
 import com.Sunrise.DTOs.Requests.CreatePersonalChatRequest;
+import com.Sunrise.DTOs.Requests.PaginationRequest;
 import com.Sunrise.DTOs.ServiceResults.*;
 import com.Sunrise.Core.Services.ChatService;
 import com.Sunrise.Configurations.Annotations.ValidId;
@@ -26,10 +27,7 @@ public class ChatController {
     }
 
     @PostMapping("/create-personal")
-    public ResponseEntity<?> createPersonalChat(@RequestBody @Valid CreatePersonalChatRequest request, @CurrentUserId Long userId) {
-
-//        if (creatorId.equals(userToAddId))
-//            return ChatCreationResult.error("[🔧] Cannot create personal chat with yourself");
+    public ResponseEntity<?> createPersonalChat(@RequestBody @Valid CreatePersonalChatRequest request, @CurrentUserId long userId) {
 
         ChatCreationResult result = chatService.createPersonalChat(userId, request.getOtherUserId());
 
@@ -44,11 +42,11 @@ public class ChatController {
     }
 
     @PostMapping("/create-group")
-    public ResponseEntity<?> createGroupChat(@RequestBody @Valid CreateGroupChatRequest request, @CurrentUserId Long userId) {
+    public ResponseEntity<?> createGroupChat(@RequestBody @Valid CreateGroupChatRequest request, @CurrentUserId long userId) {
 
         ChatCreationResult result = chatService.createGroupChat(
-            request.getChatName().trim(),
             userId,
+            request.getChatName().trim(),
             request.getUserIds()
         );
 
@@ -62,7 +60,7 @@ public class ChatController {
     }
 
     @PostMapping("/{chatId}/add-member")
-    public ResponseEntity<?> addGroupMember(@PathVariable @ValidId Long chatId, @RequestBody @Valid AddGroupMemberRequest request, @CurrentUserId Long userId) {
+    public ResponseEntity<?> addGroupMember(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMemberRequest request, @CurrentUserId long userId) {
 
         SimpleResult result = chatService.addGroupMember(chatId, userId, request.getNewUserId());
 
@@ -74,7 +72,7 @@ public class ChatController {
     }
 
     @PostMapping("/{chatId}/leave")
-    public ResponseEntity<?> leaveChat(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
+    public ResponseEntity<?> leaveChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
         SimpleResult result = chatService.leaveChat(chatId, userId);
 
@@ -86,7 +84,7 @@ public class ChatController {
     }
 
     @GetMapping("/{chatId}/stats")
-    public ResponseEntity<?> getChatStats(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getChatStats(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
         ChatStatsResult result = chatService.getChatStats(chatId, userId);
 
@@ -102,11 +100,10 @@ public class ChatController {
         }
     }
 
-
     @GetMapping("/{chatId}/members")
-    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId Long chatId, @RequestParam Long cursor, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId long chatId, @Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        ChatMembersResult result = chatService.getChatMembers(chatId, cursor, userId);
+        ChatMembersResult result = chatService.getChatMembers(chatId, userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());
@@ -116,9 +113,9 @@ public class ChatController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getUserChats(@RequestParam(defaultValue = "0") Long cursor, @RequestParam(defaultValue = "10") int limit, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getUserChats(@Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        UserChatsResult result = chatService.getUserChats(userId, cursor, limit);
+        UserChatsResult result = chatService.getUserChats(userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());

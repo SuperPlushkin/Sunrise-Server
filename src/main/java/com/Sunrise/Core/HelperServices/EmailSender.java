@@ -1,4 +1,4 @@
-package com.Sunrise.Core;
+package com.Sunrise.Core.HelperServices;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;

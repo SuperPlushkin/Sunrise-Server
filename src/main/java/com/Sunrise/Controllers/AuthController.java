@@ -10,6 +10,7 @@ import com.Sunrise.Core.Services.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import org.springframework.http.ResponseEntity;
@@ -17,7 +18,6 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
-
 
 @RestController
 @RequestMapping("/auth")
@@ -31,7 +31,7 @@ public class AuthController {
 
     @ResponseBody
     @PostMapping("/register")
-    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<?> register(@RequestBody @Valid RegisterRequest request) {
 
         UserRegistrationResult result = authService.registerUser(
             request.getUsername().trim(),
@@ -50,7 +50,7 @@ public class AuthController {
 
     @ResponseBody
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest) {
 
         UserLoginResult result = authService.authenticateUser(
             request.getUsername().trim(),
@@ -70,7 +70,9 @@ public class AuthController {
     }
 
     @GetMapping("/confirm")
-    public String confirmEmail(@RequestParam("type") String type, @RequestParam("token") @Size(min = 64, max = 64) String token, Model model) {
+    public String confirmEmail(@RequestParam @NotBlank String type,
+                               @RequestParam @Size(min = 64, max = 64) String token,
+                               Model model) {
 
         TokenConfirmationResult result = authService.confirmToken(type, token);
 

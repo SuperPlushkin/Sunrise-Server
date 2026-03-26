@@ -102,7 +102,7 @@ public class MessageService {
         }
     }
 
-    public ChatMessagesResult getChatMessages(long chatId, long userId, Long fromMessageId, int limit, Direction direction) {
+    public ChatMessagesResult getChatMessages(long chatId, long userId, Long cursor, int limit, Direction direction) {
 
         // READ на чат + READ на пользователя
         if (!lockManager.tryLockChatReadUserRead(chatId, userId))
@@ -111,7 +111,7 @@ public class MessageService {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
-            MessagesPageDTO pagination = dataOrchestrator.getChatMessagesPage(chatId, userId, fromMessageId, limit, direction);
+            MessagesPageDTO pagination = dataOrchestrator.getChatMessagesPage(chatId, userId, cursor, limit, direction);
 
             return ChatMessagesResult.success(pagination);
         }

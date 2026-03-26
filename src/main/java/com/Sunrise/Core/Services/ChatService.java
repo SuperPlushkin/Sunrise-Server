@@ -82,7 +82,7 @@ public class ChatService {
             lockManager.unLockChatWriteUsersRead(chatId, userIds);
         }
     }
-    public ChatCreationResult createGroupChat(@NotNull String chatName, long creatorId, @NotNull Set<Long> userToAddIds) {
+    public ChatCreationResult createGroupChat(long creatorId, @NotNull String chatName, @NotNull Set<Long> userToAddIds) {
 
         if (userToAddIds.contains(creatorId))
             return ChatCreationResult.error("Creator cannot be in usersToAdd list");
@@ -282,7 +282,7 @@ public class ChatService {
             lockManager.unLockUserRead(userId);
         }
     }
-    public ChatMembersResult getChatMembers(long chatId, Long cursor, long userId) {
+    public ChatMembersResult getChatMembers(long chatId, long userId, Long cursor, int limit) {
 
         // READ на чат + READ на профиль пользователя
         if (!lockManager.tryLockChatReadUserRead(chatId, userId))
@@ -291,7 +291,7 @@ public class ChatService {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
-            ChatMembersPageDTO chatMembers = dataOrchestrator.getChatMembersPage(chatId, cursor, 20);
+            ChatMembersPageDTO chatMembers = dataOrchestrator.getChatMembersPage(chatId, cursor, limit);
 
             log.debug("[🔧] ✅ User {} viewed {} members of chat {}", userId, chatMembers.chatMembers(), chatId);
             return ChatMembersResult.success(chatMembers);

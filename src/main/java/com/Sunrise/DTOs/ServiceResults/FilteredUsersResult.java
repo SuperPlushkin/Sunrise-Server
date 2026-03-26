@@ -4,11 +4,11 @@ import com.Sunrise.DTOs.Paginations.UsersPageDTO;
 
 @lombok.Getter
 public class FilteredUsersResult extends ServiceResultTemplate {
-    private final UsersPageDTO page;
+    private final UsersPageDTO pagination;
 
-    public FilteredUsersResult(boolean success, String errorMessage, UsersPageDTO page){
+    public FilteredUsersResult(boolean success, String errorMessage, UsersPageDTO pagination){
         super(success, errorMessage);
-        this.page = page;
+        this.pagination = pagination;
     }
 
     public static FilteredUsersResult success(UsersPageDTO page) {

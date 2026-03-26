@@ -9,7 +9,7 @@ import com.Sunrise.Entities.DTOs.VerificationTokenDTO;
 import com.Sunrise.Core.DataServices.DataOrchestrator;
 import com.Sunrise.JWT.JwtUtil;
 import com.Sunrise.Core.DataServices.LockManager;
-import com.Sunrise.Core.EmailSender;
+import com.Sunrise.Core.HelperServices.EmailSender;
 import com.Sunrise.Subclasses.SimpleSnowflakeId;
 import com.Sunrise.Subclasses.ValidationException;
 

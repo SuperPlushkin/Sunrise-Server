@@ -1,14 +1,18 @@
 package com.Sunrise.Controllers;
 
 import com.Sunrise.Configurations.Annotations.CurrentUserId;
-import com.Sunrise.DTOs.Requests.FilteredUsersRequest;
 import com.Sunrise.Core.Services.UserService;
 
+import com.Sunrise.DTOs.Requests.PaginationRequest;
+import com.Sunrise.DTOs.ServiceResults.FilteredUsersResult;
 import jakarta.validation.Valid;
 
+import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+@Validated
 @RestController
 @RequestMapping("/users")
 public class UserController {
@@ -20,12 +24,12 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getManyUsers(@ModelAttribute @Valid FilteredUsersRequest request, @RequestParam Long cursor, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getUsers(@RequestParam @NotNull String filter, @Valid PaginationRequest pagination, @CurrentUserId long userId) {
 
-        var result = userService.getFilteredUsers(userId, request.getFilter(), cursor, request.getLimit());
+        FilteredUsersResult result = userService.getFilteredUsers(userId, filter, pagination.getCursor(), pagination.getLimit());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getPage());
+            return ResponseEntity.ok(result.getPagination());
         }
         else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
