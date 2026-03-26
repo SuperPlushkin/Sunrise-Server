@@ -1,7 +1,7 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.DBResults.UserResult;
-import com.Sunrise.Entities.DB.User;
+import com.Sunrise.DTOs.Paginations.UserResult;
+import com.Sunrise.Entities.DBs.User;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,12 +41,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // ========== ПОИСК ==========
 
+    @Query("SELECT u FROM User u WHERE u.isDeleted = false AND u.id IN :userIds")
+    List<User> findActiveUserByIds(@Param("userIds")List<Long> userIds);
     Optional<User> findByUsername(String username);
     Optional<User> findByEmail(String email);
 
 
     // ========== ПОИСК И ФИЛЬТРАЦИЯ С ПАГИНАЦИЕЙ (ПОКА ЧТО НОРМ, НО ПОТОМ НЕ НОРМ) ==========
 
-    @Query(value = "SELECT * FROM get_users_page(:filter, :offset, :limit)", nativeQuery = true)
-    List<UserResult> getFullFilteredUsersPage(@Param("filter") String filter, @Param("offset") int offset, @Param("limit") int limit);
+    @Query(value = "SELECT * FROM get_users_page(:filter, :cursor, :limit)", nativeQuery = true)
+    List<UserResult> getFullFilteredUsersPage(@Param("filter") String filter, @Param("cursor") Long cursor, @Param("limit") int limit);
 }

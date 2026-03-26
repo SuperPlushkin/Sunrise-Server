@@ -1,8 +1,8 @@
 package com.Sunrise.Controllers;
 
-import com.Sunrise.Controllers.Annotations.CurrentUserId;
-import com.Sunrise.DTO.Requests.FilteredUsersRequest;
-import com.Sunrise.Services.UserService;
+import com.Sunrise.Configurations.Annotations.CurrentUserId;
+import com.Sunrise.DTOs.Requests.FilteredUsersRequest;
+import com.Sunrise.Core.Services.UserService;
 
 import jakarta.validation.Valid;
 
@@ -20,9 +20,9 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getManyUsers(@ModelAttribute @Valid FilteredUsersRequest request, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getManyUsers(@ModelAttribute @Valid FilteredUsersRequest request, @RequestParam Long cursor, @CurrentUserId Long userId) {
 
-        var result = userService.getFilteredUsers(userId, request.getFilter(), request.getOffset(), request.getLimit());
+        var result = userService.getFilteredUsers(userId, request.getFilter(), cursor, request.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPage());

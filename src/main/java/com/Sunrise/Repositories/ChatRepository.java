@@ -1,10 +1,10 @@
 package com.Sunrise.Repositories;
 
-import com.Sunrise.DTO.DBResults.ChatStatsDBResult;
-import com.Sunrise.DTO.DBResults.FullChatResult;
-import com.Sunrise.Entities.DB.Chat;
+import com.Sunrise.DTOs.DBResults.ChatStatsDBResult;
+import com.Sunrise.DTOs.DBResults.FullChatResult;
+import com.Sunrise.DTOs.Paginations.UserFullChatResult;
+import com.Sunrise.Entities.DBs.Chat;
 
-import com.Sunrise.Entities.DB.ChatMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Long> {
@@ -24,81 +25,39 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
 
     @Query(value = "SELECT create_personal_chat(:chatId, :user1Id, :user2Id, :createdAt)", nativeQuery = true)
-    void createPersonalChat(@Param("chatId") Long chatId, @Param("user1Id") Long user1Id,
-                            @Param("user2Id") Long user2Id, @Param("createdAt") LocalDateTime createdAt);
+    void createPersonalChat(@Param("chatId") long chatId, @Param("user1Id") long user1Id,
+                            @Param("user2Id") long user2Id, @Param("createdAt") LocalDateTime createdAt);
 
     @Query(value = "SELECT create_group_chat(:chatId, :name, :creatorId, :memberIds, :createdAt)", nativeQuery = true)
-    void createGroupChat(@Param("chatId") Long chatId, @Param("name") String name,
-                         @Param("creatorId") Long creatorId, @Param("memberIds") Long[] memberIds,
+    void createGroupChat(@Param("chatId") long chatId, @Param("name") String name,
+                         @Param("creatorId") long creatorId, @Param("memberIds") Long[] memberIds,
                          @Param("createdAt") LocalDateTime createdAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE Chat c SET c.createdBy = :newCreatorId WHERE c.id = :chatId")
-    void updateChatCreator(@Param("chatId") Long chatId, @Param("newCreatorId") Long newCreatorId);
-
-    @Modifying
-    @Transactional
     @Query("UPDATE Chat c SET c.isDeleted = false, c.deletedAt = null WHERE c.id = :chatId")
-    void restoreChat(@Param("chatId") Long chatId);
+    void restoreChat(@Param("chatId") long chatId);
 
     @Modifying
     @Transactional
     @Query("UPDATE Chat c SET c.isDeleted = true, c.deletedAt = CURRENT_TIMESTAMP WHERE c.id = :chatId")
-    void deleteChat(@Param("chatId") Long chatId);
-
-    @Query(value = "SELECT sync_chat_counters(:chatId)", nativeQuery = true)
-    void syncChatCounters(@Param("chatId") Long chatId);
-
-    @Query(value = "SELECT COUNT(*) FROM chats WHERE is_deleted = false", nativeQuery = true)
-    int countActiveChats();
+    void deleteChat(@Param("chatId") long chatId);
 
 
     // ========== ПОИСК ==========
 
-    @Query(value = """
-        SELECT
-            c as chat,
-            msg_stats.newest_message_id as newestMessageId,
-            msg_stats.visible_count as visibleCount,
-            msg_stats.hidden_count as hiddenCount,
-            msg_stats.total_count as totalCount
-        FROM chats c
-        LEFT JOIN (
-            SELECT
-                chat_id,
-                MAX(id) as newest_message_id,
-                COUNT(CASE WHEN hidden_by_admin = false THEN 1 END) as visible_count,
-                COUNT(CASE WHEN hidden_by_admin = true THEN 1 END) as hidden_count,
-                COUNT(*) as total_count
-            FROM messages
-            WHERE chat_id = :chatId
-            GROUP BY chat_id
-        ) msg_stats ON msg_stats.chat_id = c.id
-        WHERE c.id = :chatId
-        """, nativeQuery = true)
-    Optional<FullChatResult> findFullChat(@Param("chatId") Long chatId);
 
-    @Query("SELECT c FROM Chat c WHERE c.id IN " +
-            "(SELECT cm.id.chatId FROM ChatMember cm WHERE cm.id.userId = :userId AND cm.isDeleted = false)")
-    List<Chat> findUserChats(@Param("userId") Long userId);
+    @Query(value = "SELECT * FROM get_full_chat(:chatId)", nativeQuery = true)
+    Optional<FullChatResult> findFullChat(@Param("chatId") long chatId);
 
-    @Query("SELECT c FROM Chat c " +
-            "WHERE c.isGroup = false AND c.isDeleted = false AND EXISTS (" +
-            "   SELECT cm1 FROM ChatMember cm1 WHERE cm1.id.chatId = c.id " +
-            "   AND cm1.id.userId = :userId1 AND cm1.isDeleted = false" +
-            ") AND EXISTS (" +
-            "   SELECT cm2 FROM ChatMember cm2 WHERE cm2.id.chatId = c.id " +
-            "   AND cm2.id.userId = :userId2 AND cm2.isDeleted = false" +
-            ")")
-    Optional<Chat> findPersonalChat(@Param("userId1") Long userId1, @Param("userId2") Long userId2);
+    @Query(value = "SELECT * FROM get_full_personal_chat(:userId1, :userId2)", nativeQuery = true)
+    Optional<FullChatResult> findPersonalChat(@Param("userId1") long userId1, @Param("userId2") long userId2);
 
-    @Query("SELECT c FROM Chat c " +
-            "WHERE c.id = :chatId AND c.id IN :chatIds AND cm.isDeleted = false")
-    List<ChatMember> findActiveChatsWithUsersForPersonalChatsByIds(@Param("chatId") Long chatId, @Param("chatIds") List<Long> chatIds);
+    @Query(value = "SELECT * FROM get_full_chats_batch(:chatId, :userId)", nativeQuery = true)
+    List<UserFullChatResult> findFullChats(@Param("chatIds") Set<Long> chatIds, @Param("userId") long userId);
 
-    @Query("SELECT c.id FROM Chat c WHERE c.isDeleted = false")
-    List<Long> findAllActiveChatIds();
+    @Query(value = "SELECT * FROM get_user_chats_page(:user_id, :cursor, :limit)", nativeQuery = true)
+    List<UserFullChatResult> getUserChatsPage(@Param("user_id") long userId, @Param("cursor") Long cursor, @Param("limit") int limit);
 
 
     // ========== ДЕЙСТВИЯ С ИСТОРИЕЙ ЧАТОВ ==========
@@ -106,5 +65,5 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // Статистика
     @Query(value = "SELECT * FROM get_chat_clear_stats(:chatId, :userId)", nativeQuery = true)
-    ChatStatsDBResult getChatClearStats(@Param("chatId") Long chatId, @Param("userId") Long userId);
+    ChatStatsDBResult getChatClearStats(@Param("chatId") long chatId, @Param("userId") long userId);
 }

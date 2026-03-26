@@ -1,6 +1,6 @@
 package com.Sunrise.Controllers;
 
-import com.Sunrise.Services.DataServices.DataAccessService;
+import com.Sunrise.Core.DataServices.DataOrchestrator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,7 +12,7 @@ import java.util.Map;
 public class HealthTestController {
 
     @Autowired
-    private DataAccessService dataAccessService;
+    private DataOrchestrator dataOrchestrator;
 
     @GetMapping("/status")
     public Map<String, String> getStatus() {
@@ -26,6 +26,6 @@ public class HealthTestController {
 
     @GetMapping("/cache-status")
     public ResponseEntity<?> getCashStatus() {
-        return ResponseEntity.ok(dataAccessService.getCacheStatus());
+        return ResponseEntity.ok(dataOrchestrator.getCacheStatus());
     }
 }

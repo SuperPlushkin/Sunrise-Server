@@ -1,11 +1,11 @@
 package com.Sunrise.Controllers;
 
-import com.Sunrise.DTO.Requests.LoginRequest;
-import com.Sunrise.DTO.Requests.RegisterRequest;
-import com.Sunrise.DTO.ServiceResults.TokenConfirmationResult;
-import com.Sunrise.DTO.ServiceResults.UserLoginResult;
-import com.Sunrise.DTO.ServiceResults.UserRegistrationResult;
-import com.Sunrise.Services.AuthService;
+import com.Sunrise.DTOs.Requests.LoginRequest;
+import com.Sunrise.DTOs.Requests.RegisterRequest;
+import com.Sunrise.DTOs.ServiceResults.TokenConfirmationResult;
+import com.Sunrise.DTOs.ServiceResults.UserLoginResult;
+import com.Sunrise.DTOs.ServiceResults.UserRegistrationResult;
+import com.Sunrise.Core.Services.AuthService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;

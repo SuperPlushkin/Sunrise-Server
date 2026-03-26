@@ -1,12 +1,12 @@
 package com.Sunrise.Controllers;
 
-import com.Sunrise.Controllers.Annotations.CurrentUserId;
-import com.Sunrise.DTO.Requests.AddGroupMemberRequest;
-import com.Sunrise.DTO.Requests.CreateGroupChatRequest;
-import com.Sunrise.DTO.Requests.CreatePersonalChatRequest;
-import com.Sunrise.DTO.ServiceResults.*;
-import com.Sunrise.Services.ChatService;
-import com.Sunrise.Controllers.Annotations.ValidId;
+import com.Sunrise.Configurations.Annotations.CurrentUserId;
+import com.Sunrise.DTOs.Requests.AddGroupMemberRequest;
+import com.Sunrise.DTOs.Requests.CreateGroupChatRequest;
+import com.Sunrise.DTOs.Requests.CreatePersonalChatRequest;
+import com.Sunrise.DTOs.ServiceResults.*;
+import com.Sunrise.Core.Services.ChatService;
+import com.Sunrise.Configurations.Annotations.ValidId;
 
 import jakarta.validation.Valid;
 
@@ -20,7 +20,6 @@ import java.util.Map;
 public class ChatController {
 
     private final ChatService chatService;
-    public enum ClearType { FOR_ALL, FOR_SELF }
 
     public ChatController(ChatService chatService) {
         this.chatService = chatService;
@@ -55,11 +54,9 @@ public class ChatController {
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
-                "info", "User created group chat successfully",
                 "chat_id", result.getChatId()
             ));
-        }
-        else {
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
@@ -71,8 +68,7 @@ public class ChatController {
 
         if (result.isSuccess()) {
             return ResponseEntity.ok("User added to group successfully");
-        }
-        else {
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
@@ -84,8 +80,7 @@ public class ChatController {
 
         if (result.isSuccess()) {
             return ResponseEntity.ok("User leaved chat successfully");
-        }
-        else {
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
@@ -102,41 +97,32 @@ public class ChatController {
                 "deleted_for_user", result.getDeletedForUser(),
                 "can_delete_for_all", result.getCanDeleteForAll()
             ));
-        }
-        else {
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
 
 
     @GetMapping("/{chatId}/members")
-    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId Long chatId, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId Long chatId, @RequestParam Long cursor, @CurrentUserId Long userId) {
 
-        ChatMembersResult result = chatService.getChatMembers(chatId, userId);
+        ChatMembersResult result = chatService.getChatMembers(chatId, cursor, userId);
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "members", result.getChatMembers(),
-                "count", result.getChatMembersCount()
-            ));
-        }
-        else {
+            return ResponseEntity.ok(result.getPagination());
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
 
     @GetMapping
-    public ResponseEntity<?> getUserChats(@RequestParam(defaultValue = "0") int offset, @RequestParam(defaultValue = "10") int limit, @CurrentUserId Long userId) {
+    public ResponseEntity<?> getUserChats(@RequestParam(defaultValue = "0") Long cursor, @RequestParam(defaultValue = "10") int limit, @CurrentUserId Long userId) {
 
-        UserChatsResult result = chatService.getUserChats(userId, offset, limit);
+        UserChatsResult result = chatService.getUserChats(userId, cursor, limit);
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "chats", result.getUserChats(),
-                "count", result.getUserChatsCount()
-            ));
-        }
-        else {
+            return ResponseEntity.ok(result.getPagination());
+        } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
