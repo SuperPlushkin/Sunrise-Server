@@ -9,7 +9,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 public class DBService {
@@ -36,27 +35,23 @@ public class DBService {
 
 
     // Основные методы
-    @Async("dbExecutor")
-    public void saveUserAsync(User user) {
+    public void saveUser(User user) {
         userRepository.save(user);
     }
-
-    @Async("dbExecutor")
-    public void deleteUserAsync(long userId) {
+    public void deleteUser(long userId) {
         userRepository.deleteById(userId);
     }
-    @Async("dbExecutor")
-    public void restoreUserAsync(long userId) {
+    public void restoreUser(long userId) {
         userRepository.restoreUser(userId);
     }
-
     @Async("dbExecutor")
     public void updateLastLoginAsync(String username, LocalDateTime lastLogin) {
         userRepository.updateLastLogin(username, lastLogin);
     }
-
-    @Async("dbExecutor")
-    public void enableUserAsync(long userId) {
+    public void updateUserProfile(long userId, String username, String name) {
+        userRepository.updateProfile(userId, username, name);
+    }
+    public void enableUser(long userId) {
         userRepository.enableUser(userId);
     }
 
@@ -80,37 +75,21 @@ public class DBService {
     }
 
 
-    // ========== LOGIN HISTORY METHODS ==========
-
-
-    // Основные методы
-    @Async("dbExecutor")
-    public void saveLoginHistoryAsync(LoginHistory loginHistory) {
-        loginHistoryRepository.save(loginHistory);
-    }
-
-
     // ========== CHAT METHODS ==========
 
 
     // Основные методы
-    @Async("dbExecutor")
-    public void saveGroupChatAsync(Chat chat, Long[] memberIds) {
+    public void saveGroupChat(Chat chat, Long[] memberIds) {
         chatRepository.createGroupChat(chat.getId(), chat.getName(), chat.getCreatedBy(), memberIds, chat.getCreatedAt());
     }
-
-    @Async("dbExecutor")
-    public void savePersonalChatAsync(Chat chat, long opponentId) {
+    public void savePersonalChat(Chat chat, long opponentId) {
         chatRepository.createPersonalChat(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
     }
 
-    @Async("dbExecutor")
-    public void restoreChatAsync(long chatId) {
+    public void restoreChat(long chatId) {
         chatRepository.restoreChat(chatId);
     }
-
-    @Async("dbExecutor")
-    public void deleteChatAsync(long chatId) {
+    public void deleteChat(long chatId) {
         chatRepository.deleteChat(chatId);
     }
 
@@ -134,21 +113,19 @@ public class DBService {
     // ========== CHAT MEMBER METHODS ==========
 
 
-    @Async("dbExecutor")
-    public void updateUserAdminRightsAsync(long chatId, long userId, boolean isAdmin) {
+    // Основные методы
+    public void updateUserAdminRights(long chatId, long userId, boolean isAdmin) {
         chatMemberRepository.addChatMember(chatId, userId, isAdmin);
     }
-
-    @Async("dbExecutor")
-    public void upsertChatMemberAsync(ChatMember chatMember) {
+    public void upsertChatMember(ChatMember chatMember) {
         chatMemberRepository.addChatMember(chatMember.getUserId(), chatMember.getChatId(), chatMember.isAdmin());
     }
-
-    @Async("dbExecutor")
-    public void removeUserFromChatAsync(long userId, long chatId) {
+    public void removeUserFromChat(long userId, long chatId) {
         chatMemberRepository.removeChatMember(chatId, userId);
     }
 
+
+    // Вспомогательные методы
     public Optional<ChatMember> getChatMember(long chatId, long userId) {
         return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
     }
@@ -195,12 +172,26 @@ public class DBService {
     }
 
 
+    // ========== LOGIN HISTORY METHODS ==========
+
+
+    // Основные методы
+    @Async("dbExecutor")
+    public void saveLoginHistoryAsync(LoginHistory loginHistory) {
+        loginHistoryRepository.save(loginHistory);
+    }
+
+
     // =========== MESSAGE METHODS ==========
 
 
+    // Основные методы
     @Async("dbExecutor")
     public void saveMessageAsync(Message message) {
         messageRepository.save(message);
+    }
+    public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
+        messageRepository.markMessageAsRead(chatId, userId, messageId, readAt);
     }
 
 
@@ -221,10 +212,6 @@ public class DBService {
     }
     public List<UserMessageDBResult> getMessagesWithGapCheckAfter(long chatId, long userId, long afterMessageId, Long lastKnownId, int limit, int maxGap) {
         return messageRepository.getMessagesWithGapCheckAfter(chatId, userId, afterMessageId, lastKnownId, limit, maxGap);
-    }
-
-    public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
-        messageRepository.markMessageAsRead(chatId, userId, messageId, readAt);
     }
 
     public List<LastUserReadStatusResult> getUserReadStatusByChatIds(long userId, Set<Long> chatIds) {

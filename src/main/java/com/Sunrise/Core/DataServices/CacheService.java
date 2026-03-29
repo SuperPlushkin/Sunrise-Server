@@ -128,6 +128,21 @@ public class CacheService {
     public void updateUserLastLogin(String username, LocalDateTime lastLogin) {
         getUserByUsername(username).ifPresent(user -> user.setLastLogin(lastLogin));
     }
+    public void updateUserProfile(long userId, String username, String name) {
+        getCacheUser(userId).ifPresent(user -> {
+            // Обновляем username в индексе
+            String oldUsername = user.getUsername();
+            if (!oldUsername.equals(username)) {
+                usernameIndex.invalidate(oldUsername.toLowerCase());
+                usernameIndex.put(username.toLowerCase(), userId);
+            }
+
+            // Обновляем данные пользователя
+            user.setUsername(username);
+            user.setName(name);
+        });
+    }
+
 
     public Optional<CacheUser> getCacheUser(long userId) {
         return Optional.ofNullable(userCache.getIfPresent(userId));

@@ -427,6 +427,18 @@ public class EntityMapper {
     }
 
 
+    public static UserProfileDTO toUserProfileDTO(FullUserDTO user) {
+        if (user == null) return null;
+
+        return new UserProfileDTO(
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getCreatedAt()
+        );
+    }
+
+
     // ========== CHAT_MEMBER ==========
 
     public static CacheChatMember toCache(ChatMember member) {

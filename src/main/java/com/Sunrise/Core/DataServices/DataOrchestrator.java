@@ -47,26 +47,7 @@ public class DataOrchestrator {
     }
 
 
-    // вспомогательные функции
-    private Optional<CacheChat> getOrLoadCacheChat(long chatId) {
-        Optional<CacheChat> cacheChat = cacheService.getCacheChat(chatId);
-        if (cacheChat.isPresent())
-            return cacheChat;
-
-        Optional<FullChatResult> dbFullChat = dbService.getFullChat(chatId);
-        dbFullChat.ifPresent(this::cacheUserChat);
-        return dbFullChat.map(EntityMapper::toCache);
-    }
-    private Optional<CacheChat> getOrLoadActiveCacheChat(long chatId) {
-        Optional<CacheChat> cacheChat = cacheService.getCacheChat(chatId);
-        if (cacheChat.isPresent())
-            return cacheChat.filter(CacheChat::isActive);
-
-        Optional<FullChatResult> dbFullChat = dbService.getFullChat(chatId);
-        dbFullChat.ifPresent(this::cacheUserChat);
-        return dbFullChat.map(EntityMapper::toCache).filter(CacheChat::isActive);
-    }
-
+    // Основные методы
     private void cacheUser(User user) {
         CacheUser cacheUser = EntityMapper.toCache(user);
         cacheService.saveUser(cacheUser);
@@ -95,29 +76,54 @@ public class DataOrchestrator {
     }
 
 
+    // Вспомогательные методы
+    private Optional<CacheChat> getOrLoadCacheChat(long chatId) {
+        Optional<CacheChat> cacheChat = cacheService.getCacheChat(chatId);
+        if (cacheChat.isPresent())
+            return cacheChat;
+
+        Optional<FullChatResult> dbFullChat = dbService.getFullChat(chatId);
+        dbFullChat.ifPresent(this::cacheUserChat);
+        return dbFullChat.map(EntityMapper::toCache);
+    }
+    private Optional<CacheChat> getOrLoadActiveCacheChat(long chatId) {
+        Optional<CacheChat> cacheChat = cacheService.getCacheChat(chatId);
+        if (cacheChat.isPresent())
+            return cacheChat.filter(CacheChat::isActive);
+
+        Optional<FullChatResult> dbFullChat = dbService.getFullChat(chatId);
+        dbFullChat.ifPresent(this::cacheUserChat);
+        return dbFullChat.map(EntityMapper::toCache).filter(CacheChat::isActive);
+    }
+
+
     // ========== USER METHODS ==========
 
 
     // Основные методы
     public void saveUser(FullUserDTO user) {
+        dbService.saveUser(EntityMapper.toEntity(user)); // синхронно в бд
         cacheService.saveNewUser(EntityMapper.toCache(user)); // сохраняем в кеш
-        dbService.saveUserAsync(EntityMapper.toEntity(user)); // асинхронно в бд
     }
     public void enableUser(long userId) {
+        dbService.enableUser(userId); // синхронно в бд
         cacheService.updateUserIsEnabled(userId, true); // сохраняем в кеш
-        dbService.enableUserAsync(userId); // асинхронно в бд
     }
     public void updateLastLogin(String username, LocalDateTime lastLogin) {
-        cacheService.updateUserLastLogin(username, lastLogin); // сохраняем в кеш
         dbService.updateLastLoginAsync(username, lastLogin); // асинхронно в бд
+        cacheService.updateUserLastLogin(username, lastLogin); // сохраняем в кеш
+    }
+    public void updateUserProfile(long userId, String username, String name) {
+        dbService.updateUserProfile(userId, username, name); // синхронно в БД
+        cacheService.updateUserProfile(userId, username, name); // обновляем в кеше
     }
     public void deleteUser(long userId) {
+        dbService.deleteUser(userId); // синхронно в бд
         cacheService.deleteUser(userId); // сохраняем в кеш
-        dbService.deleteUserAsync(userId); // асинхронно в бд
     }
     public void restoreUser(long userId) {
+        dbService.restoreUser(userId); // синхронно в бд
         cacheService.restoreUser(userId); // сохраняем в кеш
-        dbService.restoreUserAsync(userId); // асинхронно в бд
     }
 
 
@@ -143,6 +149,15 @@ public class DataOrchestrator {
         Optional<User> dbUser = dbService.getUserByUsername(username);
         dbUser.ifPresent(this::cacheUser);
         return dbUser.map(EntityMapper::toFullDTO);
+    }
+    public Optional<UserProfileDTO> getUserProfile(long userId) {
+        // пробуем кеш
+        Optional<FullUserDTO> user = getUser(userId);
+        if (user.isEmpty())
+            return Optional.empty();
+
+        // грузим из бд
+        return user.map(EntityMapper::toUserProfileDTO);
     }
 
     public UsersPageDTO getUsersPage(String filter, Long cursor, int limit) {
@@ -192,9 +207,11 @@ public class DataOrchestrator {
 
     // ========== LOGIN HISTORY METHODS ==========
 
+
+    // Основные методы
     public void saveLoginHistory(LoginHistoryDTO loginHistory) {
         dbService.saveLoginHistoryAsync(EntityMapper.toEntity(loginHistory)); // асинхронно в бд
-    }
+    } // TODO: SYNC OUTBOX||KAFKA
 
 
     // ========== CHAT METHODS ==========
@@ -204,39 +221,41 @@ public class DataOrchestrator {
     public void savePersonalChatAndAddPerson(LightChatDTO chat, LightChatMemberDTO creator, LightChatMemberDTO opponent) {
         CacheChat cacheChat = EntityMapper.toCache(chat, null);
 
+        // синхронно в бд
+        dbService.savePersonalChat(EntityMapper.toEntity(chat), opponent.getChatId());
+
         // сохраняем в кеш
         cacheService.saveChat(cacheChat);
         cacheService.addNewChatMembers(
             cacheChat, List.of(EntityMapper.toCache(creator), EntityMapper.toCache(opponent))
         );
 
-        // асинхронно в бд
-        dbService.savePersonalChatAsync(EntityMapper.toEntity(chat), opponent.getChatId());
     } // TODO: ПОДУМАТЬ НАД ФУНКЦИЕЙ СОХРАНЕНИЯ В БД
     public void saveGroupChatAndAddPeople(LightChatDTO chat, List<LightChatMemberDTO> members) {
         CacheChat cacheChat = EntityMapper.toCache(chat, null);
+
+        // синхронно в бд
+        Long[] memberIds = members.stream().map(LightChatMemberDTO::getUserId).toArray(Long[]::new);
+        dbService.saveGroupChat(EntityMapper.toEntity(chat), memberIds);
 
         // сохраняем в кеш
         cacheService.saveChat(cacheChat);
         cacheService.addNewChatMembers(cacheChat, members.stream().map(EntityMapper::toCache).toList());
 
-        // асинхронно в бд
-        Long[] memberIds = members.stream().map(LightChatMemberDTO::getUserId).toArray(Long[]::new);
-        dbService.saveGroupChatAsync(EntityMapper.toEntity(chat), memberIds);
     } // TODO: ПОДУМАТЬ НАД ФУНКЦИЕЙ СОХРАНЕНИЯ В БД
     public void restoreChat(long chatId) {
-        // Получаем всех участников чата до восстановления
+        // Получаем всех участников чата до восстановления (из бд)
         List<Long> membersIds = dbService.getChatMemberIds(chatId);
 
+        dbService.restoreChat(chatId); // синхронно в бд
         cacheService.restoreChat(chatId, membersIds); // сохраняем в кеш
-        dbService.restoreChatAsync(chatId); // асинхронно в бд
     }
     public void deleteChat(long chatId) {
-        // Получаем всех участников чата до удаления
+        // Получаем всех участников чата до удаления (из бд)
         List<Long> membersIds = dbService.getChatMemberIds(chatId);
 
+        dbService.deleteChat(chatId); // синхронно в бд
         cacheService.deleteChat(chatId, membersIds); // сохраняем в кеш
-        dbService.deleteChatAsync(chatId); // асинхронно в бд
     }
 
 
@@ -479,16 +498,16 @@ public class DataOrchestrator {
             return;
         }
 
+        dbService.upsertChatMember(EntityMapper.toEntity(chatMember)); // синхронно в бд
         cacheService.addNewChatMember(cacheChat.get(), EntityMapper.toCache(chatMember)); // сохраняем в кеш
-        dbService.upsertChatMemberAsync(EntityMapper.toEntity(chatMember)); // асинхронно в бд
     }
     public void updateAdminRights(long chatId, long userId, boolean isAdmin) {
+        dbService.updateUserAdminRights(chatId, userId, isAdmin); // синхронно в бд
         cacheService.saveOrUpdateAdminRights(chatId, userId, isAdmin); // обновляем кэш
-        dbService.updateUserAdminRightsAsync(chatId, userId, isAdmin); // асинхронно в бд
     }
     public void removeUserFromChat(long chatId, long userId) {
+        dbService.removeUserFromChat(userId, chatId); // синхронно в бд
         cacheService.removeChatMember(userId, chatId); // сохраняем в кеш
-        dbService.removeUserFromChatAsync(userId, chatId); // асинхронно в бд
     }
 
 
@@ -648,13 +667,13 @@ public class DataOrchestrator {
 
     // Основные методы
     public void saveVerificationToken(VerificationTokenDTO verificationTokenDTO) {
-        cacheService.saveVerificationToken(EntityMapper.toCache(verificationTokenDTO)); // сохраняем в кеш
         dbService.saveVerificationTokenAsync(EntityMapper.toEntity(verificationTokenDTO)); // асинхронно в бд
-    }
+        cacheService.saveVerificationToken(EntityMapper.toCache(verificationTokenDTO)); // сохраняем в кеш
+    } // TODO: SYNC OUTBOX||KAFKA
     public void deleteVerificationToken(String token) {
-        cacheService.deleteVerificationToken(token); // сохраняем в кеш
         dbService.deleteVerificationTokenAsync(token); // асинхронно в бд
-    }
+        cacheService.deleteVerificationToken(token); // сохраняем в кеш
+    } // TODO: SYNC OUTBOX||KAFKA
 
 
     // Вспомогательные методы
@@ -676,9 +695,10 @@ public class DataOrchestrator {
     }
 
 
-    // ========== MESSAGE METHODS ========== TODO: ВСЕ ЕЩЕ КОЛХОЗ
+    // ========== MESSAGE METHODS ==========
 
 
+    // Основные методы
     public void saveMessage(LightMessageDTO message) {
         // ищем в кеше контейнер сообщений (если нет, то грузим)
         Optional<CacheChat> cacheChatOpt = getOrLoadCacheChat(message.getChatId());
@@ -687,14 +707,20 @@ public class DataOrchestrator {
             return;
         }
 
+        // асинхронно в бд
+        dbService.saveMessageAsync(EntityMapper.toEntity(message));
+
         // сохраняем в кеш
         cacheChatOpt.get().addNewMessage(EntityMapper.toCache(message));
 
-        // асинхронно в бд
-        dbService.saveMessageAsync(EntityMapper.toEntity(message));
+    } // TODO: SYNC OUTBOX||KAFKA
+    public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
+        dbService.markMessageAsRead(chatId, userId, messageId, readAt); // синхронно в бд
+        cacheService.updateLastReadByUser(chatId, userId, messageId); // сохраняем в кеш
     }
 
 
+    // Вспомогательные методы
     public enum Direction {
         FORWARD,   // после указанного ID (новые сообщения)
         BACKWARD   // до указанного ID (старые сообщения)
@@ -851,11 +877,6 @@ public class DataOrchestrator {
         }
     }
 
-    public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
-        cacheService.updateLastReadByUser(chatId, userId, messageId); // сохраняем в кеш
-        dbService.markMessageAsRead(chatId, userId, messageId, readAt); // асинхронно в бд
-    }
-
 
     // Методы для истории чатов
     public ChatStatsDBResult getChatClearStats(long chatId, long userId) {
@@ -866,6 +887,7 @@ public class DataOrchestrator {
     // ========== CACHE METHODS ==========
 
 
+    // Основные методы
     public CacheService.CacheStats getCacheStatus() {
         return cacheService.getCacheStatus();
     }

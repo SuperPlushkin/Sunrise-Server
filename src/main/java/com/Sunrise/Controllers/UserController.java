@@ -8,6 +8,7 @@ import com.Sunrise.DTOs.ServiceResults.FilteredUsersResult;
 import jakarta.validation.Valid;
 
 import jakarta.validation.constraints.NotNull;
+import lombok.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,7 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getUsers(@RequestParam @NotNull String filter, @Valid PaginationRequest pagination, @CurrentUserId long userId) {
+    public ResponseEntity<?> getUsers(@RequestParam(defaultValue = "") @NotNull String filter, @Valid PaginationRequest pagination, @CurrentUserId long userId) {
 
         FilteredUsersResult result = userService.getFilteredUsers(userId, filter, pagination.getCursor(), pagination.getLimit());
 

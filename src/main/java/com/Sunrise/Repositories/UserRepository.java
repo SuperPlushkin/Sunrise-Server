@@ -26,18 +26,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Modifying
     @Transactional
+    @Query("UPDATE User u SET u.username = :username, u.name = :name WHERE u.id = :userId")
+    void updateProfile(@Param("userId") long userId, @Param("username") String username, @Param("name") String name);
+
+    @Modifying
+    @Transactional
     @Query("UPDATE User u SET u.isEnabled = true WHERE u.id = :userId")
-    void enableUser(@Param("userId") Long userId);
+    void enableUser(@Param("userId") long userId);
 
     @Modifying
     @Transactional
     @Query("UPDATE User u SET u.isDeleted = true WHERE u.id = :userId")
-    void softDeleteUser(@Param("userId") Long userId);
+    void softDeleteUser(@Param("userId") long userId);
 
     @Modifying
     @Transactional
     @Query("UPDATE User u SET u.isDeleted = false WHERE u.id = :userId")
-    void restoreUser(@Param("userId") Long userId);
+    void restoreUser(@Param("userId") long userId);
 
     // ========== ПОИСК ==========
 

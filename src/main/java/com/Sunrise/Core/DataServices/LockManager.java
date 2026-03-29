@@ -15,6 +15,7 @@ public class LockManager {
     private static final int LOCK_TIMEOUT_SECONDS = 5;
     private static final int LOCK_EXPIRATION_MILLIS = 30 * 60 * 1000;
     private static final int LOCK_CLEANUP_SCHEDULE_MILLIS = 5 * 60 * 1000;
+
     private static class MyReadWriteLock {
         private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
         volatile long lastAccess;

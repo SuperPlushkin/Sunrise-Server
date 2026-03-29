@@ -61,7 +61,7 @@ public class AuthService {
 
             // пытаемся заблокировать профиль юзера
             if (!lockManager.tryLockUserProfileForWrite(newUserId))
-                throw new RuntimeException("Try later");
+                throw new ValidationException("Try later");
 
             var user = FullUserDTO.create(newUserId, username, name, email, passwordEncoder.encode(password));
             dataOrchestrator.saveUser(user);
@@ -128,9 +128,7 @@ public class AuthService {
         }
     }
     public TokenConfirmationResult confirmToken(String type, String token) {
-
         long userId = -1;
-
         try {
             if (token == null || token.trim().isEmpty())
                 throw new ValidationException("Token cannot be empty");
@@ -147,7 +145,7 @@ public class AuthService {
 
             // пытаемся заблокировать профиль юзера
             if (!lockManager.tryLockUserProfileForWrite(userId))
-                throw new RuntimeException("Try later");
+                throw new ValidationException("Try later");
 
             dataOrchestrator.deleteVerificationToken(token);
 
@@ -175,14 +173,12 @@ public class AuthService {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        try
-        {
+        try {
             if (request.getHeader("X-Forwarded-For") instanceof String xfHeader && !xfHeader.isEmpty()) {
                 return xfHeader.split(",")[0].trim();
             }
             return request.getRemoteAddr();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             return "unknown";
         }
     }
