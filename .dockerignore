@@ -10,7 +10,5 @@ build/
 .idea/
 .vscode/
 DocumentationAPI.html
-init-sql/01-tables.sql
-init-sql/02-functions.sql
-init-sql/03-grants.sql
+init-sql/
 src/test/test-chats.sql
