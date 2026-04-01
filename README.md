@@ -24,7 +24,7 @@
    docker pull superplushkin/sunrise-server
    ```
    
-2. **❗ВАЖНО❗Создайте файлы зависимостей:**<br><br>
+2. **❗ВАЖНО❗Создайте файлы зависимостей:**
 
    * 📁 Файл окружения (.env) <br><br>
 
@@ -87,7 +87,7 @@
 Sunrise-Server/
 ├── .env-example                    # 📋 Пример конфигурации окружения
 ├── Dockerfile                      # 🐳 Конфигурация Docker образа
-├── DocumentationAPI.md             # 📚 Документация API
+├── DocumentationAPI.md             # 📚 Документация API (устарела, требует переделки)
 ├── docker-compose.full-stack.yml   # 🐳 Docker-compose скрипт для запуска всего стека приложения
 └── docker-compose.only-app.yml     # 🐳 Docker-compose скрипт для запуска только Spring Boot приложения
 ```

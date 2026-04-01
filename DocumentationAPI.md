@@ -1,4 +1,4 @@
-# 🌅 Sunrise API Documentation
+# 🌅 Sunrise API Documentation (УСТАРЕЛА)
 
 Полная документация по REST API для общения с сервером.
 
