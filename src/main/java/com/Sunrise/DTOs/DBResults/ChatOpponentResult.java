@@ -4,7 +4,7 @@ import java.time.LocalDateTime;
 
 public interface ChatOpponentResult {
     Long getChatId();
-    Long getId();
+    Long getUserId();
     String getUsername();
     String getName();
     String getEmail();

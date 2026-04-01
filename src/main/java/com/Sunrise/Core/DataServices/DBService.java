@@ -79,11 +79,16 @@ public class DBService {
 
 
     // Основные методы
-    public void saveGroupChat(Chat chat, Long[] memberIds) {
-        chatRepository.createGroupChat(chat.getId(), chat.getName(), chat.getCreatedBy(), memberIds, chat.getCreatedAt());
+    public void saveGroupChat(Chat chat, Long[] memberIds, Boolean[] isAdminFlags) {
+        chatRepository.createGroupChatAndAddMembers(
+            chat.getId(), chat.getName(),
+            chat.getCreatedBy(), memberIds.length,
+            memberIds, isAdminFlags,
+            chat.getCreatedAt()
+        );
     }
     public void savePersonalChat(Chat chat, long opponentId) {
-        chatRepository.createPersonalChat(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
+        chatRepository.createPersonalChatAndAddMembers(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
     }
 
     public void restoreChat(long chatId) {
@@ -118,7 +123,10 @@ public class DBService {
         chatMemberRepository.addChatMember(chatId, userId, isAdmin);
     }
     public void upsertChatMember(ChatMember chatMember) {
-        chatMemberRepository.addChatMember(chatMember.getUserId(), chatMember.getChatId(), chatMember.isAdmin());
+        chatMemberRepository.addChatMember(chatMember.getChatId(), chatMember.getUserId(), chatMember.isAdmin());
+    }
+    public void upsertChatMembers(long chatId, Long[] memberIds, Boolean[] isAdminFlags) {
+        chatMemberRepository.addChatMembers(chatId, memberIds, isAdminFlags);
     }
     public void removeUserFromChat(long userId, long chatId) {
         chatMemberRepository.removeChatMember(chatId, userId);
@@ -140,8 +148,17 @@ public class DBService {
         return chatMemberRepository.findActiveChatMembersByIds(chatId, missingIds);
     }
 
-    public List<ChatOpponentResult> findOpponentsForChats(Set<Long> chatIds, long excludingId) {
-        return chatMemberRepository.findOpponentsForChats(chatIds, excludingId);
+    public List<ChatOpponentResult> findOpponentsForChats(Map<Long, Long> missingChatUserIds) {
+        Long[] chatIds = new Long[missingChatUserIds.size()];
+        Long[] userIds = new Long[missingChatUserIds.size()];
+        int index = 0;
+        for (Map.Entry<Long, Long> entry : missingChatUserIds.entrySet()){
+            chatIds[index] = entry.getKey();
+            userIds[index] = entry.getValue();
+            index++;
+        }
+
+        return chatMemberRepository.findOpponentsForChats(chatIds, userIds);
     }
 
     public List<ChatMemberResult> getFullChatMembersPage(long chatId, Long cursor, int limit) {

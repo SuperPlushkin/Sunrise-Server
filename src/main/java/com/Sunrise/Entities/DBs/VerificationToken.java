@@ -6,6 +6,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
 @NoArgsConstructor
 @AllArgsConstructor
 @Data

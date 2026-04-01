@@ -53,15 +53,21 @@ public class DataOrchestrator {
         cacheService.saveUser(cacheUser);
         log.debug("[⚡] Cached user {} || cacheUser", user.getId());
     }
+    private void cacheUser(ChatOpponentResult opponent) {
+        CacheUser cacheUser = EntityMapper.toCache(opponent);
+        cacheService.saveUser(cacheUser);
+        log.debug("[⚡] Cached opponent {} || cacheUser", opponent.getUserId());
+    }
     private void cacheUserChat(FullChatResult fullChat) {
         CacheChat cacheChat = EntityMapper.toCache(fullChat);
         cacheService.saveChat(cacheChat);
         log.debug("[⚡] Cached full chat {} with container ({} messages) || cacheChat", cacheChat.getId(), fullChat.getMessagesCount());
     }
-    private void cacheUserChat(UserFullChatResult userFullChat) {
+    private CacheChat cacheUserChat(UserFullChatResult userFullChat) {
         CacheChat cacheChat = EntityMapper.toCache(userFullChat);
         cacheService.saveChat(cacheChat);
         log.debug("[⚡] Cached full user chat {} with container ({} messages) || cacheChat", cacheChat.getId(), userFullChat.getMessagesCount());
+        return cacheChat;
     }
     private void cacheChatMember(CacheChat cacheChat, ChatMember member) {
         CacheChatMember cacheChatMember = EntityMapper.toCache(member);
@@ -105,6 +111,10 @@ public class DataOrchestrator {
         dbService.saveUser(EntityMapper.toEntity(user)); // синхронно в бд
         cacheService.saveNewUser(EntityMapper.toCache(user)); // сохраняем в кеш
     }
+    public void updateUser(FullUserDTO user) {
+        dbService.saveUser(EntityMapper.toEntity(user)); // синхронно в бд
+        cacheService.saveUser(EntityMapper.toCache(user)); // сохраняем в кеш
+    }
     public void enableUser(long userId) {
         dbService.enableUser(userId); // синхронно в бд
         cacheService.updateUserIsEnabled(userId, true); // сохраняем в кеш
@@ -113,9 +123,9 @@ public class DataOrchestrator {
         dbService.updateLastLoginAsync(username, lastLogin); // асинхронно в бд
         cacheService.updateUserLastLogin(username, lastLogin); // сохраняем в кеш
     }
-    public void updateUserProfile(long userId, String username, String name) {
-        dbService.updateUserProfile(userId, username, name); // синхронно в БД
-        cacheService.updateUserProfile(userId, username, name); // обновляем в кеше
+    public void updateUserProfile(UserProfileDTO profile) {
+        dbService.updateUserProfile(profile.getUserId(), profile.getUsername(), profile.getName()); // синхронно в БД
+        cacheService.updateUserProfile(profile.getUserId(), profile.getUsername(), profile.getName()); // обновляем в кеше
     }
     public void deleteUser(long userId) {
         dbService.deleteUser(userId); // синхронно в бд
@@ -163,7 +173,7 @@ public class DataOrchestrator {
     public UsersPageDTO getUsersPage(String filter, Long cursor, int limit) {
         // получаем пагинацию из бд
         List<UserResult> rows = dbService.getFullFilteredUsersPage(filter, cursor, limit + 1); // берем на одну больше
-        log.debug("[🏛️] Loading users page filter='{}', cursor={}, limit={} from DB", filter, cursor, limit);
+        log.debug("[🏛️] Cached users page filter='{}', cursor={}, limit={} from DB", filter, cursor, limit);
 
         Map<Long, LightUserDTO> users = new HashMap<>(rows.size());
         Long nextCursor = null;
@@ -219,28 +229,36 @@ public class DataOrchestrator {
 
     // Основные методы
     public void savePersonalChatAndAddPerson(LightChatDTO chat, LightChatMemberDTO creator, LightChatMemberDTO opponent) {
-        CacheChat cacheChat = EntityMapper.toCache(chat, null);
-
         // синхронно в бд
-        dbService.savePersonalChat(EntityMapper.toEntity(chat), opponent.getChatId());
+        dbService.savePersonalChat(
+            EntityMapper.toEntity(chat), opponent.getUserId()
+        );
 
         // сохраняем в кеш
+        CacheChat cacheChat = EntityMapper.toCache(chat, null);
         cacheService.saveChat(cacheChat);
         cacheService.addNewChatMembers(
             cacheChat, List.of(EntityMapper.toCache(creator), EntityMapper.toCache(opponent))
         );
 
     } // TODO: ПОДУМАТЬ НАД ФУНКЦИЕЙ СОХРАНЕНИЯ В БД
-    public void saveGroupChatAndAddPeople(LightChatDTO chat, List<LightChatMemberDTO> members) {
-        CacheChat cacheChat = EntityMapper.toCache(chat, null);
+    public void saveGroupChatAndAddPeople(LightChatDTO chat, List<LightChatMemberDTO> chatMembers) {
+        // конвертируем
+        Long[] memberIds = new Long[chatMembers.size()];
+        Boolean[] isAdminFlags = new Boolean[chatMembers.size()];
+        for (int i = chatMembers.size() - 1; i > 0; i--) {
+            LightChatMemberDTO member = chatMembers.get(i);
+            memberIds[i] = member.getUserId();
+            isAdminFlags[i] = member.isAdmin();
+        }
 
         // синхронно в бд
-        Long[] memberIds = members.stream().map(LightChatMemberDTO::getUserId).toArray(Long[]::new);
-        dbService.saveGroupChat(EntityMapper.toEntity(chat), memberIds);
+        dbService.saveGroupChat(EntityMapper.toEntity(chat), memberIds, isAdminFlags);
 
         // сохраняем в кеш
+        CacheChat cacheChat = EntityMapper.toCache(chat, null);
         cacheService.saveChat(cacheChat);
-        cacheService.addNewChatMembers(cacheChat, members.stream().map(EntityMapper::toCache).toList());
+        cacheService.addNewChatMembers(cacheChat, chatMembers.stream().map(EntityMapper::toCache).toList());
 
     } // TODO: ПОДУМАТЬ НАД ФУНКЦИЕЙ СОХРАНЕНИЯ В БД
     public void restoreChat(long chatId) {
@@ -268,7 +286,7 @@ public class DataOrchestrator {
         // грузим из бд
         Optional<FullChatResult> dbFullChat = dbService.getFullChat(chatId);
         dbFullChat.ifPresent(this::cacheUserChat); // восстанавливаем в кеш
-        return !dbFullChat.map(FullChatResult::getIsDeleted).orElse(true);
+        return dbFullChat.map(fullChatResult -> !fullChatResult.getIsDeleted()).orElse(false);
     }
 
     public Optional<LightChatDTO> getActiveChat(long chatId) {
@@ -335,32 +353,28 @@ public class DataOrchestrator {
 
         // загружаем с бд
         List<UserFullChatResult> rows = dbService.getFullUserChatsPage(userId, cursor, limit + 1); // берем на одну больше
-        log.debug("[🏛️] Loading user {} chats page cursor={}, limit={} from DB", userId, cursor, limit);
-
-        Map<Long, FullChatDTO> chats = new HashMap<>(rows.size());
-        Long nextCursor = null;
+        log.debug("[🏛️] Cached user {} chats page cursor={}, limit={} from DB", userId, cursor, limit);
 
         UserChatsPagination dbPagination = new UserChatsPagination(SimpleSnowflakeId.nextId(), userId, cursor, limit);
-        if (!rows.isEmpty()) {
-            boolean hasMore = rows.size() > limit;
 
-            List<UserFullChatResult> pageRows = hasMore ? rows.subList(0, limit) : rows;
+        Map<Long, FullChatDTO> chats = new HashMap<>(rows.size());
+        boolean hasMore = rows.size() > limit;
 
-            chats = EntityMapper.toFullDTOs(pageRows, chats);
-            nextCursor = hasMore ? pageRows.getLast().getId() : null;
+        List<UserFullChatResult> pageRows = hasMore ? rows.subList(0, limit) : rows;
+        chats = EntityMapper.toFullDTOs(pageRows, chats);
+        Long nextCursor = hasMore ? pageRows.getLast().getId() : null;
 
-            dbPagination.setPaginationData(chats.keySet(), nextCursor);
+        dbPagination.setPaginationData(chats.keySet(), nextCursor);
 
-            // кешируем данные
-            for (FullChatDTO chat : chats.values()) {
-                cacheService.saveChat(EntityMapper.toCache(chat));
-                log.debug("[⚡] Cached chat {} in cache || getUserChatsPage", chat.getId());
-            }
+        // кешируем данные
+        for (FullChatDTO chat : chats.values()) {
+            cacheService.saveChat(EntityMapper.toCache(chat));
+            log.debug("[⚡] Cached chat {} in cache || getUserChatsPage", chat.getId());
         }
 
         // кешируем пагинацию
         cacheService.saveUserChatsPagination(dbPagination);
-        log.debug("[⚡] Loading user {} chats page cursor={}, limit={} from DB", userId, cursor, limit);
+        log.debug("[⚡] Cached user {} chats page cursor={}, limit={} from DB", userId, cursor, limit);
         return new UserChatsPageDTO(chats, nextCursor);
     }
     private Optional<UserChatsPageDTO> getUserChatsBatch(UserChatsPagination pagination) {
@@ -372,7 +386,7 @@ public class DataOrchestrator {
         long userId = pagination.getUserId();
 
         Set<Long> missingChatIds = new HashSet<>(chatIds.size() / 2);
-        Set<Long> missingChatUserIds = new HashSet<>(chatIds.size() / 2);
+        Map<Long, Long> missingChatUserIds = new HashMap<>(chatIds.size() / 2);
         Set<Long> missingUserReadStatusIds = new HashSet<>(chatIds.size() / 2);
 
         Map<Long, LightChatDTO> chatMap = new HashMap<>(chatIds.size());
@@ -387,11 +401,12 @@ public class DataOrchestrator {
                 if (chat.isDeleted()) return Optional.empty();
                 if (!chat.isGroup()) {
                     // ищем юзера для приватных чатов или иначе добавляем в мапу для поиска в бд
-                    Optional<CacheUser> cacheUser = cacheService.getCacheUser(chat.getCreatedBy() == userId ? userId : chat.getOpponentId());
+                    long opponentId = chat.getCreatedBy() == userId ? chat.getOpponentId() : chat.getCreatedBy();
+                    Optional<CacheUser> cacheUser = cacheService.getCacheUser(opponentId);
                     if (cacheUser.isPresent()){
                         userMap.put(chatId, EntityMapper.toLightDTO(cacheUser.get()));
                     } else{
-                        missingChatUserIds.add(chatId);
+                        missingChatUserIds.put(chatId, opponentId);
                     }
                 }
 
@@ -417,33 +432,39 @@ public class DataOrchestrator {
         // загружаем недостающие чаты из БД (и пытаемся получить юзеров для приватных чатов из Кеша)
         if (!missingChatIds.isEmpty()) {
             List<UserFullChatResult> dbChats = dbService.getUserFullChatsByChatIds(missingChatIds, userId);
-            if (dbChats.size() != missingChatIds.size()) return Optional.empty(); // Проверяем, что загрузили все, что ожидали
-
             for (UserFullChatResult fullChat : dbChats) {
                 long chatId = fullChat.getId();
                 if (fullChat.getIsDeleted()) continue;
                 if (!fullChat.getIsGroup()) {
                     // ищем юзера для приватных чатов или иначе добавляем в мапу для поиска в бд
-                    Optional<CacheUser> cacheUser = cacheService.getCacheUser(fullChat.getCreatedBy() == userId ? userId : fullChat.getOpponentId());
+                    long opponentId = fullChat.getCreatedBy().equals(userId) ? fullChat.getOpponentId() : fullChat.getCreatedBy();
+                    Optional<CacheUser> cacheUser = cacheService.getCacheUser(opponentId);
                     if (cacheUser.isPresent()){
                         userMap.put(chatId, EntityMapper.toLightDTO(cacheUser.get()));
                     } else{
-                        missingChatUserIds.add(chatId);
+                        missingChatUserIds.put(chatId, opponentId);
                     }
                 }
 
-                cacheUserChat(fullChat); // Кэшируем
+                UserMessageDBResult message = fullChat.getLastMessage();
+
                 chatMap.put(chatId, EntityMapper.toLightDTO(fullChat));
+                messageMap.put(chatId, EntityMapper.toLightDTO(message));
+
+                // Кэшируем
+                CacheChat chat = cacheUserChat(fullChat);
+                if (message != null && message.getIsReadByUser()){
+                    chat.updateLastReadByUser(userId, message.getId());
+                }
             }
         }
 
         // загружаем недостающих юзеров для личных чатов из БД
         if (!missingChatUserIds.isEmpty()) {
-            List<ChatOpponentResult> rows = dbService.findOpponentsForChats(missingChatUserIds, userId);
-            Map<Long, User> dbOpponents = EntityMapper.toEntities(rows);
-            dbOpponents.forEach((chatId, user) -> {
-                cacheService.saveUser(EntityMapper.toCache(user));
-                userMap.put(chatId, EntityMapper.toLightDTO(user));
+            List<ChatOpponentResult> rows = dbService.findOpponentsForChats(missingChatUserIds);
+            rows.forEach(opponent -> {
+                cacheUser(opponent);
+                userMap.put(opponent.getChatId(), EntityMapper.toCensoredLightUserDTO(opponent));
             });
         }
 
@@ -464,7 +485,6 @@ public class DataOrchestrator {
             }
         }
 
-
         // сохраняем порядок вставки и собираем в один класс
         Map<Long, FullChatDTO> finalChatMap = chatMap.keySet().stream()
                 .collect(Collectors.toMap(
@@ -476,7 +496,7 @@ public class DataOrchestrator {
                             return EntityMapper.toFullGroupChatDTO(chat, message);
                         } else {
                             LightUserDTO user = userMap.get(chatId);
-                            return EntityMapper.toFullPersonalChatDTO(chat, user, message);
+                            return EntityMapper.toFullPersonalChatDTO(chat, user, userId, message);
                         }
                     },
                     (a, b) -> b, LinkedHashMap::new)
@@ -500,6 +520,26 @@ public class DataOrchestrator {
 
         dbService.upsertChatMember(EntityMapper.toEntity(chatMember)); // синхронно в бд
         cacheService.addNewChatMember(cacheChat.get(), EntityMapper.toCache(chatMember)); // сохраняем в кеш
+    }
+    public void saveChatMembers(long chatId, List<LightChatMemberDTO> chatMembers) {
+        // загружаем информацию о чате
+        Optional<CacheChat> cacheChat = getOrLoadCacheChat(chatId);
+        if (cacheChat.isEmpty()) {
+            log.warn("[🏛️] Chat {} not found || saveChatMembers", chatId);
+            return;
+        }
+
+        // конвертируем
+        Long[] ids = new Long[chatMembers.size()];
+        Boolean[] isAdminFlags = new Boolean[chatMembers.size()];
+        for (int i = chatMembers.size() - 1; i > 0; i--) {
+            LightChatMemberDTO member = chatMembers.get(i);
+            ids[i] = member.getUserId();
+            isAdminFlags[i] = member.isAdmin();;
+        }
+
+        dbService.upsertChatMembers(chatId, ids, isAdminFlags); // синхронно в бд
+        cacheService.addNewChatMembers(cacheChat.get(), EntityMapper.toCacheChatMembers(chatMembers)); // сохраняем в кеш
     }
     public void updateAdminRights(long chatId, long userId, boolean isAdmin) {
         dbService.updateUserAdminRights(chatId, userId, isAdmin); // синхронно в бд
@@ -552,36 +592,32 @@ public class DataOrchestrator {
 
         // загружаем с бд и сохраняем пагинацию
         List<ChatMemberResult> rows = dbService.getFullChatMembersPage(chatId, cursor, limit + 1); // берем на одну больше
-        log.debug("[🏛️] Loading chat {} members page nextCursor={}, limit={} from DB || getChatMembersPage", chatId, cursor, limit);
-
-        Map<Long, FullChatMemberDTO> members = new HashMap<>(rows.size());
-        Long nextCursor = null;
+        log.debug("[🏛️] Cached chat {} members page nextCursor={}, limit={} from DB || getChatMembersPage", chatId, cursor, limit);
 
         ChatMembersPagination dbPagination = new ChatMembersPagination(SimpleSnowflakeId.nextId(), chatId, cursor, limit);
-        if (!rows.isEmpty()){
-            boolean hasMore = rows.size() > limit;
 
-            List<ChatMemberResult> pageRows = hasMore ? rows.subList(0, limit) : rows;
+        Map<Long, FullChatMemberDTO> members = new HashMap<>(rows.size());
+        boolean hasMore = rows.size() > limit;
 
-            members = EntityMapper.toFullDTOs(pageRows, chatId, members);
-            nextCursor = hasMore ? pageRows.getLast().getUserId() : null;
+        List<ChatMemberResult> pageRows = hasMore ? rows.subList(0, limit) : rows;
+        members = EntityMapper.toFullDTOs(pageRows, chatId, members);
+        Long nextCursor = hasMore ? pageRows.getLast().getUserId() : null;
 
-            dbPagination.setPaginationData(members.keySet(), nextCursor);
+        dbPagination.setPaginationData(members.keySet(), nextCursor);
 
-            // кешируем данные
-            Optional<CacheChat> cacheChat = getOrLoadCacheChat(chatId);
-            if (cacheChat.isPresent()){
-                CacheChat chat = cacheChat.get();
-                for (FullChatMemberDTO chatMember : members.values()){
-                    cacheService.addChatMember(chat, EntityMapper.toCache(chatMember));
-                    log.debug("[⚡] Cached chat member {} in chat {} || getChatMembersPage", chatMember.getUserId(), chatMember.getChatId());
-                }
+        // кешируем данные
+        Optional<CacheChat> cacheChat = getOrLoadCacheChat(chatId);
+        if (cacheChat.isPresent()){
+            CacheChat chat = cacheChat.get();
+            for (FullChatMemberDTO chatMember : members.values()){
+                cacheService.addChatMember(chat, EntityMapper.toCache(chatMember));
+                log.debug("[⚡] Cached chat member {} in chat {} || getChatMembersPage", chatMember.getUserId(), chatMember.getChatId());
             }
         }
 
         // кешируем пагинацию
         cacheService.saveChatMembersPagination(dbPagination);
-        log.debug("[⚡] Loading chat {} members page nextCursor={}, limit={} from DB || getChatMembersPage", chatId, cursor, limit);
+        log.debug("[⚡] Cached chat {} members page nextCursor={}, limit={} from DB || getChatMembersPage", chatId, cursor, limit);
         return new ChatMembersPageDTO(members, nextCursor);
     }
     private Optional<ChatMembersPageDTO> getChatMembersBatch(ChatMembersPagination pagination) {

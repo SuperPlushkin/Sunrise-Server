@@ -4,9 +4,14 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -14,10 +19,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Component
 public class JwtFilter extends OncePerRequestFilter {
-
     private final JwtUtil jwtUtil;
-    private final List<String> excludedPaths = com.Sunrise.Configurations.PublicEndpoints.ENDPOINTS;
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
+
+    @Value("${app.jwt.no-jwt-endpoints}")
+    private String[] excludedPaths;
 
     public JwtFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
@@ -26,14 +34,6 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getServletPath();
-
-        // Пропускаем публичные endpoints
-        if (excludedPaths.stream().anyMatch(path::startsWith)) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
         final String authorizationHeader = request.getHeader("Authorization");
 
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
@@ -41,9 +41,14 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        String username = null;
-        Long userId = null;
-        String jwt = null;
+        if (isPathExcluded(request.getServletPath())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String username;
+        Long userId;
+        String jwt;
 
         try {
             jwt = authorizationHeader.substring(7);
@@ -55,8 +60,7 @@ public class JwtFilter extends OncePerRequestFilter {
 
             username = jwtUtil.extractUsername(jwt);
             userId = jwtUtil.extractUserId(jwt);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "INVALID_TOKEN");
             return;
         }
@@ -71,8 +75,7 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        try
-        {
+        try {
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(username, null, List.of());
 
             Map<String, Object> details = new HashMap<>();
@@ -81,8 +84,7 @@ public class JwtFilter extends OncePerRequestFilter {
             auth.setDetails(details);
 
             SecurityContextHolder.getContext().setAuthentication(auth);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             sendErrorResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "AUTHENTICATION_ERROR");
             return;
         }
@@ -90,6 +92,22 @@ public class JwtFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
+    private boolean isPathExcluded(String path) {
+        if (excludedPaths == null) {
+            return false;
+        }
+
+        for (String pattern : excludedPaths) {
+            // Поддержка паттернов типа /auth/**
+            if (pathMatcher.match(pattern, path)) {
+                return true;
+            }
+            if (path.equals(pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
     private void sendErrorResponse(HttpServletResponse response, int statusCode, String errorCode) throws IOException {
         response.setStatus(statusCode);
         response.setContentType("application/text");

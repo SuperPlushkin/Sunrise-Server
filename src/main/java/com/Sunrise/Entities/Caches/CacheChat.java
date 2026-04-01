@@ -126,7 +126,7 @@ public class CacheChat {
 
     // ========== МЕТОДЫ ДЛЯ ПРОЧТЕНИЯ ==========
 
-    public void updateLastReadByUser(long messageId, long userId) {
+    public void updateLastReadByUser(long userId, long messageId) {
         lastReadMessageIdByUserIds.computeIfAbsent(userId, k -> new AtomicLong(0))
                 .updateAndGet(current -> Math.max(current, messageId));
     }

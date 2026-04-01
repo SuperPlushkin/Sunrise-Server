@@ -5,10 +5,10 @@ import com.fasterxml.jackson.annotation.Nulls;
 import jakarta.validation.constraints.*;
 
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 @lombok.Getter
-@lombok.Setter
 @lombok.AllArgsConstructor
 @lombok.NoArgsConstructor
 public class CreateGroupChatRequest {
@@ -22,6 +22,8 @@ public class CreateGroupChatRequest {
     private String chatName;
 
     @Size(max = 100, message = "Group cannot have more than 100 members")
-    @JsonSetter(nulls = Nulls.SKIP)
-    private Set<@NotNull(message = "UserId cannot be null") @Min(1) Long> userIds = new HashSet<>();
+    @JsonSetter(nulls = Nulls.AS_EMPTY)
+    private Map<@NotNull(message = "User ID cannot be null")
+                    @Min(value = 1, message = "User ID must be positive") Long,
+                        @NotNull(message = "Admin flag cannot be null") Boolean> members;
 }

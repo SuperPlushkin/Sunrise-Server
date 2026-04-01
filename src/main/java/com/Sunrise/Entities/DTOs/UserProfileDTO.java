@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Setter
 @AllArgsConstructor
 public class UserProfileDTO {
-    private long id;
+    private long userId;
     private String username;
     private String name;
     private LocalDateTime createdAt;

@@ -1,11 +1,11 @@
 package com.Sunrise.Core.Services;
 
 import com.Sunrise.DTOs.Paginations.UsersPageDTO;
-import com.Sunrise.DTOs.ServiceResults.FilteredUsersResult;
+import com.Sunrise.DTOs.ServiceResults.*;
+
 import com.Sunrise.Core.DataServices.DataOrchestrator;
 import com.Sunrise.Core.DataServices.DataValidator;
-import com.Sunrise.DTOs.ServiceResults.GetProfileResult;
-import com.Sunrise.DTOs.ServiceResults.UpdateProfileResult;
+
 import com.Sunrise.Entities.DTOs.FullUserDTO;
 import com.Sunrise.Entities.DTOs.UserProfileDTO;
 import com.Sunrise.Subclasses.ValidationException;
@@ -27,27 +27,31 @@ public class UserService {
         this.validator = validator;
     }
 
-    public UpdateProfileResult updateProfile(long userId, String username, String name) {
+    public UpdateProfileResult updateProfile(long userId, String newUsername, String newName) {
         try {
             validator.validateActiveUser(userId);
 
-            // Проверяем, что новый username не занят другим пользователем
-            Optional<FullUserDTO> existingUser = dataOrchestrator.getUserByUsername(username);
-            if (existingUser.isPresent() && existingUser.get().getId() != userId) {
-                return UpdateProfileResult.error("Username already taken");
+            FullUserDTO user = dataOrchestrator.getUser(userId)
+                    .orElseThrow(() -> new ValidationException("User not found"));
+
+            boolean usernameNotChanged = user.getUsername().equals(newUsername);
+            boolean nameNotChanged = user.getName().equals(newName);
+
+            // Проверяем, что данные изменились
+            if (usernameNotChanged && nameNotChanged) {
+                throw new ValidationException("Data has not changed");
+            }
+
+            if (!usernameNotChanged && dataOrchestrator.existsUserByUsername(newUsername)) {
+                throw new ValidationException("Username already taken");
             }
 
             // Обновляем профиль
-            dataOrchestrator.updateUserProfile(userId, username, name);
-
-            // Получаем обновленного пользователя
-            Optional<UserProfileDTO> profileOpt = dataOrchestrator.getUserProfile(userId);
-            if (profileOpt.isEmpty()) {
-                return UpdateProfileResult.error("User not found after update");
-            }
+            UserProfileDTO profile = new UserProfileDTO(userId, newUsername, newName, user.getCreatedAt());
+            dataOrchestrator.updateUserProfile(profile);
 
             log.info("[🔧] ✅ User {} updated profile", userId);
-            return UpdateProfileResult.success(profileOpt.get());
+            return UpdateProfileResult.success(profile);
 
         } catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to update profile for user {}: {}", userId, e.getMessage());
@@ -57,6 +61,24 @@ public class UserService {
             return UpdateProfileResult.error("Update profile failed due to server error");
         }
     }
+    public SimpleResult deleteProfile(long userId) {
+        try {
+            validator.validateActiveUser(userId);
+
+            // удаляем
+            dataOrchestrator.deleteUser(userId);
+
+            log.info("[🔧] ✅ User {} deleted profile", userId);
+            return SimpleResult.success();
+
+        } catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to delete profile for user {}: {}", userId, e.getMessage());
+            return SimpleResult.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("[🔧] ⚠️ Error deleting profile for user {}: {}", userId, e.getMessage());
+            return SimpleResult.error("Update profile failed due to server error");
+        }
+    }
 
     public GetProfileResult getMyProfile(long userId) {
         try {
@@ -64,17 +86,17 @@ public class UserService {
 
             Optional<UserProfileDTO> profileOpt = dataOrchestrator.getUserProfile(userId);
             if (profileOpt.isEmpty()) {
-                return GetProfileResult.error("User not found or is deleted");
+                throw new ValidationException("User not found or is deleted");
             }
 
             log.debug("[🔧] ✅ Loaded profile for user {}", userId);
             return GetProfileResult.success(profileOpt.get());
 
         } catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to get profile for user {}: {}", userId, e.getMessage());
+            log.warn("[🔧] ☝️ Failed to get self profile for user {}: {}", userId, e.getMessage());
             return GetProfileResult.error(e.getMessage());
         } catch (Exception e) {
-            log.error("[🔧] ⚠️ Error getting profile for user {}: {}", userId, e.getMessage());
+            log.error("[🔧] ⚠️ Error getting self profile for user {}: {}", userId, e.getMessage());
             return GetProfileResult.error("Get profile failed due to server error");
         }
     }
@@ -85,17 +107,17 @@ public class UserService {
 
             Optional<UserProfileDTO> profileOpt = dataOrchestrator.getUserProfile(otherUserId);
             if (profileOpt.isEmpty()) {
-                return GetProfileResult.error("User not found or is deleted");
+                throw new ValidationException("User not found or is deleted");
             }
 
             log.debug("[🔧] ✅ User {} retrieved profile of user {}", currentUserId, otherUserId);
             return GetProfileResult.success(profileOpt.get());
 
         } catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to get profile for user {}: {}", otherUserId, e.getMessage());
+            log.warn("[🔧] ☝️ Failed to get other profile for user {}: {}", otherUserId, e.getMessage());
             return GetProfileResult.error(e.getMessage());
         } catch (Exception e) {
-            log.error("[🔧] ⚠️ Error getting profile for user {}: {}", otherUserId, e.getMessage());
+            log.error("[🔧] ⚠️ Error getting other profile for user {}: {}", otherUserId, e.getMessage());
             return GetProfileResult.error("Get profile failed due to server error");
         }
     }

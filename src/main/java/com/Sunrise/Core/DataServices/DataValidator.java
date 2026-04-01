@@ -5,6 +5,7 @@ import com.Sunrise.Entities.DTOs.LightChatDTO;
 import com.Sunrise.Entities.DTOs.FullUserDTO;
 import com.Sunrise.Subclasses.ValidationException;
 import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -14,6 +15,7 @@ import java.util.Set;
 @AllArgsConstructor
 public class DataValidator {
 
+    @Autowired
     private final DataOrchestrator dataOrchestrator;
 
 
@@ -63,6 +65,18 @@ public class DataValidator {
         }
     }
 
+    public void validateAddGroupMembers(long chatId, long inviterId, Set<Long> newUserIds) {
+        // проверяем пользователей
+        validateActiveUsers(inviterId, newUserIds);
+
+        // проверяем, что это групповой чат
+        if (!validateActiveChatAndGetIsGroup(chatId))
+            throw new ValidationException("Cannot add members to personal chat");
+
+        validateActiveChatMemberIsAdmin(chatId, inviterId);
+        newUserIds.forEach(id -> validateActiveChatMember(chatId, id));
+    }
+
     public void validateAddGroupMember(long chatId, long inviterId, long newUserId) {
         // проверяем пользователей
         validateActiveUser(inviterId);
@@ -74,16 +88,6 @@ public class DataValidator {
 
         validateActiveChatMemberIsAdmin(chatId, inviterId);
         validateActiveChatMember(chatId, newUserId);
-    }
-    public void validateCanClearForAll(long chatId, long userId) {
-        validateActiveChatMemberInActiveChat(chatId, userId);
-
-        // проверяем, что приглашающий - админ
-        validateActiveChatMemberIsAdmin(chatId, userId);
-
-        ChatStatsDBResult stats = dataOrchestrator.getChatClearStats(chatId, userId);
-        if (!stats.getCanDeleteForAll())
-            throw new ValidationException("User does not have permission to clear chat for all");
     }
 
 

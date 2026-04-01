@@ -9,10 +9,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
+@Table(name = "messages")
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-@Table(name = "messages")
 public class Message {
     @Id
     private long id;

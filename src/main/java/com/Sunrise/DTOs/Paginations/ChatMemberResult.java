@@ -8,6 +8,5 @@ public interface ChatMemberResult {
     String getName();
     LocalDateTime getJoinedAt();
     Boolean getIsAdmin();
-    Boolean getIsDeleted();
     Boolean getUserIsDeleted();
 }

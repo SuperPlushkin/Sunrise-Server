@@ -1,11 +1,13 @@
 package com.Sunrise.DTOs.Paginations;
 
+import java.time.LocalDateTime;
+
 public interface UserMessageDBResult {
     Long getId();
     Long getChatId();
     Long getSenderId();
     String getText();
-    String getSentAt();
+    LocalDateTime getSentAt();
     Long getReadCount();
     Boolean getIsReadByUser();
     Boolean getIsHiddenByAdmin();

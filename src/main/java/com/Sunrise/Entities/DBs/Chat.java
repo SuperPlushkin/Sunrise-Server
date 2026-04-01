@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
 @Table(name = "chats")
 @lombok.Getter
 @lombok.Setter

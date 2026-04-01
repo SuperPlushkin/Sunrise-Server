@@ -1,20 +1,19 @@
 # application.yml
 server:
-  port: 8081
+  port: ${SERVER_PORT:10610}
   servlet:
-    context-path: /app
+    context-path: ${SERVER_BASE_PATH:/app}
     encoding:
       charset: UTF-8
       enabled: true
       force: true
 
 spring:
+  application:
+    name: Sunrise-Server
   config:
     activate:
-      on-profile: docker-all-stack, docker-only-app, local
-
-  application.name: Sunrise-Server
-
+      on-profile: docker-full-stack, docker-only-app, local
   autoconfigure.exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration # у меня ваще-то jwt используется
 
   mail:
@@ -23,29 +22,25 @@ spring:
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
     properties:
-      mail:
-        smtp:
-          auth: true
-          ssl:
-            enable: true
+      mail.smtp:
+        auth: true
+        ssl.enable: true
 
   thymeleaf:
     prefix: classpath:/templates/
     suffix: .html
     mode: HTML
     encoding: UTF-8
-    servlet:
-      content-type: text/html
+    servlet.content-type: text/html
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:${SPRING_DATASOURCE_REMOTE_URL}}
-    username: ${SPRING_DATASOURCE_USERNAME:${DB_REMOTE_USER}}
-    password: ${SPRING_DATASOURCE_PASSWORD:${DB_REMOTE_PASSWORD}}
+    url: jdbc:postgresql://${DB_ADDRESS}/${DB_NAME}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:}
     driver-class-name: org.postgresql.Driver
 
   jpa:
-    hibernate:
-      ddl-auto: ${SPRING_JPA_DDL_AUTO:validate}
+    hibernate.ddl-auto: ${SPRING_JPA_DDL_AUTO:validate}
     properties:
       hibernate:
         format_sql: ${SPRING_HIBERNATE_FORMAT_SQL:false}
@@ -53,19 +48,45 @@ spring:
     show-sql: ${SPRING_JPA_SHOW_SQL:false}
     open-in-view: false
 
-#  sql.init.mode: always
-
-app:
-  jwt:
-    secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
-  confirmation:
-    mail_address: ${MAIL_USERNAME}
-    base-url: ${SPRING_BASE_URL:${BASE_URL}}
-  messenger:
-    max-message-size: ${APP_MESSENGER_MAX_MESSAGE_SIZE:5000}
-
 logging:
   level:
     com.Sunrise: ${LOGGING_LEVEL_APP:DEBUG}
     org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
+
+# application.yml
+app:
+  jwt:
+    secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
+    expiration: ${APP_JWT_EXPIRATION:36000} # in seconds
+    no-jwt-endpoints: /auth/**,/actions/status
+  mail:
+    mail-address: ${MAIL_USERNAME}
+    base-url: http://${SERVER_IP:localhost}:${SERVER_PORT:10610}${SERVER_BASE_PATH:/app}
+  locks:
+    # in seconds
+    timeout: ${APP_LOCKS_TIMEOUT:5}
+    clean-up-expiration: ${APP_LOCKS_CLEAN_UP_EXPIRATION:900}
+    clean-up-schedule: ${APP_LOCKS_CLEAN_UP_SCHEDULE:300}
+  cache:
+    max-size:
+      user: ${APP_CACHE_MAX_SIZE_USER:100000}
+      username-index: ${APP_CACHE_MAX_SIZE_USERNAME_INDEX:150000}
+      email-index: ${APP_CACHE_MAX_SIZE_EMAIL_INDEX:150000}
+      chat: ${APP_CACHE_MAX_SIZE_CHAT:200000}
+      personal-chat-index: ${APP_CACHE_MAX_SIZE_PERSONAL_CHAT_INDEX:100000}
+      chat-members: ${APP_CACHE_MAX_SIZE_CHAT_MEMBERS:150000}
+      verification-tokens: ${APP_CACHE_MAX_SIZE_VERIFICATION_TOKENS:100000}
+      user_chats_pagination: ${APP_CACHE_MAX_SIZE_USER_CHATS_PAGINATION:25000}
+      chat_members_pagination: ${APP_CACHE_MAX_SIZE_CHAT_MEMBERS_PAGINATION:50000}
+    ttl:
+      # in minutes
+      user: ${APP_CACHE_TTL_USER:60}
+      user-username-index: ${APP_CACHE_TTL_USER_USERNAME_INDEX:60}
+      user-email-index: ${APP_CACHE_TTL_USER_EMAIL_INDEX:60}
+      chat: ${APP_CACHE_TTL_CHAT:720}
+      personal-chat-index: ${APP_CACHE_TTL_PERSONAL_CHAT_INDEX:720}
+      chat-members: ${APP_CACHE_TTL_CHAT_MEMBERS:240}
+      verification-tokens: ${APP_CACHE_TTL_VERIFICATION_TOKENS:60}
+      user_chats_pagination: ${APP_CACHE_TTL_USER_CHATS_PAGINATION:20}
+      chat_members_pagination: ${APP_CACHE_TTL_CHAT_MEMBERS_PAGINATION:20}

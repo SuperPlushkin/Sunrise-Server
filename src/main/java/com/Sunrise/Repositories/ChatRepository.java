@@ -25,12 +25,21 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
 
     @Query(value = "SELECT create_personal_chat(:chatId, :user1Id, :user2Id, :createdAt)", nativeQuery = true)
-    void createPersonalChat(@Param("chatId") long chatId, @Param("user1Id") long user1Id,
-                            @Param("user2Id") long user2Id, @Param("createdAt") LocalDateTime createdAt);
+    void createPersonalChatAndAddMembers(@Param("chatId") long chatId, @Param("user1Id") long user1Id,
+                                         @Param("user2Id") long user2Id, @Param("createdAt") LocalDateTime createdAt);
 
-    @Query(value = "SELECT create_group_chat(:chatId, :name, :creatorId, :memberIds, :createdAt)", nativeQuery = true)
-    void createGroupChat(@Param("chatId") long chatId, @Param("name") String name,
-                         @Param("creatorId") long creatorId, @Param("memberIds") Long[] memberIds,
+    @Query(value = """
+           WITH created_chat AS (
+              INSERT INTO chats (id, name, members_count, created_by, created_at, is_group)
+              VALUES (:chatId, :name, :membersCount, :creatorId, :createdAt, TRUE)
+              RETURNING id
+           )
+           SELECT add_or_restore_chat_member(:chatId, user_id, is_admin, :createdAt, FALSE)
+           FROM unnest(:memberIds, :isAdminFlags) AS t(user_id, is_admin);
+           """, nativeQuery = true)
+    void createGroupChatAndAddMembers(@Param("chatId") long chatId, @Param("name") String name,
+                         @Param("creatorId") long creatorId, @Param("members_count") int membersCount,
+                         @Param("memberIds") Long[] memberIds, @Param("isAdminFlags") Boolean[] isAdminFlags,
                          @Param("createdAt") LocalDateTime createdAt);
 
     @Modifying

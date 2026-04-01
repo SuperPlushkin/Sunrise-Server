@@ -9,9 +9,9 @@ import org.springframework.stereotype.Service;
 @Service
 public class EmailSender {
 
-    @Value("${app.confirmation.mail-address}")
+    @Value("${app.mail.mail-address}")
     private String mailAddress;
-    @Value("${app.confirmation.base-url}")
+    @Value("${app.mail.base-url}")
     private String baseUrl;
 
     private final JavaMailSender mailSender;

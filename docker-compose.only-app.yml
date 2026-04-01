@@ -1,0 +1,26 @@
+# docker-compose.only-app.yml
+services:
+  app:
+    build: .
+    container_name: sunrise-app
+    environment:
+      SPRING_PROFILES_ACTIVE: docker-only-app
+
+      SERVER_IP: ${SERVER_IP:-localhost}
+      SERVER_PORT: ${SERVER_PORT:-10610}
+
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_ADDRESS: ${DB_ADDRESS:-192.168.0.28:5435}
+      DB_NAME: ${DB_NAME:-messenger_db}
+
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set}
+
+      MAIL_USERNAME: ${MAIL_USERNAME:?MAIL_USERNAME must be set}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?MAIL_PASSWORD must be set}
+
+      LOGGING_LEVEL_APP: INFO
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: WARN
+
+    ports:
+      - "${PORT_SERVER:-10610}:${SERVER_PORT:-10610}"

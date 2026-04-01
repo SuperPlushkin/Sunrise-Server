@@ -48,8 +48,6 @@ public class AuthService {
         if (!lockManager.tryLockRegistration(username, email))
             return UserRegistrationResult.error("Try again later");
 
-        long newUserId = -1;
-
         try {
             if (dataOrchestrator.existsUserByUsername(username.trim()))
                 throw new ValidationException("Username already exists");
@@ -57,13 +55,9 @@ public class AuthService {
             if (dataOrchestrator.existsUserByEmail(email.toLowerCase()))
                 throw new ValidationException("Email already exists");
 
-            newUserId = SimpleSnowflakeId.nextId();
+            long newUserId = SimpleSnowflakeId.nextId();
+            FullUserDTO user = FullUserDTO.create(newUserId, username, name, email, passwordEncoder.encode(password));
 
-            // пытаемся заблокировать профиль юзера
-            if (!lockManager.tryLockUserProfileForWrite(newUserId))
-                throw new ValidationException("Try later");
-
-            var user = FullUserDTO.create(newUserId, username, name, email, passwordEncoder.encode(password));
             dataOrchestrator.saveUser(user);
 
             var verificationTokenDTO = new VerificationTokenDTO(
@@ -88,9 +82,6 @@ public class AuthService {
             return UserRegistrationResult.error("Registration failed due to server error");
         }
         finally {
-            if (newUserId != -1) {
-                lockManager.unLockUserProfileForWrite(newUserId); // разблокируем профиль юзера
-            }
             lockManager.unLockRegistration(username, email); // разблокируем регистрацию
         }
     }
@@ -128,7 +119,6 @@ public class AuthService {
         }
     }
     public TokenConfirmationResult confirmToken(String type, String token) {
-        long userId = -1;
         try {
             if (token == null || token.trim().isEmpty())
                 throw new ValidationException("Token cannot be empty");
@@ -141,20 +131,15 @@ public class AuthService {
             if (!type.equals(verificationToken.getTokenType()))
                 throw new ValidationException("Invalid token");
 
-            userId = verificationToken.getUserId();
-
-            // пытаемся заблокировать профиль юзера
-            if (!lockManager.tryLockUserProfileForWrite(userId))
-                throw new ValidationException("Try later");
-
             dataOrchestrator.deleteVerificationToken(token);
 
             if (verificationToken.isExpired())
                 throw new ValidationException("Token expired");
 
-            dataOrchestrator.enableUser(verificationToken.getUserId());
+            long userId = verificationToken.getUserId();
+            dataOrchestrator.enableUser(userId);
 
-            log.info("[🔧] ✅ Email verified successfully for user {}", verificationToken.getUserId());
+            log.info("[🔧] ✅ Email verified successfully for user {}", userId);
             return TokenConfirmationResult.success("Email successfully verified");
         }
         catch (ValidationException e) {
@@ -164,11 +149,6 @@ public class AuthService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Token confirmation error: {}", e.getMessage());
             return TokenConfirmationResult.error("Error during Token Confirmation: " + e.getMessage());
-        }
-        finally {
-            if(userId != -1){
-                lockManager.unLockUserProfileForWrite(userId); // разблокируем профиль юзера
-            }
         }
     }
 

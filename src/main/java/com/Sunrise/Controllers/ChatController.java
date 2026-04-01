@@ -1,10 +1,7 @@
 package com.Sunrise.Controllers;
 
 import com.Sunrise.Configurations.Annotations.CurrentUserId;
-import com.Sunrise.DTOs.Requests.AddGroupMemberRequest;
-import com.Sunrise.DTOs.Requests.CreateGroupChatRequest;
-import com.Sunrise.DTOs.Requests.CreatePersonalChatRequest;
-import com.Sunrise.DTOs.Requests.PaginationRequest;
+import com.Sunrise.DTOs.Requests.*;
 import com.Sunrise.DTOs.ServiceResults.*;
 import com.Sunrise.Core.Services.ChatService;
 import com.Sunrise.Configurations.Annotations.ValidId;
@@ -12,10 +9,12 @@ import com.Sunrise.Configurations.Annotations.ValidId;
 import jakarta.validation.Valid;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+@Validated
 @RestController
 @RequestMapping("/chats")
 public class ChatController {
@@ -47,7 +46,7 @@ public class ChatController {
         ChatCreationResult result = chatService.createGroupChat(
             userId,
             request.getChatName().trim(),
-            request.getUserIds()
+            request.getMembers()
         );
 
         if (result.isSuccess()) {
@@ -71,6 +70,18 @@ public class ChatController {
         }
     }
 
+    @PostMapping("/{chatId}/add-members")
+    public ResponseEntity<?> addGroupMembers(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMembersRequest request, @CurrentUserId long userId) {
+
+        SimpleResult result = chatService.addGroupMembers(chatId, userId, request.getMembers());
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("User added to group successfully");
+        } else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
     @PostMapping("/{chatId}/leave")
     public ResponseEntity<?> leaveChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
@@ -78,6 +89,29 @@ public class ChatController {
 
         if (result.isSuccess()) {
             return ResponseEntity.ok("User leaved chat successfully");
+        } else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
+    @PostMapping("/{chatId}/admin-rights/{otherUserId}")
+    public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
+        SimpleResult result = chatService.updateAdminRights(
+            chatId, otherUserId, userId, request.getIsAdmin()
+        );
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Successfully updated admin rights");
+        } else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+    @DeleteMapping("/{chatId}")
+    public ResponseEntity<?> deleteChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
+        SimpleResult result = chatService.deleteChat(chatId, userId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Chat successfully deleted");
         } else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }

@@ -5,6 +5,7 @@ import com.Sunrise.Configurations.Annotations.ValidId;
 import com.Sunrise.Core.Services.UserService;
 import com.Sunrise.DTOs.Requests.ProfileUpdateRequest;
 import com.Sunrise.DTOs.ServiceResults.GetProfileResult;
+import com.Sunrise.DTOs.ServiceResults.SimpleResult;
 import com.Sunrise.DTOs.ServiceResults.UpdateProfileResult;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,16 @@ public class ProfileController {
             return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
+    @DeleteMapping
+    public ResponseEntity<?> deleteProfile(@CurrentUserId long userId) {
+        SimpleResult result = userService.deleteProfile(userId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Profile successfully deleted");
+        } else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
 
     @GetMapping
     public ResponseEntity<?> getMyProfile(@CurrentUserId long userId) {
@@ -44,7 +55,6 @@ public class ProfileController {
             return ResponseEntity.status(404).body(result.getErrorMessage());
         }
     }
-
     @GetMapping("/{otherUserId}")
     public ResponseEntity<?> getOtherProfile(@PathVariable @ValidId long otherUserId, @CurrentUserId long userId) {
         GetProfileResult result = userService.getOtherProfile(userId, otherUserId);

@@ -38,11 +38,10 @@ public class ChatService {
         if (creatorId == opponentId)
             return ChatCreationResult.error("Cannot create personal chat with yourself");
 
-        Set<Long> userIds = Set.of(creatorId, opponentId);
         long chatId = SimpleSnowflakeId.nextId();
 
-        // WRITE на будущий чат + READ на профили двух пользователей
-        if (!lockManager.tryLockChatWriteUsersRead(chatId, userIds))
+        // WRITE на будущий чат
+        if (!lockManager.tryLockChatWrite(chatId))
             return ChatCreationResult.error("Try again later");
 
         try {
@@ -79,42 +78,36 @@ public class ChatService {
             return ChatCreationResult.error("CreatePersonalChat failed due to server error");
         }
         finally {
-            lockManager.unLockChatWriteUsersRead(chatId, userIds);
+            lockManager.unLockChatWrite(chatId);
         }
     }
-    public ChatCreationResult createGroupChat(long creatorId, @NotNull String chatName, @NotNull Set<Long> userToAddIds) {
+    public ChatCreationResult createGroupChat(long creatorId, @NotNull String chatName, @NotNull Map<Long, Boolean> usersToAdd) {
 
-        if (userToAddIds.contains(creatorId))
+        if (usersToAdd.containsKey(creatorId))
             return ChatCreationResult.error("Creator cannot be in usersToAdd list");
-
-        if (userToAddIds.isEmpty())
-            return ChatCreationResult.error("Group must have at least one member besides creator");
-
-        Set<Long> allUserIds = new HashSet<>(userToAddIds);
-        allUserIds.add(creatorId);
 
         long chatId = SimpleSnowflakeId.nextId();
 
-        // WRITE на будущий чат + READ на профили всех пользователей
-        if (!lockManager.tryLockChatWriteUsersRead(chatId, allUserIds))
+        // WRITE на будущий чат
+        if (!lockManager.tryLockChatWrite(chatId))
             return ChatCreationResult.error("Try again later");
 
         try {
-            validator.validateActiveUsers(creatorId, allUserIds);
+            validator.validateActiveUsers(creatorId, usersToAdd.keySet());
 
             var chat = LightChatDTO.createGroup(chatId, chatName, creatorId);
 
-            List<LightChatMemberDTO> chatMembers = new ArrayList<>(userToAddIds.size());
+            List<LightChatMemberDTO> chatMembers = new ArrayList<>(usersToAdd.size() + 1);
             chatMembers.add(LightChatMemberDTO.create(chatId, creatorId, true));  // creator с правами админа
 
-            for (long userId : userToAddIds){
-                var chatMember = LightChatMemberDTO.create(chatId, userId, false);  // остальные без прав
+            for (Map.Entry<Long, Boolean> entry : usersToAdd.entrySet()){
+                var chatMember = LightChatMemberDTO.create(chatId, entry.getKey(), entry.getValue());  // остальные без прав
                 chatMembers.add(chatMember);
             }
 
             dataOrchestrator.saveGroupChatAndAddPeople(chat, chatMembers);
 
-            log.info("[🔧] ✅ Created group chat {} '{}' with {} members by creator {}", chatId, chatName, allUserIds.size(), creatorId);
+            log.info("[🔧] ✅ Created group chat {} '{}' with {} members by creator {}", chatId, chatName, usersToAdd.size(), creatorId);
             return ChatCreationResult.success(chatId);
         }
         catch (ValidationException e) {
@@ -126,7 +119,7 @@ public class ChatService {
             return ChatCreationResult.error("CreateGroupChat failed due to server error");
         }
         finally {
-            lockManager.unLockChatWriteUsersRead(chatId, allUserIds);
+            lockManager.unLockChatWrite(chatId);
         }
     }
 
@@ -135,10 +128,8 @@ public class ChatService {
         if (inviterId == opponentId)
             return SimpleResult.error("Cannot add yourself to the chat");
 
-        Set<Long> users = Set.of(inviterId, opponentId);
-
-        // WRITE на чат + READ на профиль пригласителя и нового пользователя
-        if (!lockManager.tryLockChatWriteUsersRead(chatId, users))
+        // WRITE на чат
+        if (!lockManager.tryLockChatWrite(chatId))
             return SimpleResult.error("Try again later");
 
         try {
@@ -158,13 +149,80 @@ public class ChatService {
             return SimpleResult.error("AddGroupMember failed due to server error");
         }
         finally {
-            lockManager.unLockChatWriteUsersRead(chatId, users);
+            lockManager.unLockChatWrite(chatId);
         }
     }
+    public SimpleResult addGroupMembers(long chatId, long inviterId, @NotNull Map<Long, Boolean> usersToAdd) {
+
+        if (usersToAdd.containsKey(inviterId))
+            return SimpleResult.error("Cannot add yourself to the chat");
+
+        // WRITE на чат
+        if (!lockManager.tryLockChatWrite(chatId))
+            return SimpleResult.error("Try again later");
+
+        try {
+            validator.validateAddGroupMembers(chatId, inviterId, usersToAdd.keySet());
+
+            List<LightChatMemberDTO> members = new ArrayList<>(usersToAdd.size() + 1);
+            members.add(LightChatMemberDTO.create(chatId, inviterId, true));
+
+            for (Map.Entry<Long, Boolean> entry : usersToAdd.entrySet()){
+                members.add(LightChatMemberDTO.create(chatId, entry.getKey(), entry.getValue()));
+            }
+
+            dataOrchestrator.saveChatMembers(chatId, members);
+
+            log.info("[🔧] ✅ User {} added users {} to group chat {}", inviterId, members, chatId);
+            return SimpleResult.success();
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to add members to chat {}: {}", chatId, e.getMessage());
+            return SimpleResult.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error adding members to chat {}: {}", chatId, e.getMessage());
+            return SimpleResult.error("AddGroupMember failed due to server error");
+        }
+        finally {
+            lockManager.unLockChatWrite(chatId);
+        }
+    }
+
+    public SimpleResult updateAdminRights(long chatId, long adminId, long userToUpdate, boolean isAdmin) {
+
+        if (adminId == userToUpdate)
+            return SimpleResult.error("Cannot add yourself to the chat");
+
+        // WRITE на чат
+        if (!lockManager.tryLockChatWrite(chatId))
+            return SimpleResult.error("Try again later");
+
+        try {
+            validator.validateActiveUsersInActiveChatAndOneIsAdmin(chatId, adminId, userToUpdate);
+
+            dataOrchestrator.updateAdminRights(chatId, userToUpdate, isAdmin);
+
+            log.info("[🔧] ✅ Updated admin rights for user {} by admin {} in group chat {}", userToUpdate, adminId, chatId);
+            return SimpleResult.success();
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to update admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
+            return SimpleResult.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error updating admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
+            return SimpleResult.error("AddGroupMember failed due to server error");
+        }
+        finally {
+            lockManager.unLockChatWrite(chatId);
+        }
+    }
+
     public SimpleResult leaveChat(long chatId, long userId) {
 
-        // WRITE на чат + READ на профиль пользователя
-        if (!lockManager.tryLockChatWriteUserRead(chatId, userId))
+        // WRITE на чат
+        if (!lockManager.tryLockChatWrite(chatId))
             return SimpleResult.error("Try again later");
 
         try {
@@ -194,45 +252,13 @@ public class ChatService {
             return SimpleResult.error("LeaveChat failed due to server error");
         }
         finally {
-            lockManager.unLockChatWriteUserRead(chatId, userId);
-        }
-    }
-
-    public SimpleResult updateAdminRights(long chatId, long adminId, long userToUpdate, boolean isAdmin) {
-
-        if (adminId == userToUpdate)
-            return SimpleResult.error("Cannot add yourself to the chat");
-
-        Set<Long> users = Set.of(adminId, userToUpdate);
-
-        // WRITE на чат + READ на админа и юзера
-        if (!lockManager.tryLockChatWriteUsersRead(chatId, users))
-            return SimpleResult.error("Try again later");
-
-        try {
-            validator.validateActiveUsersInActiveChatAndOneIsAdmin(chatId, adminId, userToUpdate);
-
-            dataOrchestrator.updateAdminRights(chatId, userToUpdate, isAdmin);
-
-            log.info("[🔧] ✅ Updated admin rights for user {} by admin {} in group chat {}", userToUpdate, adminId, chatId);
-            return SimpleResult.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to update admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error updating admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return SimpleResult.error("AddGroupMember failed due to server error");
-        }
-        finally {
-            lockManager.unLockChatWriteUsersRead(chatId, users);
+            lockManager.unLockChatWrite(chatId);
         }
     }
     public SimpleResult deleteChat(long chatId, long userId) {
 
-        // WRITE на чат + READ на профиль пользователя
-        if (!lockManager.tryLockChatWriteUserRead(chatId, userId))
+        // WRITE на чат
+        if (!lockManager.tryLockChatWrite(chatId))
             return SimpleResult.error("Try again later");
 
         try {
@@ -252,16 +278,11 @@ public class ChatService {
             return SimpleResult.error("DeleteChat failed due to server error");
         }
         finally {
-            lockManager.unLockChatWriteUserRead(chatId, userId);
+            lockManager.unLockChatWrite(chatId);
         }
     }
 
     public UserChatsResult getUserChats(long userId, Long cursor, int limit) {
-
-        // READ на профиль пользователя
-        if (!lockManager.tryLockUserRead(userId))
-            return UserChatsResult.error("Try again later");
-
         try {
             validator.validateActiveUser(userId);
 
@@ -278,22 +299,14 @@ public class ChatService {
             log.error("[🔧] ⚠️ Error getting user {} chats: {}", userId, e.getMessage());
             return UserChatsResult.error("getUserChats failed due to server error");
         }
-        finally {
-            lockManager.unLockUserRead(userId);
-        }
     }
     public ChatMembersResult getChatMembers(long chatId, long userId, Long cursor, int limit) {
-
-        // READ на чат + READ на профиль пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return ChatMembersResult.error("Try again later");
-
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             ChatMembersPageDTO chatMembers = dataOrchestrator.getChatMembersPage(chatId, cursor, limit);
 
-            log.debug("[🔧] ✅ User {} viewed {} members of chat {}", userId, chatMembers.chatMembers(), chatId);
+            log.debug("[🔧] ✅ User {} got {} members of chat {}", userId, chatMembers.chatMembers().size(), chatId);
             return ChatMembersResult.success(chatMembers);
         }
         catch (ValidationException e) {
@@ -304,17 +317,9 @@ public class ChatService {
             log.error("[🔧] ⚠️ Error getting chat {} members: {}", chatId, e.getMessage());
             return ChatMembersResult.error("getChatMembers failed due to server error");
         }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
-        }
     }
 
     public ChatStatsResult getChatStats(long chatId, long userId) {
-
-        // READ на чат + READ на профиль пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return ChatStatsResult.error("Try again later");
-
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -335,9 +340,6 @@ public class ChatService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting chat {} stats: {}", chatId, e.getMessage());
             return ChatStatsResult.error("GetChatStats failed due to server error");
-        }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
         }
     }
 }

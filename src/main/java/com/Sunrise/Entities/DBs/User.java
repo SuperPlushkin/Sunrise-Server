@@ -6,10 +6,12 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
-@Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Data
+@Getter
+@Setter
+@Entity
+@Cacheable(false)
 @Table(name = "users")
 public class User {
 
@@ -35,7 +37,7 @@ public class User {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(name = "enabled", nullable = false)
+    @Column(name = "is_enabled", nullable = false)
     private boolean isEnabled = true;
 
     @Column(name = "is_deleted", nullable = false)

@@ -12,7 +12,6 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Set;
 
 @Repository
 public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemberId> {
@@ -24,16 +23,34 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
 
     @Modifying
     @Transactional
+    @Query(value = "SELECT add_or_restore_chat_member(:chatId, user_id, is_admin) " +
+                    "FROM unnest(:userIds, :isAdminFlags) AS t(user_id, is_admin)", nativeQuery = true)
+    void addChatMembers(@Param("chatId") long chatId, @Param("userIds") Long[] userIds, @Param("isAdminFlags") Boolean[] isAdminFlags);
+
+    @Modifying
+    @Transactional
     @Query(value = "SELECT remove_chat_member(:chatId, :userId)", nativeQuery = true)
     void removeChatMember(@Param("chatId") long chatId, @Param("userId") long userId);
 
 
-    @Query("SELECT cm.id.chatId as chatId, u as user FROM ChatMember cm " +
-            "JOIN User u ON u.id = cm.id.userId " +
-            "WHERE cm.id.chatId IN :chatIds " +
-            "AND cm.id.userId != :currentUserId " +
-            "AND cm.isDeleted = false")
-    List<ChatOpponentResult> findOpponentsForChats(@Param("chatIds") Set<Long> chatIds, @Param("currentUserId") Long currentUserId);
+    @Query(value = """
+                   SELECT 
+                       cm.chat_id,
+                       u.id as user_id,
+                       u.username, 
+                       u.name,
+                       u.email,
+                       u.hash_password,
+                       u.last_login,
+                       u.created_at,
+                       u.is_enabled,
+                       u.is_deleted
+                   FROM unnest(:chatIds, :userIds) AS arr(chat_id, user_id)
+                   JOIN chat_members cm ON cm.chat_id = arr.chat_id AND cm.user_id = arr.user_id
+                   JOIN users u ON u.id = cm.user_id
+                   WHERE cm.is_deleted = false
+                   """, nativeQuery = true)
+    List<ChatOpponentResult> findOpponentsForChats(@Param("chatIds") Long[] chatIds, @Param("userIds") Long[] userIds);
 
     @Query("SELECT cm.id.userId FROM ChatMember cm WHERE cm.id.chatId = :chatId")
     List<Long> findChatMemberIds(@Param("chatId") long chatId);

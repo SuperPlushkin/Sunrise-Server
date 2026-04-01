@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
 @Table(name = "chat_members")
 @lombok.Getter
 @lombok.Setter

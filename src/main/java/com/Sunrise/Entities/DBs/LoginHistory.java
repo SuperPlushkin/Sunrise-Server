@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
 @Table(name = "login_history")

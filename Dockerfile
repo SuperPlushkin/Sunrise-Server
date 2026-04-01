@@ -4,21 +4,24 @@ WORKDIR /app
 
 COPY build.gradle.kts .
 COPY settings.gradle.kts .
-COPY src ./src
+COPY gradle ./gradle
+RUN gradle dependencies --no-daemon || return 0
 
+COPY src ./src
 RUN gradle clean bootJar --no-daemon
 
 FROM eclipse-temurin:21-jdk-jammy
 
-# ✅ Добавляем мета-информацию для Docker Hub
-LABEL maintainer="kirill.vldk@gmail.com"
-LABEL version="1.0.0"
-LABEL description="Spring Boot Sunrise Server (For Messenger)"
+# для Docker Hub
+LABEL maintainer="superplushkin@mail.ru"
+LABEL version="0.0.2"
+LABEL description="Spring Boot Server (For Messenger <<Sunrise>>)"
 
 WORKDIR /app
 
 COPY --from=builder /app/build/libs/*.jar app.jar
 
-EXPOSE 8081
+# Или другой настроенный порт
+EXPOSE 10610
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

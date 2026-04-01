@@ -6,7 +6,6 @@ import com.Sunrise.Entities.DTOs.LightMessageDTO;
 import com.Sunrise.Core.DataServices.DataOrchestrator;
 import com.Sunrise.Core.DataServices.DataOrchestrator.Direction;
 import com.Sunrise.Core.DataServices.DataValidator;
-import com.Sunrise.Core.DataServices.LockManager;
 import com.Sunrise.Subclasses.SimpleSnowflakeId;
 import com.Sunrise.Subclasses.ValidationException;
 
@@ -24,20 +23,13 @@ public class MessageService {
 
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
-    private final LockManager lockManager;
 
-    public MessageService(DataValidator validator, DataOrchestrator dataOrchestrator, LockManager lockManager){
+    public MessageService(DataValidator validator, DataOrchestrator dataOrchestrator){
         this.validator = validator;
         this.dataOrchestrator = dataOrchestrator;
-        this.lockManager = lockManager;
     }
 
     public CreateMessageResult makePublicMessage(long chatId, long userId, String text) {
-
-        // READ на чат + READ на пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return CreateMessageResult.error("Try again later");
-
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -63,16 +55,8 @@ public class MessageService {
             log.error("[🔧] ⚠️ Error making public message: {}", e.getMessage());
             return CreateMessageResult.error("createPublicMessage failed due to server error");
         }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
-        }
     }
     public CreateMessageResult makePrivateMessage(long chatId, long userId, long userToSend, String text) {
-
-        // READ на чат + READ на пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return CreateMessageResult.error("Try again later");
-
         try {
             validator.validateActiveUsersInActiveChatAndChatIsPersonal(chatId, Set.of(userId, userToSend));
 
@@ -97,17 +81,9 @@ public class MessageService {
             log.error("[🔧] ⚠️ Error making private message: {}", e.getMessage());
             return CreateMessageResult.error("createPrivateMessage failed due to server error");
         }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
-        }
     }
 
     public ChatMessagesResult getChatMessages(long chatId, long userId, Long cursor, int limit, Direction direction) {
-
-        // READ на чат + READ на пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return ChatMessagesResult.error("Try again later");
-
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -123,17 +99,9 @@ public class MessageService {
             log.error("[🔧] ⚠️ Error getting {} messages {}: {}", limit, direction.name(), e.getMessage());
             return ChatMessagesResult.error("getChatMessagesAfter failed due to server error");
         }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
-        }
     }
 
     public SimpleResult markMessageAsRead(long chatId, long userId, long messageId) {
-
-        // READ на чат + READ на пользователя
-        if (!lockManager.tryLockChatReadUserRead(chatId, userId))
-            return SimpleResult.error("Try again later");
-
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -148,9 +116,6 @@ public class MessageService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error marking message as read: {}", e.getMessage());
             return SimpleResult.error("MarkMessageAsRead failed due to server error");
-        }
-        finally {
-            lockManager.unLockChatReadUserRead(chatId, userId);
         }
     }
 }

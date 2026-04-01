@@ -8,10 +8,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
+@Cacheable(false)
+@Table(name = "message_read_status")
 @AllArgsConstructor
 @NoArgsConstructor
 @Data
-@Table(name = "message_read_status")
 public class MessageReadStatus {
 
     @EmbeddedId
