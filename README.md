@@ -23,59 +23,73 @@
    ```bash
    docker pull superplushkin/sunrise-server
    ```
-2. **Запустите приложение:**
+   
+2. **❗ВАЖНО❗Создайте файлы зависимостей:**<br><br>
 
-   ```bash
-   docker-compose up -d
-   ```
+   * 📁 Файл окружения (.env)
 
-Приложение готово к работе! 🎉
-
-## ⚙️ Конфигурация ❗ВАЖНО❗
-
-Без данных файлов сборки не получится ))
-
-📁 Файл окружения (.env)
-
-    Расположение: /Sunrise-Server/.env
+    ```
+    Расположение: В корне
 
     Используйте пример: .env-example как шаблон
 
     Содержит критически важные настройки и пароли для сервисов
+    ```
+   
+    * 📁 Файлы инициализаций бд (❗обязательно только для запуска full-stack приложения❗)
+   
+    ```
+    Расположение: В корне требуется сделать папку init-sql
 
-📁 Файл инициализации бд (init.sql)
+    В ней нужно создать 3 файла:
+    1) 01-tables.sql
+    2) 02-functions.sql
+    3) 03-grants.sql
+   
+    (Содержит таблицы, функции и гранты для инициализации бд)
+    ```
+   
+   * 🐳 Файл Docker Compose (docker-compose.yml)
+   
+   ```
+   Требуется файл: docker-compose.yml
 
-    Расположение: /Sunrise-Server/init.sql
+   Файл требуется поместить в корень запуска (самому создавать не нужно, только скопировать)
 
-    Используйте пример: init.sql-example как шаблон
+   Для запуска только Spring Boot приложения: 
+   /Sunrise-Server/docker-compose.only-app.yml
+   
+   Для запуска full-stack приложения: 
+   /Sunrise-Server/docker-compose.full-stack.yml
+   
+   (Содержит скрипт для запуска приложения и зависимостей)
+   ```
+   
+   Перед сборкой проверьте еще раз наличие всех файлов 😊 <br><br>
 
-    Содержит таблицы и функции для инициализации бд
+3. **Запустите приложение:**
 
-🐳 Файл Docker Compose (docker-compose.yml)
+   ```bash
+   # Запуск только Spring Boot приложения
+    docker compose -f docker-compose.only-app.yml -p sunrise-server up -d
+   ```
+   или
+   ```bash
+   # Запуск full-stack приложения
+   docker compose -f docker-compose.full-stack.yml -p sunrise-server up -d
+   ```
 
-    Файл: /Sunrise-Server/docker-compose.yml
+4. Используйте! 🎉
 
-    Уже находится в корне проекта - создавать не нужно
-
-Перед сборкой проверьте еще раз наличие файлов 😊
-
-## 📁 Структура проекта
+## 📁 Полезные файлы
 
 ```
 Sunrise-Server/
-├── gradle/wrapper/       # 📦 Gradle Wrapper файлы
-├── src/                  # 📁 Исходный код приложения
-├── .dockerignore         # 🐳 Исключения для Docker
-├── .env-example          # 📋 Пример конфигурации окружения
-├── .gitignore            # 🔒 Игнорируемые файлы Git
-├── Dockerfile            # 🐳 Конфигурация Docker образа
-├── DocumentationAPI.md   # 📚 Документация API
-├── build.gradle.kts      # ⚙️ Конфигурация сборки Gradle
-├── docker-compose.yml    # 🐳 Компоновка Docker сервисов
-├── gradlew               # 🐧 Linux/Mac скрипт Gradle Wrapper
-├── gradlew.bat           # 🪟 Windows скрипт Gradle Wrapper
-├── init.sql-example      # 🗃️  SQL скрипт инициализации БД
-└── settings.gradle.kts   # ⚙️  Настройки проекта Gradle
+├── .env-example                    # 📋 Пример конфигурации окружения
+├── Dockerfile                      # 🐳 Конфигурация Docker образа
+├── DocumentationAPI.md             # 📚 Документация API
+├── docker-compose.full-stack.yml   # 🐳 Docker-compose скрипт для запуска всего стека приложения
+└── docker-compose.only-app.yml     # 🐳 Docker-compose скрипт для запуска только Spring Boot приложения
 ```
 
 **Приятного переваривания! ✨**
