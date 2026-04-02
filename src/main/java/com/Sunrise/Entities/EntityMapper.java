@@ -11,7 +11,6 @@ import com.Sunrise.Entities.Caches.*;
 import com.Sunrise.Entities.DBs.*;
 import com.Sunrise.Entities.DTOs.*;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 public class EntityMapper {
@@ -671,11 +670,29 @@ public class EntityMapper {
         }
         return cached;
     }
-    public static List<CacheChatMember> toCacheChatMembers(List<LightChatMemberDTO> list) {
+    public static List<CacheChatMember> toCacheLightChatMembers(List<LightChatMemberDTO> list) {
         if (list == null) return Collections.emptyList();
 
         List<CacheChatMember> cached = new ArrayList<>();
         for (LightChatMemberDTO row : list) {
+            cached.add(EntityMapper.toCache(row));
+        }
+        return cached;
+    }
+    public static List<CacheChatMember> toCacheFullChatMembers(Collection<FullChatMemberDTO> list) {
+        if (list == null) return Collections.emptyList();
+
+        List<CacheChatMember> cached = new ArrayList<>();
+        for (FullChatMemberDTO row : list) {
+            cached.add(EntityMapper.toCache(row));
+        }
+        return cached;
+    }
+    public static List<CacheChat> toCacheChats(Collection<FullChatDTO> list) {
+        if (list == null) return Collections.emptyList();
+
+        List<CacheChat> cached = new ArrayList<>();
+        for (FullChatDTO row : list) {
             cached.add(EntityMapper.toCache(row));
         }
         return cached;

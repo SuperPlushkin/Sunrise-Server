@@ -104,9 +104,6 @@ public class CacheService {
         usernameIndex.put(user.getUsername().toLowerCase(), user.getId());
         emailIndex.put(user.getEmail().toLowerCase(), user.getId());
     }
-    public void saveNewUser(CacheUser user) {
-        saveUser(user);
-    }
     public void deleteUser(long userId) {
         getCacheUser(userId).ifPresent(cacheUser -> cacheUser.setDeleted(true));
 
@@ -144,6 +141,15 @@ public class CacheService {
     }
 
 
+    public List<CacheUser> getCacheUsers(Collection<Long> userIds, Collection<Long> missingIds) {
+        List<CacheUser> list = new ArrayList<>(userIds.size());
+        for (long userId : userIds){
+            CacheUser chat = userCache.getIfPresent(userId);
+            if (chat != null) list.add(chat);
+            else missingIds.add(userId);
+        }
+        return list;
+    }
     public Optional<CacheUser> getCacheUser(long userId) {
         return Optional.ofNullable(userCache.getIfPresent(userId));
     }
@@ -184,6 +190,9 @@ public class CacheService {
             }
         }
     }
+    public void saveChats(Collection<CacheChat> chats) {
+        chats.forEach(this::saveChat);
+    }
     public void updateChatCreator(long chatId, long newCreatorId) {
         getCacheChat(chatId)
                 .ifPresent(chat -> chat.setCreatedBy(newCreatorId));
@@ -212,6 +221,28 @@ public class CacheService {
         return getCacheChat(chatId).map(CacheChat::isActive);
     }
 
+    public List<CacheChat> getCacheChats(Collection<Long> chatIds, Collection<Long> missingChatIds) {
+        List<CacheChat> list = new ArrayList<>(chatIds.size());
+        for (long chatId : chatIds){
+            CacheChat chat = chatInfoCache.getIfPresent(chatId);
+            if (chat != null) list.add(chat);
+            else missingChatIds.add(chatId);
+        }
+        return list;
+    }
+    public Map<Long, CacheUser> getCacheOpponentsForChats(long userId, List<CacheChat> chats, Map<Long, Long> missingOpponentIds) {
+        Map<Long, CacheUser> map = new HashMap<>(chats.size());
+        for (CacheChat chat : chats){
+            long opponentId = chat.getCreatedBy() == userId ? chat.getOpponentId() : chat.getCreatedBy();
+            Optional<CacheUser> cacheUser = getCacheUser(opponentId);
+            if (cacheUser.isPresent()){
+                map.put(chat.getId(), cacheUser.get());
+            } else{
+                missingOpponentIds.put(chat.getId(), opponentId);
+            }
+        }
+        return map;
+    }
     public Optional<CacheChat> getCacheChat(long chatId) {
         return Optional.ofNullable(chatInfoCache.getIfPresent(chatId));
     }
@@ -328,6 +359,10 @@ public class CacheService {
         return getChatMembersContainer(chatId).flatMap(c -> c.getMember(userId));
     }
     public Optional<Boolean> hasActiveChatMember(long chatId, long userId) {
+        Optional<Boolean> userChatCheck = getCacheUser(userId).map(user -> user.hasChat(chatId));
+        if (userChatCheck.isPresent() && userChatCheck.get().equals(true))
+            return Optional.of(true);
+
         return getChatMembersContainer(chatId).flatMap(c -> c.hasMemberAndGetIsActive(userId));
     }
     public Optional<SimpleEntry<Set<Long>, Boolean>> getUserChatsIds(long userId) {
@@ -393,6 +428,12 @@ public class CacheService {
         return Optional.ofNullable(verificationTokenCache.getIfPresent(token));
     }
 
+
+    // ========== MESSAGES METHODS ==============
+
+    public void deleteMessage(long chatId, long messageId) {
+        getCacheChat(chatId).ifPresent(chat -> chat.deleteMessage(messageId));
+    }
 
 
     // ========== ADMIN RIGHTS METHODS ==========

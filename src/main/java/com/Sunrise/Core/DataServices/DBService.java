@@ -241,4 +241,8 @@ public class DBService {
     public ChatStatsDBResult getChatMessagesDeletedStats(long chatId, long userId) {
         return chatRepository.getChatClearStats(chatId, userId);
     }
+
+    public void deleteMessage(long messageId) {
+        messageRepository.deleteMessage(messageId);
+    }
 }

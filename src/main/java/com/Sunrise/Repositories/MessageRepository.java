@@ -36,6 +36,10 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     @Query(value = "SELECT * FROM get_messages_after_with_gap(:chatId, :userId, :messageId, :readAt)", nativeQuery = true)
     void markMessageAsRead(@Param("chatId") long chatId, @Param("userId") long userId, @Param("messageId") long messageId, @Param("readAt") LocalDateTime readAt);
 
+    @Query("UPDATE Message m SET m.hiddenByAdmin = true WHERE m.id = :messageId")
+    void deleteMessage(@Param("messageId") long messageId);
+
+
     @Query(value = "SELECT * FROM user_chat_read_state state WHERE state.user_id = :userId AND state.chat_id IN (:chatIds)", nativeQuery = true)
     List<LastUserReadStatusResult> getUserReadStatusByChatIds(@Param("chatIds") Set<Long> chatIds, @Param("userId") Long userId);
 
