@@ -208,8 +208,8 @@ public class CacheService {
 
 
     // Вспомогательные методы
-    public boolean isActiveChat(long chatId) {
-        return getActiveChat(chatId).isPresent();
+    public Optional<Boolean> isActiveChat(long chatId) {
+        return getCacheChat(chatId).map(CacheChat::isActive);
     }
 
     public Optional<CacheChat> getCacheChat(long chatId) {
@@ -245,51 +245,53 @@ public class CacheService {
 
 
     // Основные методы
-    private CacheChatMembersContainer getOrCreateChatMembersContainer(CacheChat chat) {
-        return chatMembersContainerCache.get(chat.getId(), key -> new CacheChatMembersContainer(chat));
+    private CacheChatMembersContainer getOrCreateChatMembersContainer(long chatId) {
+        return chatMembersContainerCache.get(chatId, key -> new CacheChatMembersContainer(chatId));
     }
     private Optional<CacheChatMembersContainer> getChatMembersContainer(long chatId) {
         return Optional.ofNullable(chatMembersContainerCache.getIfPresent(chatId));
     }
 
-    public void addChatMembers(CacheChat chat, List<CacheChatMember> members) {
+    public void addChatMembers(long chatId, List<CacheChatMember> members) {
         // Обновляем контейнер
-        getOrCreateChatMembersContainer(chat).addMembers(members);
+        getOrCreateChatMembersContainer(chatId).addMembers(members);
 
         // Обновляем кэш пользователя
         members.forEach(m -> {
-            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
+            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chatId));
         });
     }
-    public void addNewChatMembers(CacheChat chat, List<CacheChatMember> members) {
+    public void addNewChatMembers(long chatId, List<CacheChatMember> members) {
         // Обновляем контейнер
-        getOrCreateChatMembersContainer(chat).addNewMembers(members);
+        getOrCreateChatMembersContainer(chatId).addNewMembers(members);
 
         // Обновляем кэш пользователя
         members.forEach(m -> {
-            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chat.getId()));
-            invalidateChatMembersPagination(chat.getId());
+            getCacheUser(m.getUserId()).ifPresent(user -> user.addChat(chatId));
+            invalidateChatMembersPagination(chatId);
             invalidateUserChatsPagination(m.getUserId());
         });
         log.debug("[⚡] Invalidated pagination cache for {} users | cacheService/addNewChatMembers", members.size());
     }
 
-    public void addChatMember(CacheChat chat, CacheChatMember chatMember) {
+    public void addChatMember(CacheChatMember chatMember) {
         // Обновляем контейнер НОВЫМ пользователем (кеш созданного только что пользователя)
-        getOrCreateChatMembersContainer(chat).addMember(chatMember);
+        getOrCreateChatMembersContainer(chatMember.getChatId()).addMember(chatMember);
 
         // Обновляем кэш пользователя
         getCacheUser(chatMember.getUserId()).ifPresent(user -> user.addChat(chatMember.getChatId()));
     }
-    public void addNewChatMember(CacheChat chat, CacheChatMember chatMember) {
+    public void addNewChatMember(CacheChatMember chatMember) {
+        long chatId = chatMember.getChatId();
+
         // Обновляем контейнер СТАРЫМ пользователем (просто кеш существующего пользователя)
-        getOrCreateChatMembersContainer(chat).addNewMember(chatMember);
+        getOrCreateChatMembersContainer(chatId).addNewMember(chatMember);
 
         // Обновляем кэш пользователя
-        getCacheUser(chatMember.getUserId()).ifPresent(user -> user.addChat(chatMember.getChatId()));
+        getCacheUser(chatMember.getUserId()).ifPresent(user -> user.addChat(chatId));
 
         // инвалидация пагинации
-        invalidateChatMembersPagination(chat.getId());
+        invalidateChatMembersPagination(chatId);
         invalidateUserChatsPagination(chatMember.getUserId());
         log.debug("[⚡] Invalidated pagination cache for user {} | cacheService/addNewChatMember", chatMember.getUserId());
     }
@@ -306,6 +308,7 @@ public class CacheService {
         invalidateUserChatsPagination(userId);
         log.debug("[⚡] Invalidated pagination cache for user {} | cacheService/removeChatMember", userId);
     }
+
     public void restoreChatMember(long userId, long chatId, boolean isAdmin) {
         // Обновляем контейнер
         getChatMembersContainer(chatId).ifPresent(c -> c.restoreMember(userId, isAdmin));
@@ -338,7 +341,7 @@ public class CacheService {
     // пагинация для выдачи чатов пользователей
 
     private String getUserChatsPaginationKey(long userId, Long cursor, int limit) {
-        return userId + ":" + (cursor == null ? "" : cursor) + ":" + limit;
+        return userId + ":" + (cursor == null ? "0" : cursor) + ":" + limit;
     }
     public void saveUserChatsPagination(UserChatsPagination pagination) {
         String key = getUserChatsPaginationKey(pagination.getUserId(), pagination.getCursor(), pagination.getLimit());
@@ -358,7 +361,7 @@ public class CacheService {
 
     // пагинация для выдачи участников чата
     private String getChatMembersPaginationKey(long chatId, Long cursor, int limit) {
-        return chatId + ":" + (cursor == null ? "" : cursor) + ":" + limit;
+        return chatId + ":" + (cursor == null ? "0" : cursor) + ":" + limit;
     }
     public void saveChatMembersPagination(ChatMembersPagination pagination) {
         String key = getChatMembersPaginationKey(pagination.getChatId(), pagination.getCursor(), pagination.getLimit());
@@ -374,9 +377,6 @@ public class CacheService {
         if (keys != null)
             keys.forEach(chatMembersPaginationCache::invalidate);
     }
-
-
-    // ========== MESSAGES METHODS ==========
 
 
 

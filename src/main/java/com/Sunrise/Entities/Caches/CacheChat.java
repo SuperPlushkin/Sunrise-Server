@@ -168,6 +168,21 @@ public class CacheChat {
     }
 
 
+    // ========== ДЕЙСТВИЯ С СООБЩЕНИЯМИ ==========
+
+    public boolean hasMessages() {
+        return messagesCount.get() > 0;
+    }
+
+    public void deleteMessage(long messageId) {
+        CacheMessage message = messages.get(messageId);
+        if (message == null) return;
+
+        message.delete();
+        deletedMessagesCount.incrementAndGet();
+    }
+
+
     // ========== ПРОВЕРКИ ==========
 
     public boolean isLoadedBefore(long messageId) {
@@ -206,19 +221,4 @@ public class CacheChat {
     public boolean isFullyLoaded() {
         return messages.size() >= messagesCount.get();
     }
-    public boolean hasSomeMessagesDB() {
-        return messagesCount.get() - messages.size() > 0;
-    }
-
-    public boolean hasMessages() {
-        return messagesCount.get() > 0;
-    }
-
-    public Long getUserLastReadMessageId(long userId) {
-        AtomicLong read = lastReadMessageIdByUserIds.get(userId);
-        if(read == null) return null;
-        return read.get();
-    }
-
-
 }

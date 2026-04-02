@@ -1,6 +1,5 @@
 package com.Sunrise.Core.DataServices;
 
-import com.Sunrise.DTOs.DBResults.ChatStatsDBResult;
 import com.Sunrise.Entities.DTOs.LightChatDTO;
 import com.Sunrise.Entities.DTOs.FullUserDTO;
 import com.Sunrise.Subclasses.ValidationException;
@@ -94,8 +93,8 @@ public class DataValidator {
     // ========== PRIVATE METHODS ==========
 
     private void validateActiveChat(long chatId) {
-        if (!dataOrchestrator.ensureActiveChat(chatId))
-            throw new ValidationException("Chat does not exist or is deleted: " + chatId);
+        if (!dataOrchestrator.isActiveChat(chatId))
+            throw new ValidationException("Chat does not existttttt or is deleted: " + chatId);
     }
     private Boolean validateActiveChatAndGetIsGroup(long chatId) {
         Optional<Boolean> isGroup = dataOrchestrator.isGroupChat(chatId);

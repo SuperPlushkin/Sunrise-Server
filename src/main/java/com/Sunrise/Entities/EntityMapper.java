@@ -534,8 +534,8 @@ public class EntityMapper {
             resultMap.put(member.getUserId(), new FullChatMemberDTO(
                 chatId,
                 member.getUserId(),
-                member.getName(),
                 member.getUsername(),
+                member.getName(),
                 member.getJoinedAt(),
                 member.getIsAdmin(),
                 false,

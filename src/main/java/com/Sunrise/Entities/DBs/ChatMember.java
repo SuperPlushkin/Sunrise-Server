@@ -21,6 +21,10 @@ public class ChatMember {
     @Column(name = "is_admin", nullable = false)
     protected boolean isAdmin = false;
 
+    public boolean isActive() {
+        return !isDeleted;
+    }
+
     @Column(name = "is_deleted",nullable = false)
     protected boolean isDeleted = false;
 
@@ -32,4 +36,5 @@ public class ChatMember {
     public Long getUserId() {
         return id != null ? id.getUserId() : null;
     }
+
 }

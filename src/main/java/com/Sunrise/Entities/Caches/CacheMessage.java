@@ -29,4 +29,7 @@ public class CacheMessage {
     public void incrementReadCount() {
         this.readCount++;
     }
+    public void delete() {
+        this.hiddenByAdmin = true;
+    }
 }

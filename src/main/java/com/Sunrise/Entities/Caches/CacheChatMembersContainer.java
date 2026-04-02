@@ -5,26 +5,18 @@ import lombok.Getter;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
 public class CacheChatMembersContainer {
-    private final Long chatId;
-    private volatile Long chatCreatorId;
-    private final AtomicInteger deletedMemberCount;                 // удаленных участников в БД
-    private final AtomicInteger totalMemberCount;                   // всего участников в БД
+    private final long chatId;
     private final LocalDateTime createdAt = LocalDateTime.now();    // когда создан контейнер
 
     private final Map<Long, CacheChatMember> members = new ConcurrentHashMap<>();   // userId -> CacheChatMember
     private final Set<Long> adminIds = ConcurrentHashMap.newKeySet();               // userId
     private final Set<Long> deletedMemberIds = ConcurrentHashMap.newKeySet();       // userId
 
-    public CacheChatMembersContainer(CacheChat chat) {
-        this.chatId = chat.getId();
-        this.chatCreatorId = chat.getCreatedBy();
-        this.deletedMemberCount = new AtomicInteger(chat.getDeletedMembersCount());
-        this.totalMemberCount = new AtomicInteger(chat.getMembersCount());
-        this.adminIds.add(chat.getCreatedBy());
+    public CacheChatMembersContainer(long chatId) {
+        this.chatId = chatId;
     }
 
     public List<CacheChatMember> getChatAdmins() {
@@ -39,7 +31,6 @@ public class CacheChatMembersContainer {
 
     public void addNewMembers(Collection<CacheChatMember> newMembers) {
         addMembers(newMembers);
-        totalMemberCount.addAndGet(newMembers.size());
     }
     public void addMembers(Iterable<CacheChatMember> newMembers)  {
         for (CacheChatMember member : newMembers) {
@@ -49,13 +40,11 @@ public class CacheChatMembersContainer {
             }
             if (member.isDeleted()) {
                 deletedMemberIds.add(member.getUserId());
-                deletedMemberCount.incrementAndGet();  // <-- Добавляем
             }
         }
     }
     public void addNewMember(CacheChatMember member) {
         addMember(member);
-        totalMemberCount.incrementAndGet();
     }
     public void addMember(CacheChatMember member) {
         members.put(member.getUserId(), member);
@@ -64,14 +53,9 @@ public class CacheChatMembersContainer {
         }
         if (member.isDeleted()) {
             deletedMemberIds.add(member.getUserId());
-            deletedMemberCount.incrementAndGet();
         }
     }
     public void updateAdminRights(Long userId, Boolean isAdmin) {
-        // Нельзя убрать права у создателя
-        if (userId.equals(chatCreatorId))
-            return;
-
         CacheChatMember member = members.get(userId);
         if (member != null && !member.isDeleted()) {
             member.setIsAdmin(isAdmin);
@@ -83,29 +67,15 @@ public class CacheChatMembersContainer {
         }
     }
     public void updateChatCreator(Long newCreatorId) {
-        // Новый создатель получает права
-        this.chatCreatorId = newCreatorId;
         adminIds.add(newCreatorId);
-
-        // Обновляем права в member если он загружен
         getMember(newCreatorId).ifPresent(us -> us.setIsAdmin(true));
     }
 
-    public void deleteAdminRightsForAllAdmins() {
-        adminIds.stream() // Удаляем права у всех админов, кроме создателя
-                .filter(adminId -> !adminId.equals(chatCreatorId))
-                .forEach(adminId -> updateAdminRights(adminId, false));
-    }
     public void markMemberAsDeleted(Long userId) {
-        // Нельзя удалить создателя
-        if (userId.equals(chatCreatorId))
-            return;
-
         CacheChatMember member = members.get(userId);
         if (member != null) {
             member.setIsDeleted(true);
             deletedMemberIds.add(userId);
-            deletedMemberCount.incrementAndGet();
             if (member.isAdmin())
                 adminIds.remove(userId);
         }
@@ -116,7 +86,6 @@ public class CacheChatMembersContainer {
             member.setIsAdmin(isAdmin);
             member.setIsDeleted(false);
             deletedMemberIds.remove(userId);
-            deletedMemberCount.decrementAndGet();
             if (isAdmin)
                 adminIds.add(userId);
         }
@@ -148,19 +117,5 @@ public class CacheChatMembersContainer {
             return Optional.of(false);
 
         return Optional.empty();
-    }
-
-    public int getActiveMemberCount() {
-        return totalMemberCount.get() - deletedMemberCount.get();
-    }
-    public int getActiveLoadedCount() {
-        return members.size() - deletedMemberCount.get();
-    }
-
-    public boolean isFullyLoaded() {
-        return members.size() >= totalMemberCount.get();
-    }
-    public double getLoadPercentage() {
-        return (members.size() * 100.0) / totalMemberCount.get();
     }
 }
