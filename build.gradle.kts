@@ -11,7 +11,7 @@ java {
     }
 }
 
-group = "com.RisingSun"
+group = "com.sunrise"
 version = "1.0-SNAPSHOT"
 
 repositories {

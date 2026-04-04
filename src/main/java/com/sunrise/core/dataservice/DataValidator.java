@@ -1,0 +1,117 @@
+package com.sunrise.core.dataservice;
+
+import com.sunrise.entity.dto.LightChatDTO;
+import com.sunrise.helpclass.ValidationException;
+import lombok.AllArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
+import java.util.Optional;
+import java.util.Set;
+
+@Component
+@AllArgsConstructor
+public class DataValidator {
+
+    @Autowired
+    private final DataOrchestrator dataOrchestrator;
+
+
+    // ========== BASE METHODS ==========
+
+    public void validateActiveUser(long userId) {
+        if (!dataOrchestrator.isActiveUser(userId))
+            throw new ValidationException("User not active: " + userId);
+    }
+    private void validateActiveChat(long chatId) {
+        if (!dataOrchestrator.isActiveChat(chatId))
+            throw new ValidationException("Chat does not exist or is deleted: " + chatId);
+    }
+    private void validateActiveChatMember(long chatId, long userId) {
+        if (!dataOrchestrator.hasActiveChatMember(chatId, userId))
+            throw new ValidationException("User " + userId + " is not a member of chat " + chatId);
+    }
+
+    public void validateActiveGroupChat(long chatId) {
+        Optional<Boolean> isGroup = dataOrchestrator.isGroupChat(chatId);
+        if (isGroup.isEmpty()) {
+            throw new ValidationException("Chat does not exist or is deleted: " + chatId);
+        }
+        if (!isGroup.get()) {
+            throw new ValidationException("Chat is a personal chat: " + chatId);
+        }
+    }
+    private LightChatDTO validateActiveChatAndGet(long chatId) {
+        Optional<LightChatDTO> chatOpt = dataOrchestrator.getActiveChat(chatId);
+        if (chatOpt.isEmpty()) {
+            throw new ValidationException("Chat does not exist or is deleted: " + chatId);
+        }
+        return chatOpt.get();
+    }
+    private void validateActiveChatMemberIsAdmin(long chatId, long userId){
+        Optional<Boolean> isAdmin = dataOrchestrator.isActiveAdminInActiveChat(chatId, userId);
+        if (isAdmin.isEmpty()) {
+            throw new ValidationException("Inviter is not a member of this chat");
+        }
+        if (!isAdmin.get()) {
+            throw new ValidationException("Only admin can add members to group");
+        }
+    }
+
+
+    // ========== OTHER METHODS ==========
+
+    public void validateActiveUsers(long userId, Set<Long> userIds) {
+        validateActiveUser(userId);
+        userIds.forEach(this::validateActiveUser);
+    }
+    public void validateActiveUsers(long userId, long otherUserId) {
+        validateActiveUser(userId);
+        validateActiveUser(otherUserId);
+    }
+
+    public void validateActiveChatMemberInActiveChat(long chatId, long userId) {
+        validateActiveUser(userId);
+        validateActiveChat(chatId);
+        validateActiveChatMember(chatId, userId);
+    }
+    public void validateActiveUsersInActiveChatAndOneIsAdmin(long chatId, long adminId, long otherUserId) {
+        validateActiveUsers(adminId, otherUserId);
+        validateActiveChat(chatId);
+        validateActiveChatMemberIsAdmin(chatId, adminId);
+    }
+    public LightChatDTO validateActiveUserInActiveChatAndGetChat(long chatId, long userId) {
+        validateActiveUser(userId);
+        LightChatDTO chat = validateActiveChatAndGet(chatId);
+        validateActiveChatMember(chatId, userId);
+        return chat;
+    }
+
+
+    public void validateAddGroupMembers(long chatId, long inviterId, Set<Long> newUserIds) {
+        validateActiveUsers(inviterId, newUserIds);
+        validateActiveGroupChat(chatId);
+        validateActiveChatMemberIsAdmin(chatId, inviterId);
+        newUserIds.forEach(id -> validateActiveChatMember(chatId, id));
+    }
+    public void validateAddGroupMember(long chatId, long inviterId, long newUserId) {
+        validateActiveUsers(inviterId, newUserId);
+        validateActiveGroupChat(chatId);
+        validateActiveChatMemberIsAdmin(chatId, inviterId);
+        validateActiveChatMember(chatId, newUserId);
+    }
+    public void validateCanSendPrivateMessage(long chatId, long senderId, long userToSend) {
+        validateActiveUsers(senderId, userToSend);
+        validateActiveGroupChat(chatId);
+        validateActiveChatMember(chatId, senderId);
+        validateActiveChatMember(chatId, userToSend);
+    }
+    public void validateCanDeleteChat(long chatId, long userId) {
+        validateActiveChatMemberInActiveChat(chatId, userId);
+        validateActiveChatMemberIsAdmin(chatId, userId);
+    }
+
+    public void validateActiveMessage(long chatId, long messageId) {
+        dataOrchestrator.isActiveChat()
+    }
+}
