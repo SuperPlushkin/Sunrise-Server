@@ -111,7 +111,28 @@ public class DataValidator {
         validateActiveChatMemberIsAdmin(chatId, userId);
     }
 
-    public void validateActiveMessage(long chatId, long messageId) {
-        dataOrchestrator.isActiveChat()
+    public void validateActiveMessageInChat(long chatId, long messageId) {
+        if (!dataOrchestrator.isActiveMessageInChat(chatId, messageId)){
+            throw new ValidationException("Message not exists or is deleted: " + messageId);
+        }
+    }
+    public void validateActiveMessageInChatAndIsSender(long chatId, long userId, long messageId) {
+        if (!dataOrchestrator.isActiveMessageInChatAndIsSender(chatId, userId, messageId)){
+            throw new ValidationException("Message not exists or is deleted: " + messageId);
+        }
+    }
+
+    public void validateCanDeleteMessage(long chatId, long userId, long messageId) {
+        validateActiveUser(userId);
+        Optional<Boolean> isAdmin = dataOrchestrator.isActiveAdminInActiveChat(chatId, userId);
+        if (isAdmin.isEmpty()) {
+            throw new ValidationException("Member not exists or is deleted: " + messageId);
+        }
+
+        if (isAdmin.get()) {
+            validateActiveMessageInChat(chatId, messageId);
+        } else {
+            validateActiveMessageInChatAndIsSender(chatId, userId, messageId);
+        }
     }
 }

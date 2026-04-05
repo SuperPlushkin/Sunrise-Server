@@ -97,7 +97,7 @@ public class ChatController {
     @PostMapping("/{chatId}/admin-rights/{otherUserId}")
     public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
         SimpleResult result = chatService.updateAdminRights(
-            chatId, otherUserId, userId, request.getIsAdmin()
+            chatId, userId, otherUserId, request.getIsAdmin()
         );
 
         if (result.isSuccess()) {

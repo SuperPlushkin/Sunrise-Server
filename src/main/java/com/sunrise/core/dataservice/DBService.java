@@ -40,21 +40,21 @@ public class DBService {
     public void saveUser(User user) {
         userRepository.save(user);
     }
-    public void deleteUser(long userId) {
-        userRepository.deleteById(userId);
+    public int deleteUser(long userId) {
+        return userRepository.deleteUser(userId);
     }
-    public void restoreUser(long userId) {
-        userRepository.restoreUser(userId);
+    public int restoreUser(long userId) {
+        return userRepository.restoreUser(userId);
     }
     @Async("dbExecutor")
     public void updateLastLoginAsync(String username, LocalDateTime lastLogin) {
         userRepository.updateLastLogin(username, lastLogin);
     }
-    public void updateUserProfile(long userId, String username, String name) {
-        userRepository.updateProfile(userId, username, name);
+    public int updateUserProfile(long userId, String username, String name) {
+        return userRepository.updateProfile(userId, username, name);
     }
-    public void enableUser(long userId) {
-        userRepository.enableUser(userId);
+    public int enableUser(long userId) {
+        return userRepository.enableUser(userId);
     }
 
 
@@ -63,14 +63,14 @@ public class DBService {
         return userRepository.findById(userId);
     }
     public Optional<User> getUserByUsername(String username) {
-        return userRepository.findByUsername(username);
+        return userRepository.getByUsername(username);
     }
     public Optional<User> getUserByEmail(String email) {
-        return userRepository.findByEmail(email);
+        return userRepository.getByEmail(email);
     }
 
     public List<User> getActiveUserByIds(List<Long> missingIds) {
-        return userRepository.findActiveUserByIds(missingIds);
+        return userRepository.getActiveUserByIds(missingIds);
     }
     public List<UserResult> getFullFilteredUsersPage(String filter, Long cursor, int limit) {
         return userRepository.getFullFilteredUsersPage(filter, cursor, limit);
@@ -82,7 +82,7 @@ public class DBService {
 
     // Основные методы
     public void saveGroupChat(Chat chat, Long[] memberIds, Boolean[] isAdminFlags) {
-        chatRepository.createGroupChatAndAddMembers(
+        chatRepository.saveGroupChatAndMembers(
             chat.getId(), chat.getName(),
             chat.getCreatedBy(), memberIds.length,
             memberIds, isAdminFlags,
@@ -90,23 +90,23 @@ public class DBService {
         );
     }
     public void savePersonalChat(Chat chat, long opponentId) {
-        chatRepository.createPersonalChatAndAddMembers(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
+        chatRepository.savePersonalChatAndMembers(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
     }
 
-    public void restoreChat(long chatId) {
-        chatRepository.restoreChat(chatId);
+    public int restoreChat(long chatId) {
+        return chatRepository.restoreChat(chatId);
     }
-    public void deleteChat(long chatId) {
-        chatRepository.deleteChat(chatId);
+    public int deleteChat(long chatId) {
+        return chatRepository.deleteChat(chatId);
     }
 
 
     // Вспомогательные методы
     public Optional<FullChatResult> getFullChat(long chatId) {
-        return chatRepository.findFullChat(chatId);
+        return chatRepository.getFullChat(chatId);
     }
     public Optional<FullChatResult> getFullPersonalChat(long userId1, long userId2) {
-        return chatRepository.findPersonalChat(userId1, userId2);
+        return chatRepository.getPersonalChat(userId1, userId2);
     }
     public List<UserFullChatResult> getFullUserChatsPage(long userId, Long cursor, int limit) {
         return chatRepository.getUserChatsPage(userId, cursor, limit);
@@ -117,17 +117,17 @@ public class DBService {
 
 
     // Основные методы
-    public void updateUserAdminRights(long chatId, long userId, boolean isAdmin) {
-        chatMemberRepository.addChatMember(chatId, userId, isAdmin);
+    public int updateUserAdminRights(long chatId, long userId, boolean isAdmin) {
+        return chatMemberRepository.updateAdminRights(chatId, userId, isAdmin);
     }
     public void upsertChatMember(ChatMember chatMember) {
-        chatMemberRepository.addChatMember(chatMember.getChatId(), chatMember.getUserId(), chatMember.isAdmin());
+        chatMemberRepository.saveOrRestoreChatMember(chatMember.getChatId(), chatMember.getUserId(), chatMember.isAdmin());
     }
     public void upsertChatMembers(long chatId, Long[] memberIds, Boolean[] isAdminFlags) {
-        chatMemberRepository.addChatMembers(chatId, memberIds, isAdminFlags);
+        chatMemberRepository.saveOrRestoreChatMembers(chatId, memberIds, isAdminFlags);
     }
-    public void removeUserFromChat(long userId, long chatId) {
-        chatMemberRepository.removeChatMember(chatId, userId);
+    public boolean removeUserFromChat(long userId, long chatId) {
+        return chatMemberRepository.removeChatMember(chatId, userId);
     }
 
 
@@ -136,10 +136,10 @@ public class DBService {
         return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
     }
     public Optional<ChatMember> getActiveChatMember(long chatId, long userId) {
-        return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
+        return chatMemberRepository.getActiveChatMember(chatId, userId);
     }
     public List<ChatMember> getActiveChatMembersByIds(long chatId, List<Long> missingIds) {
-        return chatMemberRepository.findActiveChatMembersByIds(chatId, missingIds);
+        return chatMemberRepository.getActiveChatMembersByIds(chatId, missingIds);
     }
 
     public List<Long> getChatMemberIdsPage(long chatId, Long cursor, int limit) {
@@ -160,7 +160,7 @@ public class DBService {
         tokenRepository.deleteByToken(token);
     }
     public Optional<VerificationToken> getVerificationToken(String token) {
-        return tokenRepository.findByToken(token);
+        return tokenRepository.getByToken(token);
     }
     public int cleanupExpiredVerificationTokens() {
         return tokenRepository.deleteByExpiryDateBefore(LocalDateTime.now());
@@ -187,11 +187,11 @@ public class DBService {
     public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
         messageRepository.markMessageAsRead(chatId, userId, messageId, readAt);
     }
-    public void restoreMessage(long messageId) {
-        messageRepository.restoreMessage(messageId);
+    public int restoreMessage(long messageId) {
+        return messageRepository.restoreMessage(messageId);
     }
-    public void deleteMessage(long messageId) {
-        messageRepository.deleteMessage(messageId);
+    public int deleteMessage(long messageId) {
+        return messageRepository.deleteMessage(messageId);
     }
 
     // Вспомогательные методы
@@ -206,7 +206,7 @@ public class DBService {
 
         return messageRepository.findMessageIdsBefore(chatId, cursor, pageable);
     }
-    public List<MessageDBResult> getMessagesByIds(long chatId, Set<Long> missingIds) {
+    public List<Message> getMessagesByIds(long chatId, Set<Long> missingIds) {
         return messageRepository.findMessagesById(chatId, missingIds.toArray(Long[]::new));
     }
 
@@ -218,7 +218,10 @@ public class DBService {
         return chatRepository.getChatClearStats(chatId, userId);
     }
 
-    public Optional<MessageDBResult> getMessage(long messageId) {
-        messageRepository.findMessagesById()
+    public Optional<Message> getMessage(long messageId) {
+        return messageRepository.findById(messageId);
+    }
+    public Optional<UserMessageDBResult> getMessageWithReadStatus(long userId, long messageId) {
+        return messageRepository.findMessageById(userId, messageId);
     }
 }

@@ -23,27 +23,19 @@ public class UserIdArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer, NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
         if (authentication == null || !authentication.isAuthenticated())
             throw new SecurityException("User not authenticated");
 
         Object details = authentication.getDetails();
-        if (details instanceof Map) {
-            @SuppressWarnings("unchecked")
-            Map<String, Object> detailsMap = (Map<String, Object>) details;
-            Long userId = (Long)detailsMap.get("userId");
-
-            if (userId == null)
-                throw new IllegalArgumentException("User ID cannot be null");
-
-            if (userId <= 0)
-                throw new IllegalArgumentException("User ID must be positive: " + userId);
-
-            return userId;
+        if (details instanceof Map<?, ?> detailsMap) {
+            Object userIdObj = detailsMap.get("userId");
+            if (userIdObj instanceof Long) {
+                long userId = (Long) userIdObj;
+                if (userId <= 0) throw new IllegalArgumentException("User ID must be positive: " + userId);
+                return userId;
+            }
         }
-
         throw new IllegalStateException("User ID not found in JWT token");
     }
 }

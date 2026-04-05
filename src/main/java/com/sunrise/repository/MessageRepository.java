@@ -1,6 +1,6 @@
 package com.sunrise.repository;
 
-import com.sunrise.core.dataservice.type.MessageDBResult;
+import com.sunrise.core.dataservice.type.UserMessageDBResult;
 import com.sunrise.entity.db.Message;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,8 +19,25 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     // ========== ОПЕРАЦИИ С СООБЩЕНИЯМИ ==========
 
-    @Query(value = "SELECT * FROM get_messages_by_ids(:chatId, :messageIds)", nativeQuery = true)
-    List<MessageDBResult> findMessagesById(@Param("chatId") long chatId, @Param("messageIds") Long[] messageIds);
+    @Query(value = """
+            SELECT
+                m.id,
+                m.chat_id,
+                m.sender_id,
+                m.text,
+                m.sent_at,
+                m.read_count,
+                (ucrs.last_read_message_id IS NOT NULL AND m.id <= ucrs.last_read_message_id) AS is_read,
+                m.hidden_by_admin
+            FROM messages m
+            LEFT JOIN user_chat_read_state ucrs
+                ON ucrs.user_id = :userId
+                AND ucrs.chat_id = m.chat_id
+            WHERE m.id = :messageId;
+            """, nativeQuery = true)
+    Optional<UserMessageDBResult> findMessageById(@Param("userId") long userId, @Param("messageId") long messageId);
+    @Query("SELECT m FROM Message m WHERE m.chatId = :chatId AND m.id = ANY(:messageIds) ORDER BY m.id DESC")
+    List<Message> findMessagesById(@Param("chatId") long chatId, @Param("messageIds") Long[] messageIds);
 
     @Query("SELECT m.id FROM Message m WHERE m.chatId = :chatId ORDER BY m.id DESC")
     List<Long> findFirstMessageIds(@Param("chatId") long chatId, Pageable pageable);
@@ -36,14 +53,12 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     void markMessageAsRead(@Param("chatId") long chatId, @Param("userId") long userId, @Param("messageId") long messageId, @Param("readAt") LocalDateTime readAt);
 
     @Modifying
-    @Transactional
-    @Query("UPDATE Message m SET m.hiddenByAdmin = true WHERE m.id = :messageId")
-    void restoreMessage(@Param("messageId") long messageId);
+    @Query("UPDATE Message m SET m.hiddenByAdmin = false WHERE m.id = :messageId")
+    int restoreMessage(@Param("messageId") long messageId);
 
     @Modifying
-    @Transactional
     @Query("UPDATE Message m SET m.hiddenByAdmin = true WHERE m.id = :messageId")
-    void deleteMessage(@Param("messageId") long messageId);
+    int deleteMessage(@Param("messageId") long messageId);
 
     @Query(value = "SELECT last_read_message_id FROM user_chat_read_state state WHERE state.user_id = :userId AND state.chat_id = :chatId", nativeQuery = true)
     Optional<Long> getUserReadStatusByChatId(@Param("chatId") long chatId, @Param("userId") long userId);

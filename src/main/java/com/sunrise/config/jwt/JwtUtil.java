@@ -37,18 +37,18 @@ public class JwtUtil {
         this.secretKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
-    public String generateToken(String username, long userId) {
+    public String generateToken(long userId) {
         return Jwts.builder()
                 .setClaims(Map.of("userId", userId))
-                .setSubject(username)
+                .setSubject(String.valueOf(userId))
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
                 .signWith(secretKey)
                 .compact();
     }
-    public boolean validateToken(String token, String username) {
+    public boolean validateToken(String token) {
         try {
-            return username.equals(extractUsername(token)) && !isTokenExpired(token);
+            return !isTokenExpired(token);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
@@ -64,9 +64,6 @@ public class JwtUtil {
     public Long extractUserId(String token) {
         Claims claims = getClaims(token);
         return claims.get("userId", Long.class);
-    }
-    public String extractUsername(String token) {
-        return getClaims(token).getSubject();
     }
     private Claims getClaims(String token) {
         return Jwts.parserBuilder()

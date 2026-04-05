@@ -42,14 +42,17 @@ public class CacheChat {
     public boolean isActive() {
         return !isDeleted;
     }
-    public void delete(){
+
+    public void delete() {
         this.deletedAt = LocalDateTime.now();
         this.isDeleted = true;
     }
-    public void restore(){
+
+    public void restore() {
         this.deletedAt = null;
         this.isDeleted = false;
     }
+
     public void updateFromCache(CacheChat cacheChat) {
         this.name = cacheChat.getName();
         this.isGroup = cacheChat.isGroup();
@@ -63,12 +66,30 @@ public class CacheChat {
         this.newestMessage = cacheChat.getNewestMessage();
     }
 
-
-    // ========== ДЕЙСТВИЯ С СООБЩЕНИЯМИ ==========
-
     public void updateNewestMessageIsDeletedIfHasId(long messageId, boolean isDeleted) {
         if (newestMessage != null && newestMessage.getId() == messageId) {
             newestMessage.setHiddenByAdmin(isDeleted);
         }
+    }
+
+    public static CacheChat copy(CacheChat chat) {
+        if (chat == null) return null;
+        CacheMessage copiedMessage = null;
+        if (chat.getNewestMessage() != null) {
+            copiedMessage = CacheMessage.copy(chat.getNewestMessage());
+        }
+        return new CacheChat(
+                chat.getId(),
+                chat.getName(),
+                chat.isGroup(),
+                chat.getOpponentId(),
+                chat.getMembersCount(),
+                chat.getDeletedMembersCount(),
+                chat.getCreatedAt(),
+                chat.getCreatedBy(),
+                chat.getDeletedAt(),
+                chat.isDeleted(),
+                copiedMessage
+        );
     }
 }

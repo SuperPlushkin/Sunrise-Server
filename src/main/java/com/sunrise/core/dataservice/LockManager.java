@@ -39,8 +39,10 @@ public class LockManager {
 
     // ========== LOCK MAPS ==========
 
-    private final Map<Long, MyLock> chatDataLocks = new ConcurrentHashMap<>();
-    private final Map<String, MyLock> registrationLocks = new ConcurrentHashMap<>();
+    private final Map<String, MyLock> chatCreationLocks = new ConcurrentHashMap<>();
+    private final Map<String, MyLock> chatLeaveLocks = new ConcurrentHashMap<>();
+    private final Map<String, MyLock> usernameLocks = new ConcurrentHashMap<>();
+    private final Map<String, MyLock> emailLocks = new ConcurrentHashMap<>();
 
 
     // ========== ABSTRACT LOCK FUNCTIONS ==========
@@ -66,22 +68,54 @@ public class LockManager {
     // ========== REGISTRATION LOCKS ==========
 
     public boolean tryLockRegistration(String username, String email) {
-        String key = "username:" + username.toLowerCase().trim() + ":email:" + email.toLowerCase().trim();
-        return tryLock(registrationLocks, key);
+        String usernameKey = "username:" + username;
+        String emailKey = "email:" + email.toLowerCase().trim();
+
+        if (!tryLockUsername(usernameKey)) return false;
+        if (!tryLock(emailLocks, emailKey)) {
+            unLockUsername(username); // откат
+            return false;
+        }
+        return true;
     }
     public void unLockRegistration(String username, String email) {
-        String key = "username:" + username.toLowerCase().trim() + ":email:" + email.toLowerCase().trim();
-        unLock(registrationLocks, key);
+        String usernameKey = "username:" + username;
+        String emailKey = "email:" + email.toLowerCase().trim();
+        unLockUsername(usernameKey);
+        unLock(emailLocks, emailKey);
+    }
+
+
+    // ========== REGISTRATION LOCKS ==========
+
+    public boolean tryLockUsername(String username) {
+        String key = "username:" + username;
+        return tryLock(usernameLocks, key);
+    }
+    public void unLockUsername(String username) {
+        String key = "username:" + username;
+        unLock(usernameLocks, key);
     }
 
 
     // ========== CHAT DATA LOCKS ==========
 
-    public boolean tryLockChatWrite(long chatId) {
-        return tryLock(chatDataLocks, chatId);
+    public boolean tryLockPersonalChatCreation(long user1, long user2) {
+        String key = "user1:" + Math.max(user1, user2) + ":user2:" + Math.min(user1, user2);
+        return tryLock(chatCreationLocks, key);
     }
-    public void unLockChatWrite(long chatId) {
-        unLock(chatDataLocks, chatId);
+    public void unLockPersonalChatCreation(long user1, long user2) {
+        String key = "user1:" + Math.max(user1, user2) + ":user2:" + Math.min(user1, user2);
+        unLock(chatCreationLocks, key);
+    }
+
+    public boolean tryLockLeaveChatOperation(long chatId) {
+        String key = "chatId:" + chatId;
+        return tryLock(chatLeaveLocks, key);
+    }
+    public void unLockLeaveChatOperation(long chatId) {
+        String key = "chatId:" + chatId;
+        unLock(chatLeaveLocks, key);
     }
 
 
@@ -89,8 +123,10 @@ public class LockManager {
 
     public Map<String, Object> getLockStats() {
         Map<String, Object> stats = new HashMap<>();
-        stats.put("chatDataLocks.size", chatDataLocks.size());
-        stats.put("registrationLocks.size", registrationLocks.size());
+        stats.put("chatCreationLocks.size", chatCreationLocks.size());
+        stats.put("chatLeaveLocks.size", chatLeaveLocks.size());
+        stats.put("usernameLocks.size", usernameLocks.size());
+        stats.put("emailLocks.size", emailLocks.size());
         return stats;
     }
 
@@ -100,8 +136,10 @@ public class LockManager {
     @Scheduled(fixedDelayString = "${app.locks.clean-up-schedule}")
     public void cleanupOldLocks() {
         long now = System.currentTimeMillis();
-        cleanupLockMap(chatDataLocks, now);
-        cleanupLockMap(registrationLocks, now);
+        cleanupLockMap(chatCreationLocks, now);
+        cleanupLockMap(chatLeaveLocks, now);
+        cleanupLockMap(usernameLocks, now);
+        cleanupLockMap(emailLocks, now);
     }
     private void cleanupLockMap(Map<?, MyLock> lockMap, long now) {
         lockMap.entrySet().removeIf(entry -> {

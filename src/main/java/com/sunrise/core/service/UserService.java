@@ -1,9 +1,7 @@
 package com.sunrise.core.service;
 
-import com.sunrise.core.service.result.FilteredUsersResult;
-import com.sunrise.core.service.result.GetProfileResult;
-import com.sunrise.core.service.result.SimpleResult;
-import com.sunrise.core.service.result.UpdateProfileResult;
+import com.sunrise.core.dataservice.LockManager;
+import com.sunrise.core.service.result.*;
 import com.sunrise.entity.dto.UsersPageDTO;
 
 import com.sunrise.core.dataservice.DataOrchestrator;
@@ -23,14 +21,20 @@ import java.util.Optional;
 @Service
 public class UserService {
     private final DataOrchestrator dataOrchestrator;
+    private final LockManager lockManager;
     private final DataValidator validator;
 
-    public UserService(DataOrchestrator dataOrchestrator, DataValidator validator){
+    public UserService(DataOrchestrator dataOrchestrator, LockManager lockManager, DataValidator validator){
         this.dataOrchestrator = dataOrchestrator;
+        this.lockManager = lockManager;
         this.validator = validator;
     }
 
     public UpdateProfileResult updateProfile(long userId, String newUsername, String newName) {
+        // LOCK на username
+        if (!lockManager.tryLockUsername(newUsername))
+            return UpdateProfileResult.error("Try again later");
+
         try {
             validator.validateActiveUser(userId);
 
@@ -56,12 +60,17 @@ public class UserService {
             log.info("[🔧] ✅ User {} updated profile", userId);
             return UpdateProfileResult.success(profile);
 
-        } catch (ValidationException e) {
+        }
+        catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to update profile for user {}: {}", userId, e.getMessage());
             return UpdateProfileResult.error(e.getMessage());
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             log.error("[🔧] ⚠️ Error updating profile for user {}: {}", userId, e.getMessage());
             return UpdateProfileResult.error("Update profile failed due to server error");
+        }
+        finally {
+            lockManager.unLockUsername(newUsername);
         }
     }
     public SimpleResult deleteProfile(long userIdToDeleted, long userWhoDelete) {
@@ -77,10 +86,12 @@ public class UserService {
             log.info("[🔧] ✅ User {} deleted profile {}", userWhoDelete, userIdToDeleted);
             return SimpleResult.success();
 
-        } catch (ValidationException e) {
+        }
+        catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to delete profile for user {}: {}", userWhoDelete, e.getMessage());
             return SimpleResult.error(e.getMessage());
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             log.error("[🔧] ⚠️ Error deleting profile for user {}: {}", userWhoDelete, e.getMessage());
             return SimpleResult.error("Update profile failed due to server error");
         }
@@ -98,10 +109,12 @@ public class UserService {
             log.debug("[🔧] ✅ Loaded profile for user {}", userId);
             return GetProfileResult.success(profileOpt.get());
 
-        } catch (ValidationException e) {
+        }
+        catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get self profile for user {}: {}", userId, e.getMessage());
             return GetProfileResult.error(e.getMessage());
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting self profile for user {}: {}", userId, e.getMessage());
             return GetProfileResult.error("Get profile failed due to server error");
         }
@@ -119,10 +132,12 @@ public class UserService {
             log.debug("[🔧] ✅ User {} retrieved profile of user {}", currentUserId, otherUserId);
             return GetProfileResult.success(profileOpt.get());
 
-        } catch (ValidationException e) {
+        }
+        catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get other profile for user {}: {}", otherUserId, e.getMessage());
             return GetProfileResult.error(e.getMessage());
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting other profile for user {}: {}", otherUserId, e.getMessage());
             return GetProfileResult.error("Get profile failed due to server error");
         }

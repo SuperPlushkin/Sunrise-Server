@@ -54,12 +54,11 @@ logging:
     org.hibernate.SQL: ${LOGGING_LEVEL_ORG_HIBERNATE_SQL:WARN}
     org.hibernate.type.descriptor.sql.BasicBinder: WARN
 
-# application.yml
 app:
   jwt:
     secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
     expiration: ${APP_JWT_EXPIRATION:36000} # in seconds
-    no-jwt-endpoints: /auth/**,/actions/status
+    no-jwt-endpoints: /auth/**,/status
   mail:
     mail-address: ${MAIL_USERNAME}
     base-url: http://${SERVER_IP:localhost}:${SERVER_PORT:10610}${SERVER_BASE_PATH:/app}
@@ -68,6 +67,7 @@ app:
     timeout: ${APP_LOCKS_TIMEOUT:5}
     clean-up-expiration: ${APP_LOCKS_CLEAN_UP_EXPIRATION:900}
     clean-up-schedule: ${APP_LOCKS_CLEAN_UP_SCHEDULE:300}
+  # нужно добавить в код
   cache:
     max-size:
       user: ${APP_CACHE_MAX_SIZE_USER:100000}

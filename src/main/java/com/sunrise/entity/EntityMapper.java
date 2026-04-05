@@ -348,6 +348,19 @@ public class EntityMapper {
             message.getIsHiddenByAdmin()
         );
     }
+    public static CacheMessage toCache(UserMessageDBResult message) {
+        if (message == null) return null;
+
+        return new CacheMessage(
+                message.getId(),
+                message.getChatId(),
+                message.getSenderId(),
+                message.getText(),
+                message.getSentAt(),
+                message.getReadCount(),
+                message.getIsHiddenByAdmin()
+        );
+    }
     public static CacheMessage toCache(LightMessageDTO message) {
         if (message == null) return null;
 
@@ -511,11 +524,11 @@ public class EntityMapper {
     public static Map<Long, LightUserDTO> toLightUserDTOs(Collection<UserResult> users, Map<Long, LightUserDTO> resultMap) {
         if (users == null) return null;
 
-        for (UserResult user : users){
+        for (UserResult user : users) {
             resultMap.put(user.getUserId(), new LightUserDTO(
-                user.getUserId(),
-                user.getUsername(),
-                user.getName()
+                    user.getUserId(),
+                    user.getUsername(),
+                    user.getName()
             ));
         }
         return resultMap;

@@ -52,7 +52,7 @@ public class ProfileController {
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getProfile());
         } else {
-            return ResponseEntity.status(404).body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
         }
     }
     @GetMapping("/{otherUserId}")

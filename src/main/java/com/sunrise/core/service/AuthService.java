@@ -104,7 +104,7 @@ public class AuthService {
             var loginHistory = LoginHistoryDTO.create(SimpleSnowflakeId.nextId(), user.getId(), extractClientIp(httpRequest), httpRequest.getHeader("User-Agent"));
             dataOrchestrator.saveLoginHistory(loginHistory);
 
-            String token = jwtUtil.generateToken(username, user.getId());
+            String token = jwtUtil.generateToken(user.getId());
 
             log.info("[🔧] ✅ User logged in successfully --> {}", username);
             return UserLoginResult.success(token, jwtUtil.getTokenExpirationTime(token));

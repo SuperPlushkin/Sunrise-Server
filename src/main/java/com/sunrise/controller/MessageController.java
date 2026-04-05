@@ -77,7 +77,7 @@ public class MessageController {
                                              @RequestParam(defaultValue = "BACKWARD") @NotNull Direction type,
                                              @CurrentUserId long userId) {
 
-        ChatMessagesResult result = messageService.getChatMessages(chatId, userId, pagination.getCursor(), pagination.getLimit(), type);
+        ChatMessagesResult result = messageService.getMessagePagination(chatId, userId, pagination.getCursor(), pagination.getLimit(), type);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());

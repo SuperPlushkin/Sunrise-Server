@@ -12,4 +12,17 @@ public class CacheVerificationToken {
     private LocalDateTime expiryDate;
     private LocalDateTime createdAt;
     private String tokenType;
+
+    public static CacheVerificationToken copy(CacheVerificationToken token) {
+        if (token == null) return null;
+
+        return new CacheVerificationToken(
+            token.getId(),
+            token.getUserId(),
+            token.getToken(),
+            token.getExpiryDate(),
+            token.getCreatedAt(),
+            token.getTokenType()
+        );
+    }
 }

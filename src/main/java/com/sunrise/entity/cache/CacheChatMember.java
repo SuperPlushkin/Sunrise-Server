@@ -21,4 +21,8 @@ public class CacheChatMember {
     public boolean isActive() {
         return !isDeleted;
     }
+    public static CacheChatMember copy(CacheChatMember member){
+        if (member == null) return null;
+        return new CacheChatMember(member.getChatId(), member.getUserId(), member.getJoinedAt(), member.isAdmin(), member.isDeleted());
+    }
 }

@@ -39,4 +39,17 @@ public class CacheMessage {
     public boolean isActive() {
         return !hiddenByAdmin;
     }
+
+    public static CacheMessage copy(CacheMessage message) {
+        if (message == null) return null;
+        return new CacheMessage(
+                message.getId(),
+                message.getChatId(),
+                message.getSenderId(),
+                message.getText(),
+                message.getSentAt(),
+                message.getReadCount(),
+                message.isHiddenByAdmin()
+        );
+    }
 }

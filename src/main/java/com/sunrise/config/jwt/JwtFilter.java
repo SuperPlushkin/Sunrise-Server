@@ -34,6 +34,11 @@ public class JwtFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
+        if (isPathExcluded(request.getServletPath())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authorizationHeader = request.getHeader("Authorization");
 
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
@@ -41,42 +46,34 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        if (isPathExcluded(request.getServletPath())) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        String username;
         Long userId;
         String jwt;
 
         try {
             jwt = authorizationHeader.substring(7);
-
             if (jwt.trim().isEmpty()) {
                 sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "EMPTY_TOKEN");
                 return;
             }
 
-            username = jwtUtil.extractUsername(jwt);
             userId = jwtUtil.extractUserId(jwt);
         } catch (Exception e) {
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "INVALID_TOKEN");
             return;
         }
 
-        if (username == null || username.trim().isEmpty()) {
-            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "INVALID_TOKEN_PAYLOAD");
+        if (userId == null || userId <= 0) {
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "INVALID_USER_ID");
             return;
         }
 
-        if (!jwtUtil.validateToken(jwt, username)) {
+        if (!jwtUtil.validateToken(jwt)) {
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_VALIDATION_FAILED");
             return;
         }
 
         try {
-            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(username, null, List.of());
+            UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(userId, null, List.of());
 
             Map<String, Object> details = new HashMap<>();
             details.put("userId", userId);
