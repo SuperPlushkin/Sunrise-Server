@@ -69,11 +69,6 @@ public class CacheService {
             .recordStats()
             .build();
 
-    private final Cache<String, Long> lastReadCache = Caffeine.newBuilder() // "chatId:userId" -> messageId (для быстрой проверки на прочтение)
-            .maximumSize(300_000)
-            .expireAfterAccess(1, TimeUnit.HOURS)
-            .build();
-
 
     // кеш токенов подтверждения
     private final Cache<String, CacheVerificationToken> verificationTokenCache = Caffeine.newBuilder() // token -> CacheVerificationToken (токены подтверждения)
@@ -89,26 +84,14 @@ public class CacheService {
     // Основные методы
     public void saveUsers(Collection<CacheUser> users) {
         for (CacheUser user : users){
-            Optional<CacheUser> existing = getUserLink(user.getId());
-            if (existing.isPresent()) {
-                existing.get().updateFromCache(user);
-            } else {
-                userCache.put(user.getId(), CacheUser.copy(user));
-            }
-
+            userCache.put(user.getId(), CacheUser.copy(user));
             usernameIndex.put(user.getUsername().toLowerCase(), user.getId());
             emailIndex.put(user.getEmail().toLowerCase(), user.getId());
         }
         log.debug("[⚡] Batch saved {} users to cache and updated indexes || saveUsers", users.size());
     }
     public void saveUser(CacheUser user) {
-        Optional<CacheUser> existing = getUserLink(user.getId());
-        if (existing.isPresent()) {
-            existing.get().updateFromCache(user);
-        } else {
-            userCache.put(user.getId(), CacheUser.copy(user));
-        }
-
+        userCache.put(user.getId(), CacheUser.copy(user));
         usernameIndex.put(user.getUsername().toLowerCase(), user.getId());
         emailIndex.put(user.getEmail().toLowerCase(), user.getId());
         log.debug("[⚡] Saved user {} in cache and updated indexes || saveUser", user.getId());
@@ -400,16 +383,6 @@ public class CacheService {
 
 
     // Основные методы
-    public void saveNewMessage(CacheMessage message) {
-        CacheMessage copy = CacheMessage.copy(message);
-        messageCache.put(copy.getId(), copy);
-        log.debug("[⚡] Saved new message {} in cache (chat={}, sender={}) || saveNewMessage", message.getId(), message.getChatId(), message.getSenderId());
-
-        getChatLink(copy.getChatId()).ifPresent(chat -> {
-            chat.setNewestMessage(copy);
-            log.debug("[⚡] Updated newest message for chat {} to {} || saveNewMessage", message.getChatId(), message.getId());
-        });
-    }
     public void saveMessage(CacheMessage message) {
         CacheMessage copy = CacheMessage.copy(message);
         messageCache.put(copy.getId(), copy);
@@ -421,30 +394,10 @@ public class CacheService {
         }
         log.debug("[⚡] Batch saved {} messages to cache || saveMessages", messages.size());
     }
-    public void markMessageAsRead(long chatId, long userId, long messageId) {
-        String key = getLastReadKey(chatId, userId);
-        Long[] oldValueHolder = new Long[1];
-
-        Long newValue = lastReadCache.asMap().compute(key, (k, oldValue) -> {
-            oldValueHolder[0] = oldValue;
-            if (oldValue == null) return messageId;
-            return Math.max(oldValue, messageId);
-        });
-
-        boolean wasUpdated = (oldValueHolder[0] == null) || (newValue > oldValueHolder[0]);
-        if (wasUpdated && newValue == messageId) {
-            getMessageLink(messageId).ifPresent(CacheMessage::incrementReadCount);
-        }
-    }
     public void restoreMessage(long chatId, long messageId) {
         getMessageLink(messageId).ifPresent(message -> {
             message.restore();
             log.debug("[⚡] Restored message {} in cache (chat={}) || restoreMessage", messageId, chatId);
-        });
-
-        getChatLink(chatId).ifPresent(chat -> {
-            chat.updateNewestMessageIsDeletedIfHasId(messageId, false);
-            log.debug("[⚡] Updated newest message status for chat {} (message {}) || restoreMessage", chatId, messageId);
         });
     }
     public void deleteMessage(long chatId, long messageId) {
@@ -452,56 +405,15 @@ public class CacheService {
             message.delete();
             log.debug("[⚡] Deleted message {} in cache (chat={}) || deleteMessage", messageId, chatId);
         });
-
-        getChatLink(chatId).ifPresent(chat -> {
-            chat.updateNewestMessageIsDeletedIfHasId(messageId, true);
-            log.debug("[⚡] Updated newest message as deleted for chat {} (message {}) || deleteMessage", chatId, messageId);
-        });
     }
 
     // Вспомогательные методы
-    public Map<Long, CacheMessage> getMessages(Collection<Long> messageIds, Collection<Long> missingIds) {
-        Map<Long, CacheMessage> result = new HashMap<>(messageIds.size());
-        for (Long messageId : messageIds) {
-            CacheMessage user = messageCache.getIfPresent(messageId);
-            if (user != null) {
-                result.put(messageId, user);
-            } else if (missingIds != null) {
-                missingIds.add(messageId);
-            }
-        }
-        return result;
-    }
     public Optional<CacheMessage> getMessage(long messageId) {
         return Optional.ofNullable(CacheMessage.copy(messageCache.getIfPresent(messageId)));
     }
     private Optional<CacheMessage> getMessageLink(long messageId) {
         return Optional.ofNullable(messageCache.getIfPresent(messageId));
     }
-
-
-    // ========== МЕТОДЫ ДЛЯ ПРОЧТЕНИЯ ==========
-
-
-    // Основные методы
-    private String getLastReadKey(long chatId, long userId) {
-        return chatId + ":" + userId;
-    }
-    public void updateLastReadByUser(long chatId, long userId, long messageId) {
-        String key = getLastReadKey(chatId, userId);
-
-        lastReadCache.asMap().compute(key, (k, oldValue) -> {
-            if (oldValue == null) {
-                return messageId;
-            }
-            return Math.max(oldValue, messageId);
-        });
-    }
-    public Long getUserLastRead(long chatId, long userId) {
-        String key = getLastReadKey(chatId, userId);
-        return lastReadCache.getIfPresent(key);
-    }
-
 
 
 

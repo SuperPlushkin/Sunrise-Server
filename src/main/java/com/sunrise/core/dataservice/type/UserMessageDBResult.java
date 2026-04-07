@@ -10,5 +10,5 @@ public interface UserMessageDBResult {
     LocalDateTime getSentAt();
     Long getReadCount();
     Boolean getIsReadByUser();
-    Boolean getIsHiddenByAdmin();
+    Boolean getIsDeleted();
 }

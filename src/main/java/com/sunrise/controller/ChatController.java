@@ -82,6 +82,19 @@ public class ChatController {
         }
     }
 
+    @PostMapping("/{chatId}/admin-rights/{otherUserId}")
+    public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
+        SimpleResult result = chatService.updateAdminRights(
+                chatId, userId, otherUserId, request.getIsAdmin()
+        );
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Successfully updated admin rights");
+        } else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
     @PostMapping("/{chatId}/leave")
     public ResponseEntity<?> leaveChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
@@ -94,18 +107,6 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/admin-rights/{otherUserId}")
-    public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
-        SimpleResult result = chatService.updateAdminRights(
-            chatId, userId, otherUserId, request.getIsAdmin()
-        );
-
-        if (result.isSuccess()) {
-            return ResponseEntity.ok("Successfully updated admin rights");
-        } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
-        }
-    }
     @DeleteMapping("/{chatId}")
     public ResponseEntity<?> deleteChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
         SimpleResult result = chatService.deleteChat(chatId, userId);
@@ -126,7 +127,6 @@ public class ChatController {
             return ResponseEntity.ok(Map.of(
                 "total_messages", result.getTotalMessages(),
                 "deleted_for_all", result.getDeletedForAll(),
-                "deleted_for_user", result.getDeletedForUser(),
                 "can_delete_for_all", result.getCanDeleteForAll()
             ));
         } else {
@@ -135,9 +135,9 @@ public class ChatController {
     }
 
     @GetMapping("/{chatId}/members")
-    public ResponseEntity<?> getChatMembers(@PathVariable @ValidId long chatId, @Valid PaginationRequest request, @CurrentUserId long userId) {
+    public ResponseEntity<?> getChatMembersPage(@PathVariable @ValidId long chatId, @Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        ChatMembersResult result = chatService.getChatMembers(chatId, userId, request.getCursor(), request.getLimit());
+        ChatMembersResult result = chatService.getChatMembersPage(chatId, userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());
@@ -147,9 +147,9 @@ public class ChatController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getUserChats(@Valid PaginationRequest request, @CurrentUserId long userId) {
+    public ResponseEntity<?> getUserChatsPage(@Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        UserChatsResult result = chatService.getUserChats(userId, request.getCursor(), request.getLimit());
+        UserChatsResult result = chatService.getUserChatsPage(userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());

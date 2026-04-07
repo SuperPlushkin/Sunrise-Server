@@ -1,55 +1,36 @@
 package com.sunrise.entity.cache;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.LocalDateTime;
 
-@Getter
-@Setter
+@lombok.Getter
+@lombok.Setter
+@lombok.AllArgsConstructor
 public class CacheMessage {
     private long id;
     private long chatId;
     private long senderId;
-    private String text;
     private LocalDateTime sentAt;
-    private long readCount;
-    private boolean hiddenByAdmin;
+    private boolean isDeleted;
 
-    public CacheMessage(long id, long chatId, long senderId, String text, LocalDateTime sentAt, long readCount, boolean hiddenByAdmin) {
-        this.id = id;
-        this.chatId = chatId;
-        this.senderId = senderId;
-        this.text = text;
-        this.sentAt = sentAt;
-        this.readCount = readCount;
-        this.hiddenByAdmin = hiddenByAdmin;
-    }
-
-    public void incrementReadCount() {
-        this.readCount++;
-    }
     public void delete() {
-        this.hiddenByAdmin = true;
+        this.isDeleted = true;
     }
     public void restore() {
-        this.hiddenByAdmin = false;
+        this.isDeleted = false;
     }
 
     public boolean isActive() {
-        return !hiddenByAdmin;
+        return !isDeleted;
     }
 
     public static CacheMessage copy(CacheMessage message) {
         if (message == null) return null;
         return new CacheMessage(
-                message.getId(),
-                message.getChatId(),
-                message.getSenderId(),
-                message.getText(),
-                message.getSentAt(),
-                message.getReadCount(),
-                message.isHiddenByAdmin()
+            message.getId(),
+            message.getChatId(),
+            message.getSenderId(),
+            message.getSentAt(),
+            message.isDeleted()
         );
     }
 }

@@ -12,12 +12,6 @@ public class CacheChatMember {
     private boolean isAdmin;
     private boolean isDeleted;
 
-    public void setIsAdmin(boolean isAdmin){
-        this.isAdmin = isAdmin;
-    }
-    public void setIsDeleted(boolean isDeleted){
-        this.isDeleted = isDeleted;
-    }
     public boolean isActive() {
         return !isDeleted;
     }

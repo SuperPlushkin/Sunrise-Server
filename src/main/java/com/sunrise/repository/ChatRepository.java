@@ -1,7 +1,6 @@
 package com.sunrise.repository;
 
 import com.sunrise.core.dataservice.type.ChatStatsDBResult;
-import com.sunrise.core.dataservice.type.FullChatResult;
 import com.sunrise.core.dataservice.type.UserFullChatResult;
 import com.sunrise.entity.db.Chat;
 
@@ -22,27 +21,17 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     // ========== ОПЕРАЦИИ С ЧАТОМ ==========
 
-
+    @Transactional
     @Query(value = "SELECT create_personal_chat(:chatId, :user1Id, :user2Id, :createdAt)", nativeQuery = true)
     void savePersonalChatAndMembers(@Param("chatId") long chatId, @Param("user1Id") long user1Id,
                                     @Param("user2Id") long user2Id, @Param("createdAt") LocalDateTime createdAt);
 
-    @Modifying
-    @Transactional
-    @Query(value = """
-           WITH created_chat AS (
-              INSERT INTO chats (id, name, members_count, created_by, created_at, is_group)
-              VALUES (:chatId, :name, :membersCount, :creatorId, :createdAt, TRUE)
-              RETURNING id
-           )
-           SELECT add_or_restore_chat_member(:chatId, user_id, is_admin, :createdAt, FALSE)
-           FROM unnest(:memberIds, :isAdminFlags) AS t(user_id, is_admin);
-           """, nativeQuery = true)
-    void saveGroupChatAndMembers(@Param("chatId") long chatId, @Param("name") String name,
-                                 @Param("creatorId") long creatorId, @Param("members_count") int membersCount,
-                                 @Param("memberIds") Long[] memberIds, @Param("isAdminFlags") Boolean[] isAdminFlags,
-                                 @Param("createdAt") LocalDateTime createdAt);
 
+    @Transactional
+    @Query(value = "SELECT create_group_chat_with_members(:chatId, :name, :memberIds, :isAdminFlags, :creatorId, :createdAt)", nativeQuery = true)
+    void saveGroupChatAndMembers(@Param("chatId") long chatId, @Param("name") String name,
+                                 @Param("memberIds") Long[] memberIds, @Param("isAdminFlags") Boolean[] isAdminFlags,
+                                 @Param("creatorId") long creatorId, @Param("createdAt") LocalDateTime createdAt);
     @Modifying
     @Transactional
     @Query("UPDATE Chat c SET c.isDeleted = false, c.deletedAt = null WHERE c.id = :chatId")
@@ -57,11 +46,15 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
     // ========== ПОИСК ==========
 
 
-    @Query(value = "SELECT * FROM get_full_chat(:chatId)", nativeQuery = true)
-    Optional<FullChatResult> getFullChat(@Param("chatId") long chatId);
 
-    @Query(value = "SELECT * FROM get_full_personal_chat(:userId1, :userId2)", nativeQuery = true)
-    Optional<FullChatResult> getPersonalChat(@Param("userId1") long userId1, @Param("userId2") long userId2);
+    @Query("""
+           SELECT c
+           FROM Chat c
+           INNER JOIN ChatMember cm1 ON cm1.id.chatId = c.id AND cm1.id.userId = :userId1 AND cm1.isDeleted = false
+           INNER JOIN ChatMember cm2 ON cm2.id.chatId = c.id AND cm2.id.userId = :userId2 AND cm2.isDeleted = false
+           WHERE c.isGroup = false
+           """)
+    Optional<Chat> getPersonalChat(@Param("userId1") long userId1, @Param("userId2") long userId2);
 
     @Query(value = "SELECT * FROM get_user_chats_page(:user_id, :cursor, :limit)", nativeQuery = true)
     List<UserFullChatResult> getUserChatsPage(@Param("user_id") long userId, @Param("cursor") Long cursor, @Param("limit") int limit);

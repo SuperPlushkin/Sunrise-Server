@@ -58,7 +58,7 @@ app:
   jwt:
     secret: ${JWT_SECRET:mysupersecretkeymysupersecretkeymysupersecretkey}
     expiration: ${APP_JWT_EXPIRATION:36000} # in seconds
-    no-jwt-endpoints: /auth/**,/status
+    no-jwt-endpoints: /auth/**,/ping,/cache-status
   mail:
     mail-address: ${MAIL_USERNAME}
     base-url: http://${SERVER_IP:localhost}:${SERVER_PORT:10610}${SERVER_BASE_PATH:/app}

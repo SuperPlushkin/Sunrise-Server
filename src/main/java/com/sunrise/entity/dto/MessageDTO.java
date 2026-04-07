@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 @lombok.Setter
 @lombok.Getter
 @lombok.AllArgsConstructor
-public class LightMessageDTO {
+public class MessageDTO {
     private long id;
     private long chatId;
     private long senderId;
@@ -15,7 +15,7 @@ public class LightMessageDTO {
     private boolean readByUser;
     private boolean hiddenByAdmin;
 
-    public static LightMessageDTO create(long id, long chatId, long senderId, String text) {
-        return new LightMessageDTO(id, chatId, senderId, text, LocalDateTime.now(), 0L, false, false);
+    public static MessageDTO create(long id, long chatId, long senderId, String text) {
+        return new MessageDTO(id, chatId, senderId, text, LocalDateTime.now(), 0L, false, false);
     }
 }

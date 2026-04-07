@@ -13,25 +13,23 @@ import com.sunrise.helpclass.SimpleSnowflakeId;
 import com.sunrise.helpclass.ValidationException;
 
 import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class ChatService {
 
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
-
-    public ChatService(LockManager lockManager, DataOrchestrator dataOrchestrator, DataValidator validator) {
-        this.lockManager = lockManager;
-        this.dataOrchestrator = dataOrchestrator;
-        this.validator = validator;
-    }
+    private final SimpMessagingTemplate messagingTemplate;
 
     public ChatCreationResult createPersonalChat(long creatorId, long opponentId) {
 
@@ -244,7 +242,7 @@ public class ChatService {
         }
     }
 
-    public UserChatsResult getUserChats(long userId, Long cursor, int limit) {
+    public UserChatsResult getUserChatsPage(long userId, Long cursor, int limit) {
         try {
             validator.validateActiveUser(userId);
 
@@ -262,7 +260,7 @@ public class ChatService {
             return UserChatsResult.error("getUserChats failed due to server error");
         }
     }
-    public ChatMembersResult getChatMembers(long chatId, long userId, Long cursor, int limit) {
+    public ChatMembersResult getChatMembersPage(long chatId, long userId, Long cursor, int limit) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -291,7 +289,6 @@ public class ChatService {
             return ChatStatsResult.success(
                     result.getTotalMessages(),
                     result.getDeletedForAll(),
-                    result.getDeletedForUser(),
                     result.getCanDeleteForAll()
             );
         }

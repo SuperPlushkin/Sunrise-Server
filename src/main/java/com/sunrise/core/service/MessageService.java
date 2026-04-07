@@ -1,35 +1,33 @@
 package com.sunrise.core.service;
 
-import com.sunrise.core.service.result.ChatMessageResult;
-import com.sunrise.core.service.result.ChatMessagesResult;
-import com.sunrise.core.service.result.CreateMessageResult;
-import com.sunrise.core.service.result.SimpleResult;
+import com.sunrise.core.service.result.*;
+import com.sunrise.entity.dto.MessageReadStatusDTO;
 import com.sunrise.entity.dto.MessagesPageDTO;
-import com.sunrise.entity.dto.LightMessageDTO;
+import com.sunrise.entity.dto.MessageDTO;
 import com.sunrise.core.dataservice.DataOrchestrator;
 import com.sunrise.core.dataservice.type.Direction;
 import com.sunrise.core.dataservice.DataValidator;
 import com.sunrise.helpclass.SimpleSnowflakeId;
 import com.sunrise.helpclass.ValidationException;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class MessageService {
 
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
-
-    public MessageService(DataValidator validator, DataOrchestrator dataOrchestrator){
-        this.validator = validator;
-        this.dataOrchestrator = dataOrchestrator;
-    }
+    private final SimpMessagingTemplate messagingTemplate;
 
     public CreateMessageResult makePublicMessage(long chatId, long senderId, String text) {
         try {
@@ -43,7 +41,7 @@ public class MessageService {
                 throw new ValidationException("Message text is too long");
             }
 
-            var message = LightMessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
+            var message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
 
             dataOrchestrator.saveMessage(message);
 
@@ -74,7 +72,7 @@ public class MessageService {
                 throw new ValidationException("Message text is too long");
             }
 
-            var message = LightMessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
+            var message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
 
             // Отправляем приватное сообщение (при этом оно не хранится на сервере, надо удостовериться, что отослалось. Если нет - то ошибка)
 
@@ -91,7 +89,7 @@ public class MessageService {
         }
     }
 
-    public SimpleResult deleteMessage(long chatId, long userId, long messageId){
+    public SimpleResult deleteMessage(long chatId, long userId, long messageId) {
         try {
             validator.validateCanDeleteMessage(chatId, userId, messageId);
 
@@ -132,7 +130,7 @@ public class MessageService {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
-            Optional<LightMessageDTO> message = dataOrchestrator.getActiveMessageWithReadStatusInChat(chatId, userId, messageId);
+            Optional<MessageDTO> message = dataOrchestrator.getActiveMessageWithReadStatusInChat(chatId, userId, messageId);
             if (message.isEmpty()) {
                 throw new ValidationException("Message not found");
             }
@@ -149,13 +147,32 @@ public class MessageService {
             return ChatMessageResult.error("getMessage failed due to server error");
         }
     }
-
-    public SimpleResult markMessageAsRead(long chatId, long userId, long messageId) {
+    public MessageReadsResult getMessageReads(long chatId, long userId, long messageId) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
             validator.validateActiveMessageInChat(chatId, messageId);
 
-            dataOrchestrator.markMessageAsRead(chatId, userId, messageId, LocalDateTime.now()); // уведомить всех надо об этом
+            Map<Long, MessageReadStatusDTO> message = dataOrchestrator.getMessageReads(messageId);
+
+            log.info("[🔧] ✅ User {} got {} reads of {} message in chat {}", userId, message.size(), messageId, chatId);
+            return MessageReadsResult.success(message);
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed getting message reads {} for user {} in chat {}: {}", userId, messageId, chatId, e.getMessage());
+            return MessageReadsResult.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting message reads {} for user {} in chat {}: {}", userId, messageId, chatId, e.getMessage());
+            return MessageReadsResult.error("getMessage failed due to server error");
+        }
+    }
+
+    public SimpleResult markMessagesUpToRead(long chatId, long userId, long messageId) {
+        try {
+            validator.validateActiveChatMemberInActiveChat(chatId, userId);
+            validator.validateActiveMessageInChat(chatId, messageId);
+
+            dataOrchestrator.markMessagesUpToRead(chatId, userId, messageId, LocalDateTime.now()); // уведомить всех надо об этом
 
             log.info("[🔧] ✅ User {} marked message as read {} in chat {}", userId, messageId, chatId);
             return SimpleResult.success();

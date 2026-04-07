@@ -1,13 +1,12 @@
 package com.sunrise.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
 
 import java.time.LocalDateTime;
 
-@Getter
-@AllArgsConstructor
+@lombok.Setter
+@lombok.Getter
+@lombok.AllArgsConstructor
 public class VerificationTokenDTO {
     private long id;
     private long userId;

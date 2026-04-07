@@ -24,9 +24,9 @@ public class UserController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getUsers(@RequestParam(defaultValue = "") @NotNull String filter, @Valid PaginationRequest pagination, @CurrentUserId long userId) {
+    public ResponseEntity<?> getActiveUsersPage(@RequestParam(defaultValue = "") @NotNull String filter, @Valid PaginationRequest pagination, @CurrentUserId long userId) {
 
-        FilteredUsersResult result = userService.getFilteredUsers(userId, filter, pagination.getCursor(), pagination.getLimit());
+        FilteredUsersResult result = userService.getActiveUsersPage(userId, filter, pagination.getCursor(), pagination.getLimit());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());

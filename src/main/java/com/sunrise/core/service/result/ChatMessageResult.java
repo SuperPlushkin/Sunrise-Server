@@ -1,17 +1,17 @@
 package com.sunrise.core.service.result;
 
-import com.sunrise.entity.dto.LightMessageDTO;
+import com.sunrise.entity.dto.MessageDTO;
 
 @lombok.Getter
 public class ChatMessageResult extends ServiceResultTemplate  {
-    private final LightMessageDTO message;
+    private final MessageDTO message;
 
-    public ChatMessageResult(boolean success, String errorMessage, LightMessageDTO message) {
+    public ChatMessageResult(boolean success, String errorMessage, MessageDTO message) {
         super(success, errorMessage);
         this.message = message;
     }
 
-    public static ChatMessageResult success(LightMessageDTO message) {
+    public static ChatMessageResult success(MessageDTO message) {
         return new ChatMessageResult(true, null, message);
     }
     public static ChatMessageResult error(String errorMessage) {

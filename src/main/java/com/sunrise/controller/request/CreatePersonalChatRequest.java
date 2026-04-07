@@ -1,5 +1,6 @@
 package com.sunrise.controller.request;
 
+import com.sunrise.config.annotation.ValidId;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -9,8 +10,6 @@ import jakarta.validation.constraints.NotNull;
 @lombok.AllArgsConstructor
 public class CreatePersonalChatRequest {
 
-    @NotNull(message = "otherUserId cannot be null")
-    @Min(value = 1, message = "otherUserId must be at least 1")
-    @Max(value = Long.MAX_VALUE, message = "otherUserId must be at most " + Long.MAX_VALUE)
-    private long otherUserId;
+    @ValidId
+    private Long otherUserId;
 }

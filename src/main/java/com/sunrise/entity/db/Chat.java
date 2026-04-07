@@ -7,13 +7,13 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Cacheable(false)
-@Table(name = "chats")
 @lombok.Getter
 @lombok.Setter
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
+@Entity
+@Cacheable(false)
+@Table(name = "chats")
 public class Chat {
 
     @Id
@@ -40,7 +40,6 @@ public class Chat {
     @Min(0)
     @Column(name = "deleted_members_count", nullable = false)
     protected int deletedMembersCount;
-
 
     @Column(name = "created_at", nullable = false, updatable = false)
     protected LocalDateTime createdAt = LocalDateTime.now();

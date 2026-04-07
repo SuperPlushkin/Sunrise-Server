@@ -3,13 +3,13 @@ package com.sunrise.entity.db;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-@Entity
-@Cacheable(false)
-@Table(name = "chat_members")
 @lombok.Getter
 @lombok.Setter
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
+@Entity
+@Cacheable(false)
+@Table(name = "chat_members")
 public class ChatMember {
 
     @EmbeddedId

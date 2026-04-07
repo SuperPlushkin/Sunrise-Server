@@ -1,15 +1,15 @@
 package com.sunrise.entity.db;
 
 import jakarta.persistence.*;
-import lombok.*;
 
 import java.time.LocalDateTime;
 
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
 @Entity
 @Cacheable(false)
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
 @Table(name = "verification_token")
 public class VerificationToken {
 

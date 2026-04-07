@@ -2,18 +2,15 @@ package com.sunrise.entity.db;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import java.time.LocalDateTime;
 
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
 @Entity
 @Cacheable(false)
 @Table(name = "messages")
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
 public class Message {
     @Id
     private long id;
@@ -34,6 +31,10 @@ public class Message {
     @Column(name = "read_count", nullable = false)
     private long readCount = 0L;
 
-    @Column(name = "hidden_by_admin", nullable = false)
-    private boolean hiddenByAdmin = false;
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
+
+    public boolean isActive(){
+        return !isDeleted;
+    }
 }

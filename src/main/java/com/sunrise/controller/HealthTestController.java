@@ -14,13 +14,12 @@ public class HealthTestController {
     @Autowired
     private DataOrchestrator dataOrchestrator;
 
-    @GetMapping("/status")
+    @GetMapping("/ping")
     public Map<String, String> getStatus() {
         return Map.of(
             "name", "Sunrise-Server",
             "status", "🟢 Онлайн",
-            "version", "0.3",
-            "users", "skoro"
+            "version", "0.3"
         );
     }
 

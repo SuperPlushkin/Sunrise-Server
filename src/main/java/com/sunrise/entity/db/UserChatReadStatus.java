@@ -1,16 +1,15 @@
 package com.sunrise.entity.db;
 
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
+
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
 @Entity
 @Cacheable(false)
 @Table(name = "user_chat_read_state")
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
 public class UserChatReadStatus {
     @EmbeddedId
     protected UserChatReadStatusId id;

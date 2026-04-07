@@ -1,20 +1,16 @@
 package com.sunrise.entity.cache;
 
-import lombok.Getter;
-
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Getter
+@lombok.Getter
+@lombok.Setter
+@lombok.AllArgsConstructor
 public class CacheChatMembersContainer {
     private final long chatId;
     private final Map<Long, CacheChatMember> members = new ConcurrentHashMap<>();   // userId -> CacheChatMember
     private final Set<Long> adminIds = ConcurrentHashMap.newKeySet();               // userId
     private final Set<Long> deletedMemberIds = ConcurrentHashMap.newKeySet();       // userId
-
-    public CacheChatMembersContainer(long chatId) {
-        this.chatId = chatId;
-    }
 
     public List<CacheChatMember> getChatAdmins() {
         return adminIds.stream().map(key -> CacheChatMember.copy(members.get(key))).toList();
@@ -50,7 +46,7 @@ public class CacheChatMembersContainer {
     }
 
     public void updateAdminRights(Long userId, Boolean isAdmin) {
-        getMemberLink(userId).filter(CacheChatMember::isActive).ifPresent(m -> m.setIsAdmin(isAdmin));
+        getMemberLink(userId).filter(CacheChatMember::isActive).ifPresent(m -> m.setAdmin(isAdmin));
         if (isAdmin) {
             adminIds.add(userId);
         } else {
@@ -58,18 +54,18 @@ public class CacheChatMembersContainer {
         }
     }
     public void updateChatCreator(Long newCreatorId) {
-        getMember(newCreatorId).ifPresent(m -> m.setIsAdmin(true));
+        getMember(newCreatorId).ifPresent(m -> m.setAdmin(true));
         adminIds.add(newCreatorId);
     }
 
     public void markMemberAsDeleted(Long userId) {
-        getMember(userId).ifPresent(m -> m.setIsDeleted(true));
+        getMember(userId).ifPresent(m -> m.setDeleted(true));
         deletedMemberIds.add(userId);
     }
     public void restoreMember(Long userId, Boolean isAdmin) {
         getMember(userId).ifPresent(member ->{
-            member.setIsAdmin(isAdmin);
-            member.setIsDeleted(false);
+            member.setAdmin(isAdmin);
+            member.setDeleted(false);
         });
 
         deletedMemberIds.remove(userId);

@@ -7,12 +7,13 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
 @Entity
 @Cacheable(false)
 @Table(name = "message_read_status")
-@AllArgsConstructor
-@NoArgsConstructor
-@Data
 public class MessageReadStatus {
 
     @EmbeddedId

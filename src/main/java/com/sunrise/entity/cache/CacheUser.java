@@ -16,15 +16,6 @@ public class CacheUser {
     private boolean isEnabled;
     private boolean isDeleted;
 
-    public void updateFromCache(CacheUser cacheUser) {
-        setUsername(cacheUser.getUsername());
-        setName(cacheUser.getName());
-        setEmail(cacheUser.getEmail());
-        setHashPassword(cacheUser.getHashPassword());
-        setLastLogin(cacheUser.getLastLogin());
-        setEnabled(cacheUser.isEnabled());
-        setDeleted(cacheUser.isDeleted());
-    }
     public static CacheUser copy(CacheUser user) {
         if (user == null) return null;
 

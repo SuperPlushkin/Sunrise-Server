@@ -11,24 +11,23 @@ import com.sunrise.entity.dto.FullUserDTO;
 import com.sunrise.entity.dto.UserProfileDTO;
 import com.sunrise.helpclass.ValidationException;
 
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
 @Slf4j
 @Service
+@AllArgsConstructor
 public class UserService {
+
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
     private final DataValidator validator;
-
-    public UserService(DataOrchestrator dataOrchestrator, LockManager lockManager, DataValidator validator){
-        this.dataOrchestrator = dataOrchestrator;
-        this.lockManager = lockManager;
-        this.validator = validator;
-    }
+    private final SimpMessagingTemplate messagingTemplate;
 
     public UpdateProfileResult updateProfile(long userId, String newUsername, String newName) {
         // LOCK на username
@@ -143,11 +142,11 @@ public class UserService {
         }
     }
 
-    public FilteredUsersResult getFilteredUsers(long userId, String filter, Long cursor, int limit) {
+    public FilteredUsersResult getActiveUsersPage(long userId, String filter, Long cursor, int limit) {
         try {
             validator.validateActiveUser(userId);
 
-            UsersPageDTO usersPage = dataOrchestrator.getUsersPage(filter, cursor, limit);
+            UsersPageDTO usersPage = dataOrchestrator.getActiveUsersPage(filter, cursor, limit);
 
             log.debug("[🔧] ✅ Get {} users with filter='{}', nextCursor={}, limit={}", usersPage.users().size(), filter, cursor, limit);
             return FilteredUsersResult.success(usersPage);

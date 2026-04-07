@@ -2,15 +2,15 @@ package com.sunrise.entity.db;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import lombok.*;
 
 import java.io.Serializable;
 
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
+@lombok.EqualsAndHashCode
 @Embeddable
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@EqualsAndHashCode
 public class MessageReadStatusId implements Serializable {
 
     @Column(name = "message_id", nullable = false)

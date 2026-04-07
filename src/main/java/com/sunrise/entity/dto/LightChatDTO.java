@@ -23,10 +23,6 @@ public class LightChatDTO {
     public boolean isMoreThenOneMember() {
         return membersCount > 1;
     }
-    @JsonIgnore
-    public boolean isActive() {
-        return !isDeleted;
-    }
 
     public static LightChatDTO createPrivate(long id, long createdBy, long opponentId){
         return new LightChatDTO(id, null, false, opponentId, 0, 0, LocalDateTime.now(), createdBy, null, false);

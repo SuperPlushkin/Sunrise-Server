@@ -72,8 +72,8 @@ public class DBService {
     public List<User> getActiveUserByIds(List<Long> missingIds) {
         return userRepository.getActiveUserByIds(missingIds);
     }
-    public List<UserResult> getFullFilteredUsersPage(String filter, Long cursor, int limit) {
-        return userRepository.getFullFilteredUsersPage(filter, cursor, limit);
+    public List<UserResult> getActiveUsersPage(String filter, Long cursor, int limit) {
+        return userRepository.getActiveUsersPage(filter, cursor, Pageable.ofSize(limit));
     }
 
 
@@ -84,9 +84,8 @@ public class DBService {
     public void saveGroupChat(Chat chat, Long[] memberIds, Boolean[] isAdminFlags) {
         chatRepository.saveGroupChatAndMembers(
             chat.getId(), chat.getName(),
-            chat.getCreatedBy(), memberIds.length,
             memberIds, isAdminFlags,
-            chat.getCreatedAt()
+            chat.getCreatedBy(), chat.getCreatedAt()
         );
     }
     public void savePersonalChat(Chat chat, long opponentId) {
@@ -102,10 +101,10 @@ public class DBService {
 
 
     // Вспомогательные методы
-    public Optional<FullChatResult> getFullChat(long chatId) {
-        return chatRepository.getFullChat(chatId);
+    public Optional<Chat> getFullChat(long chatId) {
+        return chatRepository.findById(chatId);
     }
-    public Optional<FullChatResult> getFullPersonalChat(long userId1, long userId2) {
+    public Optional<Chat> getFullPersonalChat(long userId1, long userId2) {
         return chatRepository.getPersonalChat(userId1, userId2);
     }
     public List<UserFullChatResult> getFullUserChatsPage(long userId, Long cursor, int limit) {
@@ -184,8 +183,8 @@ public class DBService {
     public void saveMessage(Message message) {
         messageRepository.save(message);
     }
-    public void markMessageAsRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
-        messageRepository.markMessageAsRead(chatId, userId, messageId, readAt);
+    public void markMessagesUpToRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
+        messageRepository.markMessagesUpToRead(chatId, userId, messageId, readAt, "7 days");
     }
     public int restoreMessage(long messageId) {
         return messageRepository.restoreMessage(messageId);
@@ -195,23 +194,16 @@ public class DBService {
     }
 
     // Вспомогательные методы
-    public List<Long> getMessageIdsPage(long chatId, Long cursor, int limit, Direction direction) {
+    public List<UserMessageDBResult> getMessagePage(long chatId, long userId, Long cursor, int limit, Direction direction) {
         Pageable pageable = PageRequest.of(0, limit);
         if (cursor == null) {
-            return messageRepository.findFirstMessageIds(chatId, pageable);
+            return messageRepository.getFirstMessagePage(chatId, userId, pageable);
         }
         if (direction == Direction.FORWARD) {
-            return messageRepository.findMessageIdsAfter(chatId, cursor, pageable);
+            return messageRepository.getMessagePageAfter(chatId, userId, cursor, pageable);
         }
 
-        return messageRepository.findMessageIdsBefore(chatId, cursor, pageable);
-    }
-    public List<Message> getMessagesByIds(long chatId, Set<Long> missingIds) {
-        return messageRepository.findMessagesById(chatId, missingIds.toArray(Long[]::new));
-    }
-
-    public Optional<Long> getUserReadStatusByChatId(long chatId, long userId) {
-        return messageRepository.getUserReadStatusByChatId(chatId, userId);
+        return messageRepository.getMessagePageBefore(chatId, userId, cursor, pageable);
     }
 
     public ChatStatsDBResult getChatMessagesDeletedStats(long chatId, long userId) {
@@ -222,6 +214,9 @@ public class DBService {
         return messageRepository.findById(messageId);
     }
     public Optional<UserMessageDBResult> getMessageWithReadStatus(long userId, long messageId) {
-        return messageRepository.findMessageById(userId, messageId);
+        return messageRepository.getMessageById(userId, messageId);
+    }
+    public List<MessageReadStatusResult> getMessageReaders(long messageId){
+        return messageRepository.getMessageReaders(messageId);
     }
 }

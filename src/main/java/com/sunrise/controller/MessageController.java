@@ -4,15 +4,14 @@ import com.sunrise.config.annotation.CurrentUserId;
 import com.sunrise.config.annotation.ValidId;
 
 import com.sunrise.controller.request.PaginationRequest;
-import com.sunrise.core.service.result.ChatMessagesResult;
-import com.sunrise.core.service.result.CreateMessageResult;
-import com.sunrise.core.service.result.SimpleResult;
+import com.sunrise.controller.request.PrivateMessageRequest;
+import com.sunrise.controller.request.PublicMessageRequest;
+import com.sunrise.core.service.result.*;
 
 import com.sunrise.core.dataservice.type.Direction;
 import com.sunrise.core.service.MessageService;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 
 import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +22,7 @@ import java.util.Map;
 
 @Validated
 @RestController
-@RequestMapping("/chats")
+@RequestMapping("/chats/{chatId}/messages")
 public class MessageController {
 
     private final MessageService messageService;
@@ -32,17 +31,15 @@ public class MessageController {
         this.messageService = messageService;
     }
 
-    @PostMapping("/{chatId}/messages")
-    public ResponseEntity<?> makeChatMessagePublic(@PathVariable @ValidId long chatId,
-                                                   @RequestParam @NotBlank(message = "must not be blank") String text,
-                                                   @CurrentUserId long userId) {
+    @PostMapping
+    public ResponseEntity<?> sendPublicMessage(@PathVariable @ValidId long chatId,
+                                               @RequestBody @Valid PublicMessageRequest request, @CurrentUserId long userId) {
 
-        CreateMessageResult result = messageService.makePublicMessage(chatId, userId, text);
+        CreateMessageResult result = messageService.makePublicMessage(chatId, userId, request.getText());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
-                "messageId", result.getMessageId(),
-                "sentAt", result.getSentAt()
+                "messageId", result.getMessageId()
             ));
         }
         else {
@@ -50,18 +47,15 @@ public class MessageController {
         }
     }
 
-    @PostMapping("/{chatId}/messages/private")
-    public ResponseEntity<?> makeChatMessagePrivate(@PathVariable @ValidId long chatId,
-                                                    @RequestParam @ValidId long userToSendId,
-                                                    @RequestParam @NotBlank(message = "must not be blank") String text,
-                                                    @CurrentUserId long userId) {
+    @PostMapping("/private")
+    public ResponseEntity<?> sendPrivateMessage(@PathVariable @ValidId long chatId,
+                                                @RequestBody @Valid PrivateMessageRequest request, @CurrentUserId long userId) {
 
-        CreateMessageResult result = messageService.makePrivateMessage(chatId, userId, userToSendId, text);
+        CreateMessageResult result = messageService.makePrivateMessage(chatId, userId, request.getUserToSendId(), request.getText());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(Map.of(
-                "messageId", result.getMessageId(),
-                "sentAt", result.getSentAt()
+                "messageId", result.getMessageId()
             ));
         }
         else {
@@ -69,15 +63,11 @@ public class MessageController {
         }
     }
 
+    @GetMapping
+    public ResponseEntity<?> getMessagesPage(@PathVariable @ValidId long chatId, @Valid PaginationRequest pagination,
+                                             @RequestParam(defaultValue = "BACKWARD") @NotNull Direction direction, @CurrentUserId long userId) {
 
-
-    @GetMapping("/{chatId}/messages")
-    public ResponseEntity<?> getChatMessages(@PathVariable @ValidId long chatId,
-                                             @Valid PaginationRequest pagination,
-                                             @RequestParam(defaultValue = "BACKWARD") @NotNull Direction type,
-                                             @CurrentUserId long userId) {
-
-        ChatMessagesResult result = messageService.getMessagePagination(chatId, userId, pagination.getCursor(), pagination.getLimit(), type);
+        ChatMessagesResult result = messageService.getMessagePagination(chatId, userId, pagination.getCursor(), pagination.getLimit(), direction);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getPagination());
@@ -87,15 +77,52 @@ public class MessageController {
         }
     }
 
-    @PostMapping("/{chatId}/messages/mark-read/{messageId}")
-    public ResponseEntity<?> markMessageAsRead(@PathVariable @ValidId long chatId,
-                                               @PathVariable @ValidId long messageId,
-                                               @CurrentUserId long userId) {
+    @PostMapping("/{messageId}/mark-up-to-read")
+    public ResponseEntity<?> markMessagesUpToRead(@PathVariable @ValidId long chatId, @PathVariable @ValidId long messageId, @CurrentUserId long userId) {
 
-        SimpleResult result = messageService.markMessageAsRead(chatId, userId, messageId);
+        SimpleResult result = messageService.markMessagesUpToRead(chatId, userId, messageId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok("Successfully marked message as read");
+        }
+        else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
+    @DeleteMapping("/{messageId}")
+    public ResponseEntity<?> deleteMessage(@PathVariable @ValidId long chatId, @PathVariable @ValidId long messageId, @CurrentUserId long userId) {
+
+        SimpleResult result = messageService.deleteMessage(chatId, userId, messageId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Message successfully deleted");
+        }
+        else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
+    @GetMapping("/{messageId}")
+    public ResponseEntity<?> getMessage(@PathVariable @ValidId long chatId, @PathVariable @ValidId long messageId, @CurrentUserId long userId) {
+
+        ChatMessageResult result = messageService.getMessage(chatId, userId, messageId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getMessage());
+        }
+        else {
+            return ResponseEntity.badRequest().body(result.getErrorMessage());
+        }
+    }
+
+    @GetMapping("/{messageId}/reads")
+    public ResponseEntity<?> getMessageReads(@PathVariable @ValidId long chatId, @PathVariable @ValidId long messageId, @CurrentUserId long userId) {
+
+        MessageReadsResult result = messageService.getMessageReads(chatId, userId, messageId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getReads());
         }
         else {
             return ResponseEntity.badRequest().body(result.getErrorMessage());

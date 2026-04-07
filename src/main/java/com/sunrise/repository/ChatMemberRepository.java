@@ -28,8 +28,11 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
     void saveOrRestoreChatMembers(@Param("chatId") long chatId, @Param("userIds") Long[] userIds, @Param("isAdminFlags") Boolean[] isAdminFlags);
 
     @Modifying
-    @Query("UPDATE ChatMember cm SET cm.isAdmin = :isAdmin " +
-            "WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false")
+    @Transactional
+    @Query("""
+           UPDATE ChatMember cm
+           SET cm.isAdmin = :isAdmin
+           WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false""")
     int updateAdminRights(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isAdmin") boolean isAdmin);
 
     @Modifying
@@ -49,6 +52,7 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
            SELECT cm.id.userId FROM ChatMember cm
            WHERE cm.id.chatId = :chatId AND cm.isDeleted = false
            AND (:cursor IS NULL OR cm.id.userId < :cursor)
-           ORDER BY cm.id.userId DESC""")
+           ORDER BY cm.id.userId DESC
+           """)
     List<Long> getChatMemberIdsPage(@Param("chatId") long chatId, @Param("cursor") Long cursor, Pageable pageable);
 }

@@ -2,13 +2,13 @@ package com.sunrise.entity.db;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
-import lombok.*;
 
+@lombok.Getter
+@lombok.Setter
+@lombok.NoArgsConstructor
+@lombok.AllArgsConstructor
+@lombok.EqualsAndHashCode
 @Embeddable
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@EqualsAndHashCode
 public class UserChatReadStatusId {
     @Column(name = "chat_id", nullable = false)
     private Long chatId;

@@ -12,7 +12,7 @@ public class FullChatDTO {
     private Long opponentId; // Только для личных чатов
     private int membersCount;
     private int deletedMembersCount;
-    private LightMessageDTO lastMessage;
+    private MessageDTO lastMessage;
     private LocalDateTime createdAt;
     private long createdBy;
     //private Integer unreadCount;

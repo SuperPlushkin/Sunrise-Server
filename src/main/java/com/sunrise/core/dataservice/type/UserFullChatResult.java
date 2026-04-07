@@ -9,9 +9,17 @@ public interface UserFullChatResult {
     Long getOpponentId();
     Integer getMembersCount();
     Integer getDeletedMembersCount();
-    UserMessageDBResult getLastMessage();
     LocalDateTime getCreatedAt();
     Long getCreatedBy();
     LocalDateTime getDeletedAt();
     Boolean getIsDeleted();
+
+    Long getLastMessageId();
+    Long getLastMessageChatId();
+    Long getLastMessageSenderId();
+    String getLastMessageText();
+    LocalDateTime getLastMessageSentAt();
+    Long getLastMessageReadCount();
+    Boolean getLastMessageIsReadByUser();
+    Boolean getLastMessageIsDeleted();
 }

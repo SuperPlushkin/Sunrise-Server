@@ -19,8 +19,8 @@ public class CreateGroupChatRequest {
     )
     private String chatName;
 
+    @NotNull(message = "members is required")
     @Size(max = 100, message = "Group cannot have more than 100 members")
-    @JsonSetter(nulls = Nulls.AS_EMPTY)
     private Map<@NotNull(message = "User ID cannot be null")
                     @Min(value = 1, message = "User ID must be positive") Long,
                         @NotNull(message = "Admin flag cannot be null") Boolean> members;

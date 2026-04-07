@@ -5,10 +5,12 @@ import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
 
-@Entity
-@Cacheable(false)
+@lombok.Getter
+@lombok.Setter
 @lombok.NoArgsConstructor
 @lombok.AllArgsConstructor
+@Entity
+@Cacheable(false)
 @Table(name = "login_history")
 public class LoginHistory {
 

@@ -5,9 +5,7 @@ import java.time.LocalDateTime;
 @lombok.Setter
 @lombok.Getter
 @lombok.AllArgsConstructor
-public class UserProfileDTO {
+public class MessageReadStatusDTO {
     private long userId;
-    private String username;
-    private String name;
-    private LocalDateTime createdAt;
+    private LocalDateTime readAt;
 }
