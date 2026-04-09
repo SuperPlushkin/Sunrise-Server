@@ -6,8 +6,11 @@ import com.sunrise.core.service.result.*;
 import com.sunrise.core.service.ChatService;
 import com.sunrise.config.annotation.ValidId;
 
+import com.sunrise.entity.dto.ChatMembersPageDTO;
+import com.sunrise.entity.dto.UserChatsPageDTO;
 import jakarta.validation.Valid;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -15,146 +18,134 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 
 @Validated
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/chats")
 public class ChatController {
 
     private final ChatService chatService;
 
-    public ChatController(ChatService chatService) {
-        this.chatService = chatService;
-    }
-
     @PostMapping("/create-personal")
     public ResponseEntity<?> createPersonalChat(@RequestBody @Valid CreatePersonalChatRequest request, @CurrentUserId long userId) {
 
-        ChatCreationResult result = chatService.createPersonalChat(userId, request.getOtherUserId());
+        ResultOneArg<Long> result = chatService.createPersonalChat(userId, request.getOtherUserId());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "chat_id", result.getChatId()
-            ));
-        }
-        else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.ok(result.getResult());
+        } else {
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @PostMapping("/create-group")
     public ResponseEntity<?> createGroupChat(@RequestBody @Valid CreateGroupChatRequest request, @CurrentUserId long userId) {
 
-        ChatCreationResult result = chatService.createGroupChat(
+        ResultOneArg<Long> result = chatService.createGroupChat(
             userId,
             request.getChatName().trim(),
             request.getMembers()
         );
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "chat_id", result.getChatId()
-            ));
+            return ResponseEntity.ok(result.getResult());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @PostMapping("/{chatId}/add-member")
     public ResponseEntity<?> addGroupMember(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMemberRequest request, @CurrentUserId long userId) {
 
-        SimpleResult result = chatService.addGroupMember(chatId, userId, request.getNewUserId());
+        ResultNoArgs result = chatService.addGroupMember(chatId, userId, request.getNewUserId());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok("User added to group successfully");
+            return ResponseEntity.ok(result.getOperationText());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @PostMapping("/{chatId}/add-members")
     public ResponseEntity<?> addGroupMembers(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMembersRequest request, @CurrentUserId long userId) {
 
-        SimpleResult result = chatService.addGroupMembers(chatId, userId, request.getMembers());
+        ResultNoArgs result = chatService.addGroupMembers(chatId, userId, request.getMembers());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok("User added to group successfully");
+            return ResponseEntity.ok(result.getOperationText());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @PostMapping("/{chatId}/admin-rights/{otherUserId}")
     public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
-        SimpleResult result = chatService.updateAdminRights(
-                chatId, userId, otherUserId, request.getIsAdmin()
+        ResultNoArgs result = chatService.updateAdminRights(
+            chatId, userId, otherUserId, request.getIsAdmin()
         );
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok("Successfully updated admin rights");
+            return ResponseEntity.ok(result.getOperationText());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @PostMapping("/{chatId}/leave")
     public ResponseEntity<?> leaveChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
-        SimpleResult result = chatService.leaveChat(chatId, userId);
+        ResultNoArgs result = chatService.leaveChat(chatId, userId);
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok("User leaved chat successfully");
+            return ResponseEntity.ok(result.getOperationText());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @DeleteMapping("/{chatId}")
     public ResponseEntity<?> deleteChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
-        SimpleResult result = chatService.deleteChat(chatId, userId);
+        ResultNoArgs result = chatService.deleteChat(chatId, userId);
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok("Chat successfully deleted");
+            return ResponseEntity.ok(result.getOperationText());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @GetMapping("/{chatId}/stats")
     public ResponseEntity<?> getChatStats(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
-        ChatStatsResult result = chatService.getChatStats(chatId, userId);
+        ResultOneArg<ChatStatsResult> result = chatService.getChatStats(chatId, userId);
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(Map.of(
-                "total_messages", result.getTotalMessages(),
-                "deleted_for_all", result.getDeletedForAll(),
-                "can_delete_for_all", result.getCanDeleteForAll()
-            ));
+            return ResponseEntity.ok(result.getResult());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @GetMapping("/{chatId}/members")
     public ResponseEntity<?> getChatMembersPage(@PathVariable @ValidId long chatId, @Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        ChatMembersResult result = chatService.getChatMembersPage(chatId, userId, request.getCursor(), request.getLimit());
+        ResultOneArg<ChatMembersPageDTO> result = chatService.getChatMembersPage(chatId, userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getPagination());
+            return ResponseEntity.ok(result.getResult());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 
     @GetMapping
     public ResponseEntity<?> getUserChatsPage(@Valid PaginationRequest request, @CurrentUserId long userId) {
 
-        UserChatsResult result = chatService.getUserChatsPage(userId, request.getCursor(), request.getLimit());
+        ResultOneArg<UserChatsPageDTO> result = chatService.getUserChatsPage(userId, request.getCursor(), request.getLimit());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getPagination());
+            return ResponseEntity.ok(result.getResult());
         } else {
-            return ResponseEntity.badRequest().body(result.getErrorMessage());
+            return ResponseEntity.badRequest().body(result.getError());
         }
     }
 }

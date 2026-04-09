@@ -1,6 +1,5 @@
-package com.sunrise.config;
+package com.sunrise.config.annotation;
 
-import com.sunrise.config.annotation.CurrentUserId;
 import org.springframework.core.MethodParameter;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;

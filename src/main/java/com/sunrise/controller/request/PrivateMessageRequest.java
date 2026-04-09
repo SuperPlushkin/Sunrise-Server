@@ -13,6 +13,9 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 public class PrivateMessageRequest {
+    @ValidId
+    private Long tempId;
+
     @NotBlank
     @Size(max = 10000)
     private String text;

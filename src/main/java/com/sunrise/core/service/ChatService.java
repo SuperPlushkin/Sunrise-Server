@@ -14,6 +14,7 @@ import com.sunrise.helpclass.ValidationException;
 
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -22,23 +23,22 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 
 @Slf4j
+@RequiredArgsConstructor
 @Service
-@AllArgsConstructor
 public class ChatService {
 
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
-    private final SimpMessagingTemplate messagingTemplate;
 
-    public ChatCreationResult createPersonalChat(long creatorId, long opponentId) {
+    public ResultOneArg<Long> createPersonalChat(long creatorId, long opponentId) {
 
         if (creatorId == opponentId)
-            return ChatCreationResult.error("Cannot create personal chat with yourself");
+            return ResultOneArg.error("Cannot create personal chat with yourself");
 
         // WRITE на будущий чат
         if (!lockManager.tryLockPersonalChatCreation(creatorId, opponentId))
-            return ChatCreationResult.error("Try again later");
+            return ResultOneArg.error("Try again later");
 
         try {
             validator.validateActiveUser(creatorId);
@@ -52,7 +52,7 @@ public class ChatService {
                     dataOrchestrator.restoreChat(chat.getId());
                     log.info("[🔧] ✅ Restored personal chat {} between users {} and {}", chat.getId(), creatorId, opponentId);
                 }
-                return ChatCreationResult.success(chat.getId());
+                return ResultOneArg.success(chat.getId());
             }
 
             long chatId = SimpleSnowflakeId.nextId();
@@ -64,21 +64,21 @@ public class ChatService {
             dataOrchestrator.savePersonalChatAndAddPerson(chat, creator, opponent);
 
             log.info("[🔧] ✅ Created personal chat {} between users {} and {}", chatId, creatorId, opponentId);
-            return ChatCreationResult.success(chatId);
+            return ResultOneArg.success(chatId);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to create personal chat: {}", e.getMessage());
-            return ChatCreationResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error creating personal chat: {}", e.getMessage());
-            return ChatCreationResult.error("CreatePersonalChat failed due to server error");
+            return ResultOneArg.error("CreatePersonalChat failed due to server error");
         }
         finally {
             lockManager.unLockPersonalChatCreation(creatorId, opponentId);
         }
     }
-    public ChatCreationResult createGroupChat(long creatorId, @NotNull String chatName, @NotNull Map<Long, Boolean> usersToAdd) {
+    public ResultOneArg<Long> createGroupChat(long creatorId, @NotNull String chatName, @NotNull Map<Long, Boolean> usersToAdd) {
         try {
             if (usersToAdd.containsKey(creatorId)) {
                 throw new ValidationException("Creator cannot be in usersToAdd list");
@@ -100,19 +100,19 @@ public class ChatService {
             dataOrchestrator.saveGroupChatAndAddPeople(chat, chatMembers);
 
             log.info("[🔧] ✅ Created group chat {} '{}' with {} members by creator {}", chatId, chatName, usersToAdd.size(), creatorId);
-            return ChatCreationResult.success(chatId);
+            return ResultOneArg.success(chatId);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to create group chat: {}", e.getMessage());
-            return ChatCreationResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error creating group chat: {}", e.getMessage());
-            return ChatCreationResult.error("CreateGroupChat failed due to server error");
+            return ResultOneArg.error("CreateGroupChat failed due to server error");
         }
     }
 
-    public SimpleResult addGroupMember(long chatId, long inviterId, long opponentId) {
+    public ResultNoArgs addGroupMember(long chatId, long inviterId, long opponentId) {
         try {
             if (inviterId == opponentId) {
                 throw new ValidationException("Cannot add yourself to the chat");
@@ -123,18 +123,18 @@ public class ChatService {
             dataOrchestrator.saveOrRestoreChatMember(LightChatMemberDTO.create(chatId, opponentId, false));
 
             log.info("[🔧] ✅ User {} added user {} to group chat {}", inviterId, opponentId, chatId);
-            return SimpleResult.success();
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to add member to chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error adding member to chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error("AddGroupMember failed due to server error");
+            return ResultNoArgs.error("AddGroupMember failed due to server error");
         }
     }
-    public SimpleResult addGroupMembers(long chatId, long inviterId, @NotNull Map<Long, Boolean> usersToAdd) {
+    public ResultNoArgs addGroupMembers(long chatId, long inviterId, @NotNull Map<Long, Boolean> usersToAdd) {
         try {
             if (usersToAdd.containsKey(inviterId)) {
                 throw new ValidationException("Cannot add yourself to the chat");
@@ -152,19 +152,19 @@ public class ChatService {
             dataOrchestrator.saveChatMembers(chatId, members);
 
             log.info("[🔧] ✅ User {} added users {} to group chat {}", inviterId, members, chatId);
-            return SimpleResult.success();
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to add members to chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error adding members to chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error("AddGroupMember failed due to server error");
+            return ResultNoArgs.error("AddGroupMember failed due to server error");
         }
     }
 
-    public SimpleResult updateAdminRights(long chatId, long adminId, long userToUpdate, boolean isAdmin) {
+    public ResultNoArgs updateAdminRights(long chatId, long adminId, long userToUpdate, boolean isAdmin) {
         try {
             if (adminId == userToUpdate) {
                 throw new ValidationException("Cannot update rights of yourself");
@@ -175,23 +175,23 @@ public class ChatService {
             dataOrchestrator.updateAdminRights(chatId, userToUpdate, isAdmin);
 
             log.info("[🔧] ✅ Updated admin rights for user {} by admin {} in group chat {}", userToUpdate, adminId, chatId);
-            return SimpleResult.success();
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to update admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error updating admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return SimpleResult.error("AddGroupMember failed due to server error");
+            return ResultNoArgs.error("AddGroupMember failed due to server error");
         }
     }
 
-    public SimpleResult leaveChat(long chatId, long userId) {
+    public ResultNoArgs leaveChat(long chatId, long userId) {
 
         // WRITE на чат
         if (!lockManager.tryLockLeaveChatOperation(chatId))
-            return SimpleResult.error("Try again later");
+            return ResultNoArgs.error("Try again later");
 
         try {
             LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
@@ -209,96 +209,98 @@ public class ChatService {
                 log.info("[🔧] ✅ User {} deleted personal chat {}", userId, chatId);
             }
 
-            return SimpleResult.success();
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to leave chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error leaving chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error("LeaveChat failed due to server error");
+            return ResultNoArgs.error("LeaveChat failed due to server error");
         }
         finally {
             lockManager.unLockLeaveChatOperation(chatId);
         }
     }
-    public SimpleResult deleteChat(long chatId, long userId) {
+    public ResultNoArgs deleteChat(long chatId, long userId) {
         try {
             validator.validateCanDeleteChat(chatId, userId);
 
             dataOrchestrator.deleteChat(chatId);
 
             log.info("[🔧] ✅ Admin {} deleted chat {}", userId, chatId);
-            return SimpleResult.success();
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to delete chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error deleting chat {}: {}", chatId, e.getMessage());
-            return SimpleResult.error("DeleteChat failed due to server error");
+            return ResultNoArgs.error("DeleteChat failed due to server error");
         }
     }
 
-    public UserChatsResult getUserChatsPage(long userId, Long cursor, int limit) {
+    public ResultOneArg<UserChatsPageDTO> getUserChatsPage(long userId, Long cursor, int limit) {
         try {
             validator.validateActiveUser(userId);
 
             UserChatsPageDTO chats = dataOrchestrator.getUserChatsPage(userId, cursor, limit);
 
             log.debug("[🔧] ✅ User {} got {} chats", userId, chats.chats().size());
-            return UserChatsResult.success(chats);
+            return ResultOneArg.success(chats);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get user {} chats: {}", userId, e.getMessage());
-            return UserChatsResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting user {} chats: {}", userId, e.getMessage());
-            return UserChatsResult.error("getUserChats failed due to server error");
+            return ResultOneArg.error("getUserChats failed due to server error");
         }
     }
-    public ChatMembersResult getChatMembersPage(long chatId, long userId, Long cursor, int limit) {
+    public ResultOneArg<ChatMembersPageDTO> getChatMembersPage(long chatId, long userId, Long cursor, int limit) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             ChatMembersPageDTO chatMembers = dataOrchestrator.getChatMembersPage(chatId, cursor, limit);
 
             log.debug("[🔧] ✅ User {} got {} members of chat {}", userId, chatMembers.chatMembers().size(), chatId);
-            return ChatMembersResult.success(chatMembers);
+            return ResultOneArg.success(chatMembers);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get chat {} members: {}", chatId, e.getMessage());
-            return ChatMembersResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting chat {} members: {}", chatId, e.getMessage());
-            return ChatMembersResult.error("getChatMembers failed due to server error");
+            return ResultOneArg.error("getChatMembers failed due to server error");
         }
     }
 
-    public ChatStatsResult getChatStats(long chatId, long userId) {
+    public ResultOneArg<ChatStatsResult> getChatStats(long chatId, long userId) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
             ChatStatsDBResult result = dataOrchestrator.getChatClearStats(chatId, userId);
 
             log.debug("[🔧] ✅ User {} viewed stats for chat {}", userId, chatId);
-            return ChatStatsResult.success(
+            return ResultOneArg.success(
+                new ChatStatsResult(
                     result.getTotalMessages(),
                     result.getDeletedForAll(),
                     result.getCanDeleteForAll()
+                )
             );
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get chat {} stats: {}", chatId, e.getMessage());
-            return ChatStatsResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting chat {} stats: {}", chatId, e.getMessage());
-            return ChatStatsResult.error("GetChatStats failed due to server error");
+            return ResultOneArg.error("GetChatStats failed due to server error");
         }
     }
 }

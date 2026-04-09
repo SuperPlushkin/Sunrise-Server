@@ -15,7 +15,7 @@ public class AsyncDBConfig {
     @Bean("dbExecutor")
     public Executor dbExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(1); // Всего один поток для последовательной обработки
+        executor.setCorePoolSize(1); // один поток
         executor.setMaxPoolSize(1);
         executor.setQueueCapacity(1000);
         executor.setThreadNamePrefix("db-queue-");

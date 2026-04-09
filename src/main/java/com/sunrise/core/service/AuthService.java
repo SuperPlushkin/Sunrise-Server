@@ -1,8 +1,6 @@
 package com.sunrise.core.service;
 
-import com.sunrise.core.service.result.TokenConfirmationResult;
-import com.sunrise.core.service.result.UserLoginResult;
-import com.sunrise.core.service.result.UserRegistrationResult;
+import com.sunrise.core.service.result.*;
 import com.sunrise.entity.dto.FullUserDTO;
 import com.sunrise.entity.dto.LoginHistoryDTO;
 import com.sunrise.entity.dto.VerificationTokenDTO;
@@ -15,6 +13,7 @@ import com.sunrise.helpclass.ValidationException;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -26,6 +25,7 @@ import java.util.Base64;
 import java.util.Optional;
 
 @Slf4j
+@RequiredArgsConstructor
 @Service
 public class AuthService {
 
@@ -35,18 +35,11 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-    public AuthService(DataOrchestrator dataOrchestrator, JwtUtil jwtUtil, EmailSender emailSender, LockManager lockManager) {
-        this.dataOrchestrator = dataOrchestrator;
-        this.jwtUtil = jwtUtil;
-        this.emailSender = emailSender;
-        this.lockManager = lockManager;
-    }
-
-    public UserRegistrationResult registerUser(String username, String name, String email, String password) {
+    public ResultOneArg<String> registerUser(String username, String name, String email, String password) {
 
         // пытаемся заблокировать регистрацию
         if (!lockManager.tryLockRegistration(username, email))
-            return UserRegistrationResult.error("Try again later");
+            return ResultOneArg.error("Try again later");
 
         try {
             if (dataOrchestrator.existsUserByUsername(username.trim()))
@@ -71,23 +64,22 @@ public class AuthService {
             emailSender.sendVerificationEmail(email, verificationTokenDTO.getToken());
 
             log.info("[🔧] ✅ User registered successfully --> {}", username);
-            return UserRegistrationResult.success(verificationTokenDTO.getToken());
+            return ResultOneArg.success("User registered successfully. Check your mail to activate your account!!!");
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to register user: {}", e.getMessage());
-            return UserRegistrationResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Registration failed for user {}: {}", username, e.getMessage());
-            return UserRegistrationResult.error("Registration failed due to server error");
+            return ResultOneArg.error("Registration failed due to server error");
         }
         finally {
             lockManager.unLockRegistration(username, email); // разблокируем регистрацию
         }
     }
-    public UserLoginResult authenticateUser(String username, String password, HttpServletRequest httpRequest) {
-        try
-        {
+    public ResultOneArg<UserLoginResult> authenticateUser(String username, String password, HttpServletRequest httpRequest) {
+        try {
             Optional<FullUserDTO> userOpt = dataOrchestrator.getUserByUsername(username);
             if (userOpt.isEmpty())
                 throw new ValidationException("Invalid username or password");
@@ -107,18 +99,18 @@ public class AuthService {
             String token = jwtUtil.generateToken(user.getId());
 
             log.info("[🔧] ✅ User logged in successfully --> {}", username);
-            return UserLoginResult.success(token, jwtUtil.getTokenExpirationTime(token));
+            return ResultOneArg.success(new UserLoginResult(token, jwtUtil.getTokenExpirationTime(token)));
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to authenticate user: {}", e.getMessage());
-            return UserLoginResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Authentication failed for user {}: {}", username, e.getMessage());
-            return UserLoginResult.error("Authentication failed");
+            return ResultOneArg.error("Authentication failed");
         }
     }
-    public TokenConfirmationResult confirmToken(String type, String token) {
+    public ResultOneArg<String> confirmToken(String type, String token) {
         try {
             if (token == null || token.trim().isEmpty())
                 throw new ValidationException("Token cannot be empty");
@@ -140,15 +132,15 @@ public class AuthService {
             dataOrchestrator.enableUser(userId);
 
             log.info("[🔧] ✅ Email verified successfully for user {}", userId);
-            return TokenConfirmationResult.success("Email successfully verified");
+            return ResultOneArg.success("Email successfully verified");
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to confirm token: {}", e.getMessage());
-            return TokenConfirmationResult.error(e.getMessage());
+            return ResultOneArg.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Token confirmation error: {}", e.getMessage());
-            return TokenConfirmationResult.error("Error during Token Confirmation: " + e.getMessage());
+            return ResultOneArg.error("Error during Token Confirmation: " + e.getMessage());
         }
     }
 

@@ -1,4 +1,4 @@
-package com.sunrise.config;
+package com.sunrise.config.websocket;
 
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.stereotype.Component;
@@ -9,12 +9,12 @@ import java.security.Principal;
 import java.util.Map;
 
 @Component
-public class UserIdHandshakeHandler extends DefaultHandshakeHandler {
+public class WsHandshakeHandler extends DefaultHandshakeHandler {
     @Override
     protected Principal determineUser(ServerHttpRequest request, WebSocketHandler wsHandler, Map<String, Object> attributes) {
-        Long userId = (Long) attributes.get("userId");
-        if (userId != null) {
-            return () -> String.valueOf(userId);
+        String sessionId = (String) attributes.get("sessionId");
+        if (sessionId != null) {
+            return () -> sessionId;
         }
         return null;
     }
