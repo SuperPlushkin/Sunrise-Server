@@ -1,7 +1,7 @@
 package com.sunrise.controller.request;
 
-import com.fasterxml.jackson.annotation.JsonSetter;
-import com.fasterxml.jackson.annotation.Nulls;
+import com.sunrise.config.annotation.ValidId;
+import com.sunrise.core.dataservice.type.ChatType;
 import jakarta.validation.constraints.*;
 
 import java.util.Map;
@@ -11,6 +11,9 @@ import java.util.Map;
 @lombok.NoArgsConstructor
 public class CreateGroupChatRequest {
 
+    @ValidId
+    private Long tempId;
+
     @NotBlank(message = "chatName is required")
     @Size(min = 4, max = 30, message = "chatName must be between 4 and 30 characters")
     @Pattern(
@@ -18,6 +21,12 @@ public class CreateGroupChatRequest {
         message = "chatName must contain only letters, digits, and underscores"
     )
     private String chatName;
+
+    @Size(max = 500, message = "chatDescription mustn`t be more than 500 characters")
+    private String chatDescription;
+
+    @NotNull(message = "groupType is required")
+    private ChatType groupType;
 
     @NotNull(message = "members is required")
     @Size(max = 100, message = "Group cannot have more than 100 members")

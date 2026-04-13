@@ -1,5 +1,6 @@
 package com.sunrise.entity.db;
 
+import com.sunrise.core.dataservice.type.TokenType;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -22,12 +23,13 @@ public class VerificationToken {
     @Column(name = "token", nullable = false, unique = true)
     private String token;
 
+    @Column(name = "token_type", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TokenType tokenType;
+
     @Column(name = "expiry_date", nullable = false)
     private LocalDateTime expiryDate;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-
-    @Column(name = "token_type", nullable = false)
-    private String tokenType;
 }

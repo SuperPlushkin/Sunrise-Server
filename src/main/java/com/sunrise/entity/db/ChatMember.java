@@ -13,20 +13,31 @@ import java.time.LocalDateTime;
 public class ChatMember {
 
     @EmbeddedId
-    protected ChatMemberId id;
+    private ChatMemberId id;
+
+    @Column(name = "tag")
+    private String tag = null;
+
+    @Column(name = "settings_updated_at", nullable = false)
+    private LocalDateTime settingsUpdatedAt = LocalDateTime.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     @Column(name = "joined_at", nullable = false)
-    protected LocalDateTime joinedAt = LocalDateTime.now();
+    private LocalDateTime joinedAt = LocalDateTime.now();
+
+    @Column(name = "is_pinned", nullable = false)
+    private boolean isPinned = false;
 
     @Column(name = "is_admin", nullable = false)
-    protected boolean isAdmin = false;
+    private boolean isAdmin = false;
 
-    public boolean isActive() {
-        return !isDeleted;
-    }
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(name = "is_deleted",nullable = false)
-    protected boolean isDeleted = false;
+    private boolean isDeleted = false;
 
 
     public Long getChatId() {
@@ -35,5 +46,8 @@ public class ChatMember {
 
     public Long getUserId() {
         return id != null ? id.getUserId() : null;
+    }
+    public boolean isActive() {
+        return !isDeleted;
     }
 }

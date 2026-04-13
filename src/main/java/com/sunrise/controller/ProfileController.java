@@ -23,18 +23,17 @@ public class ProfileController {
 
     @PostMapping
     public ResponseEntity<?> updateProfile(@RequestBody @Valid ProfileUpdateRequest request, @CurrentUserId long userId) {
-        ResultOneArg<UserProfileDTO> result =
-                userService.updateProfile(userId, request.getUsername(), request.getName());
+        ResultNoArgs result = userService.updateProfile(userId, request.getUsername(), request.getName());
 
         if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getResult());
+            return ResponseEntity.ok(result.getOperationText());
         } else {
             return ResponseEntity.badRequest().body(result.getError());
         }
     }
     @DeleteMapping
     public ResponseEntity<?> deleteProfile(@CurrentUserId long userId) {
-        ResultNoArgs result = userService.deleteProfile(userId, userId);
+        ResultNoArgs result = userService.deleteUser(userId, userId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getOperationText());

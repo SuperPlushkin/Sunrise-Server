@@ -1,5 +1,6 @@
 package com.sunrise.entity.db;
 
+import com.sunrise.core.dataservice.type.ChatType;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
@@ -27,8 +28,13 @@ public class Chat {
     )
     protected String name;
 
-    @Column(name = "is_group", nullable = false)
-    protected boolean isGroup = false;
+    @Size(max = 500)
+    @Column(name = "description", length = 500)
+    protected String description;
+
+    @Column(name = "chat_type", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private ChatType chatType;
 
     @Column(name = "opponent_id")
     protected Long opponentId;
@@ -40,6 +46,9 @@ public class Chat {
     @Min(0)
     @Column(name = "deleted_members_count", nullable = false)
     protected int deletedMembersCount;
+
+    @Column(name = "updated_at", nullable = false)
+    protected LocalDateTime updatedAt = LocalDateTime.now();
 
     @Column(name = "created_at", nullable = false, updatable = false)
     protected LocalDateTime createdAt = LocalDateTime.now();
@@ -59,5 +68,9 @@ public class Chat {
     }
     public boolean isActive() {
         return !isDeleted;
+    }
+
+    public boolean isNotPersonal(){
+        return chatType.isNotPersonal();
     }
 }

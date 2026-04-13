@@ -24,15 +24,21 @@ public class Message {
     @Column(name = "text", nullable = false)
     private String text;
 
-    @Column(name = "sent_at", nullable = false)
-    private LocalDateTime sentAt = LocalDateTime.now();
-
     @Min(0)
     @Column(name = "read_count", nullable = false)
-    private long readCount = 0L;
+    private long readCount;
+
+    @Column(name = "sent_at", nullable = false)
+    private LocalDateTime sentAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(name = "is_deleted", nullable = false)
-    private boolean isDeleted = false;
+    private boolean isDeleted;
 
     public boolean isActive(){
         return !isDeleted;

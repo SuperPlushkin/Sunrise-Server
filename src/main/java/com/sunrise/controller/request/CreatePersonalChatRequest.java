@@ -11,5 +11,8 @@ import jakarta.validation.constraints.NotNull;
 public class CreatePersonalChatRequest {
 
     @ValidId
+    private Long tempId;
+
+    @ValidId
     private Long otherUserId;
 }

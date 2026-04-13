@@ -1,5 +1,7 @@
 package com.sunrise.entity.cache;
 
+import com.sunrise.core.dataservice.type.TokenType;
+
 import java.time.LocalDateTime;
 
 @lombok.Getter
@@ -9,9 +11,9 @@ public class CacheVerificationToken {
     private long id;
     private long userId;
     private String token;
+    private TokenType tokenType;
     private LocalDateTime expiryDate;
     private LocalDateTime createdAt;
-    private String tokenType;
 
     public static CacheVerificationToken copy(CacheVerificationToken token) {
         if (token == null) return null;
@@ -20,9 +22,9 @@ public class CacheVerificationToken {
             token.getId(),
             token.getUserId(),
             token.getToken(),
+            token.getTokenType(),
             token.getExpiryDate(),
-            token.getCreatedAt(),
-            token.getTokenType()
+            token.getCreatedAt()
         );
     }
 }

@@ -4,7 +4,6 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import java.time.LocalDateTime;
 
-
 @lombok.Getter
 @lombok.Setter
 @lombok.NoArgsConstructor
@@ -33,11 +32,23 @@ public class User {
     @Column(name = "last_login")
     private LocalDateTime lastLogin;
 
+    @Column(name = "profile_updated_at", nullable = false)
+    private LocalDateTime profileUpdatedAt = LocalDateTime.now();
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
+    @Column(name = "jwt_version", nullable = false)
+    private int jwtVersion = 1;
+
     @Column(name = "is_enabled", nullable = false)
-    private boolean isEnabled = true;
+    private boolean isEnabled = false;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(name = "is_deleted", nullable = false)
     private boolean isDeleted = false;

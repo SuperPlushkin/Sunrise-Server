@@ -87,19 +87,28 @@ public class DataValidator {
         return chat;
     }
 
+    public void validateCanUpdateChatInfo(long chatId, long userId) {
+        validateActiveUser(userId);
+        LightChatDTO chat = validateActiveChatAndGet(chatId);
+        if (chat.isPersonal()) {
+            throw new ValidationException("Chat info is not changeable for private chat");
+        }
+        validateActiveChatMemberIsAdmin(chatId, userId);
+    }
 
-    public void validateAddGroupMembers(long chatId, long inviterId, Set<Long> newUserIds) {
+    public void validateAddChatMembers(long chatId, long inviterId, Set<Long> newUserIds) {
         validateActiveUsers(inviterId, newUserIds);
         validateActiveGroupChat(chatId);
         validateActiveChatMemberIsAdmin(chatId, inviterId);
         newUserIds.forEach(id -> validateActiveChatMember(chatId, id));
     }
-    public void validateAddGroupMember(long chatId, long inviterId, long newUserId) {
+    public void validateAddChatMember(long chatId, long inviterId, long newUserId) {
         validateActiveUsers(inviterId, newUserId);
         validateActiveGroupChat(chatId);
         validateActiveChatMemberIsAdmin(chatId, inviterId);
         validateActiveChatMember(chatId, newUserId);
     }
+
     public void validateCanSendPrivateMessage(long chatId, long senderId, long userToSend) {
         validateActiveUsers(senderId, userToSend);
         validateActiveGroupChat(chatId);
@@ -122,6 +131,19 @@ public class DataValidator {
         }
     }
 
+    public void validateCanUpdateMessage(long chatId, long userId, long messageId) {
+        validateActiveUser(userId);
+        Optional<Boolean> isAdmin = dataOrchestrator.isActiveAdminInActiveChat(chatId, userId);
+        if (isAdmin.isEmpty()) {
+            throw new ValidationException("Member not exists or is deleted: " + messageId);
+        }
+
+        if (isAdmin.get()) {
+            validateActiveMessageInChat(chatId, messageId);
+        } else {
+            validateActiveMessageInChatAndIsSender(chatId, userId, messageId);
+        }
+    }
     public void validateCanDeleteMessage(long chatId, long userId, long messageId) {
         validateActiveUser(userId);
         Optional<Boolean> isAdmin = dataOrchestrator.isActiveAdminInActiveChat(chatId, userId);

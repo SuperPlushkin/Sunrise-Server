@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,41 +19,56 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, ChatMemb
 
     @Modifying
     @Transactional
-    @Query(value = "SELECT add_or_restore_chat_member(:chatId, :userId, :isAdmin)", nativeQuery = true)
-    void saveOrRestoreChatMember(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isAdmin") boolean isAdmin);
+    @Query(value = "SELECT add_or_restore_chat_member(:chatId, :userId, :isAdmin, :joinedAt, TRUE)", nativeQuery = true)
+    void saveOrRestore(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isAdmin") boolean isAdmin, @Param("joinedAt") LocalDateTime joinedAt);
 
     @Modifying
     @Transactional
-    @Query(value = "SELECT add_or_restore_chat_member(:chatId, user_id, is_admin) " +
+    @Query(value = "SELECT add_or_restore_chat_member(:chatId, user_id, is_admin, :joinedAt, TRUE) " +
                     "FROM unnest(:userIds, :isAdminFlags) AS t(user_id, is_admin)", nativeQuery = true)
-    void saveOrRestoreChatMembers(@Param("chatId") long chatId, @Param("userIds") Long[] userIds, @Param("isAdminFlags") Boolean[] isAdminFlags);
+    void saveOrRestoreBatch(@Param("chatId") long chatId, @Param("userIds") Long[] userIds, @Param("joinedAt") LocalDateTime joinedAt, @Param("isAdminFlags") Boolean[] isAdminFlags);
 
     @Modifying
     @Transactional
     @Query("""
            UPDATE ChatMember cm
-           SET cm.isAdmin = :isAdmin
-           WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false""")
-    int updateAdminRights(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isAdmin") boolean isAdmin);
+           SET cm.tag = :tag, cm.updatedAt = :updatedAt
+           WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId""")
+    int updateInfo(@Param("chatId") long chatId, @Param("userId") long userId, @Param("tag") String tag, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query(value = "SELECT remove_chat_member(:chatId, :userId)", nativeQuery = true)
-    boolean removeChatMember(@Param("chatId") long chatId, @Param("userId") long userId); // удален или нет
+    @Query("""
+           UPDATE ChatMember cm
+           SET cm.isAdmin = :isAdmin, cm.updatedAt = :updatedAt
+           WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId""")
+    int updateAdminRights(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isAdmin") boolean isAdmin, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query("""
+           UPDATE ChatMember cm
+           SET cm.isPinned = :isPinned, cm.settingsUpdatedAt = :updatedAt, cm.updatedAt = :updatedAt
+           WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId""")
+    int updateSettings(@Param("chatId") long chatId, @Param("userId") long userId, @Param("isPinned") boolean isPinned, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query(value = "SELECT remove_chat_member(:chatId, :userId, :updatedAt)", nativeQuery = true)
+    boolean remove(@Param("chatId") long chatId, @Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt); // удален или нет
 
     @Query("SELECT cm FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.id.userId = :userId AND cm.isDeleted = false")
-    Optional<ChatMember> getActiveChatMember(@Param("chatId") long chatId, @Param("userId") long userId);
+    Optional<ChatMember> getActive(@Param("chatId") long chatId, @Param("userId") long userId);
 
     @Query("SELECT cm FROM ChatMember cm " +
             "WHERE cm.id.chatId = :chatId AND cm.id.userId IN :userIds AND cm.isDeleted = false")
-    List<ChatMember> getActiveChatMembersByIds(@Param("chatId") long chatId, @Param("userIds") List<Long> userIds);
+    List<ChatMember> getActiveByIds(@Param("chatId") long chatId, @Param("userIds") List<Long> userIds);
 
     @Query("""
            SELECT cm.id.userId FROM ChatMember cm
            WHERE cm.id.chatId = :chatId AND cm.isDeleted = false
            AND (:cursor IS NULL OR cm.id.userId < :cursor)
-           ORDER BY cm.id.userId DESC
-           """)
-    List<Long> getChatMemberIdsPage(@Param("chatId") long chatId, @Param("cursor") Long cursor, Pageable pageable);
+           ORDER BY cm.id.userId DESC""")
+    List<Long> getIdsPage(@Param("chatId") long chatId, @Param("cursor") Long cursor, Pageable pageable);
 }

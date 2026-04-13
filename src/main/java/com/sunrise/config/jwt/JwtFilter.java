@@ -1,10 +1,12 @@
 package com.sunrise.config.jwt;
 
+import com.sunrise.core.dataservice.DataOrchestrator;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,18 +20,18 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
+@RequiredArgsConstructor
 @Component
 public class JwtFilter extends OncePerRequestFilter {
+
     private final JwtUtil jwtUtil;
+    private final DataOrchestrator dataOrchestrator;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     @Value("${app.jwt.no-jwt-endpoints}")
     private String[] excludedPaths;
-
-    public JwtFilter(JwtUtil jwtUtil) {
-        this.jwtUtil = jwtUtil;
-    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
@@ -46,8 +48,9 @@ public class JwtFilter extends OncePerRequestFilter {
             return;
         }
 
-        Long userId;
         String jwt;
+        Long userId;
+        Integer tokenVersion;
 
         try {
             jwt = authorizationHeader.substring(7);
@@ -57,6 +60,7 @@ public class JwtFilter extends OncePerRequestFilter {
             }
 
             userId = jwtUtil.extractUserId(jwt);
+            tokenVersion = jwtUtil.extractJwtVersion(jwt);
         } catch (Exception e) {
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "INVALID_TOKEN");
             return;
@@ -69,6 +73,12 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (!jwtUtil.validateToken(jwt)) {
             sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_VALIDATION_FAILED");
+            return;
+        }
+
+        Optional<Integer> jwtVersion = dataOrchestrator.getUserJwtVersion(userId);
+        if (tokenVersion == null || jwtVersion.isEmpty() || !tokenVersion.equals(jwtVersion.get())) {
+            sendErrorResponse(response, HttpServletResponse.SC_UNAUTHORIZED, "TOKEN_VERSION_MISMATCH");
             return;
         }
 

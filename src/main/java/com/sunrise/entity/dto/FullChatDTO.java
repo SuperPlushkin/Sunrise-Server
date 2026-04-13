@@ -1,5 +1,7 @@
 package com.sunrise.entity.dto;
 
+import com.sunrise.core.dataservice.type.ChatType;
+
 import java.time.LocalDateTime;
 
 @lombok.Setter
@@ -8,14 +10,16 @@ import java.time.LocalDateTime;
 public class FullChatDTO {
     private long id;
     private String name;
-    private boolean isGroup;
+    private String description;
+    private ChatType chatType;
     private Long opponentId; // Только для личных чатов
     private int membersCount;
     private int deletedMembersCount;
     private MessageDTO lastMessage;
+    private int unreadCount;
+    private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
     private long createdBy;
-    //private Integer unreadCount;
     private LocalDateTime deletedAt;
     private boolean isDeleted;
 }

@@ -1,5 +1,7 @@
 package com.sunrise.entity.cache;
 
+import com.sunrise.core.dataservice.type.ChatType;
+
 import java.time.LocalDateTime;
 
 @lombok.Getter
@@ -9,10 +11,12 @@ public class CacheChat {
 
     private long id;
     private String name;
-    private boolean isGroup;
+    private String description;
+    private ChatType chatType;
     private Long opponentId;
     private int membersCount;
     private int deletedMembersCount;
+    private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
     private long createdBy;
     private LocalDateTime deletedAt;
@@ -20,23 +24,39 @@ public class CacheChat {
 
     private final LocalDateTime cachedAt = LocalDateTime.now();
 
+    public void setChatType(ChatType chatType, LocalDateTime updatedAt) {
+        this.chatType = chatType;
+        this.updatedAt = updatedAt;
+    }
+    public void setChatInfo(String name, String description, LocalDateTime updatedAt) {
+        this.name = name;
+        this.description = description;
+        this.updatedAt = updatedAt;
+    }
+    public void delete(LocalDateTime updatedAt) {
+        this.deletedAt = updatedAt;
+        this.isDeleted = true;
+        this.updatedAt = updatedAt;
+    }
+    public void restore(LocalDateTime updatedAt) {
+        this.deletedAt = null;
+        this.isDeleted = false;
+        this.updatedAt = updatedAt;
+    }
+
     public boolean isActive() {
         return !isDeleted;
     }
-
-    public void delete() {
-        this.deletedAt = LocalDateTime.now();
-        this.isDeleted = true;
+    public boolean isPersonal(){
+        return chatType.isPersonal();
     }
-
-    public void restore() {
-        this.deletedAt = null;
-        this.isDeleted = false;
+    public boolean isNotPersonal(){
+        return !chatType.isPersonal();
     }
 
     public void updateFromCache(CacheChat cacheChat) {
         this.name = cacheChat.getName();
-        this.isGroup = cacheChat.isGroup();
+        this.chatType = cacheChat.getChatType();
         this.opponentId = cacheChat.getOpponentId();
         this.deletedMembersCount = cacheChat.getDeletedMembersCount();
         this.membersCount = cacheChat.getMembersCount();
@@ -52,10 +72,12 @@ public class CacheChat {
         return new CacheChat(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),

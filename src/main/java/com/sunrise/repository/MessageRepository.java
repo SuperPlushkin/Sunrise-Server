@@ -26,9 +26,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.chatId AS chatId,
                m.senderId AS senderId,
                m.text AS text,
-               m.sentAt AS sentAt,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
+               m.sentAt AS sentAt,
+               m.updatedAt as updatedAt,
+               m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
            LEFT JOIN UserChatReadStatus ucrs
@@ -44,9 +46,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.chatId AS chatId,
                m.senderId AS senderId,
                m.text AS text,
-               m.sentAt AS sentAt,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
+               m.sentAt AS sentAt,
+               m.updatedAt as updatedAt,
+               m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
            LEFT JOIN UserChatReadStatus ucrs
@@ -63,9 +67,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.chatId AS chatId,
                m.senderId AS senderId,
                m.text AS text,
-               m.sentAt AS sentAt,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
+               m.sentAt AS sentAt,
+               m.updatedAt as updatedAt,
+               m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
            LEFT JOIN UserChatReadStatus ucrs
@@ -81,9 +87,11 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.chatId AS chatId,
                m.senderId AS senderId,
                m.text AS text,
-               m.sentAt AS sentAt,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
+               m.sentAt AS sentAt,
+               m.updatedAt as updatedAt,
+               m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
            LEFT JOIN UserChatReadStatus ucrs
@@ -94,6 +102,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
     List<UserMessageDBResult> getMessagePageAfter(@Param("chatId") long chatId, @Param("userId") long userId, @Param("cursor") long cursor, Pageable pageable);
 
 
+    @Modifying
     @Transactional
     @Query(value = "SELECT mark_messages_up_to_read(:chatId, :userId, :messageId, :readAt, CAST(:interval AS INTERVAL))", nativeQuery = true)
     void markMessagesUpToRead(@Param("chatId") long chatId, @Param("userId") long userId, @Param("messageId") long messageId,
@@ -101,13 +110,18 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE Message m SET m.isDeleted = false WHERE m.id = :messageId")
-    int restoreMessage(@Param("messageId") long messageId);
+    @Query("UPDATE Message m SET m.text = :newText, m.updatedAt = :updatedAt WHERE m.id = :messageId")
+    int updateMessage(@Param("messageId") long messageId, @Param("newText") String text, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE Message m SET m.isDeleted = true WHERE m.id = :messageId")
-    int deleteMessage(@Param("messageId") long messageId);
+    @Query("UPDATE Message m SET m.isDeleted = false, m.deletedAt = null, m.updatedAt = :updatedAt WHERE m.id = :messageId")
+    int restoreMessage(@Param("messageId") long messageId, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE Message m SET m.isDeleted = true, m.deletedAt = :updatedAt, m.updatedAt = :updatedAt WHERE m.id = :messageId")
+    int deleteMessage(@Param("messageId") long messageId, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Query("SELECT mrs.id.userId as userId, mrs.readAt as readAt FROM MessageReadStatus mrs WHERE mrs.id.messageId = :messageId ORDER BY mrs.readAt")
     List<MessageReadStatusResult> getMessageReaders(@Param("messageId") long messageId);

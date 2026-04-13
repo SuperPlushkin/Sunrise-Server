@@ -1,25 +1,28 @@
 package com.sunrise.core.service;
 
-import com.sunrise.core.service.result.*;
-import com.sunrise.entity.dto.ChatMembersPageDTO;
-import com.sunrise.core.dataservice.type.ChatStatsDBResult;
-import com.sunrise.entity.dto.UserChatsPageDTO;
+import com.sunrise.entity.dto.FullChatDTO;
+import com.sunrise.entity.pagination.UserChatsPageDTO;
 import com.sunrise.entity.dto.LightChatDTO;
-import com.sunrise.entity.dto.LightChatMemberDTO;
+import com.sunrise.entity.dto.ChatMemberDTO;
+
 import com.sunrise.core.dataservice.DataOrchestrator;
 import com.sunrise.core.dataservice.DataValidator;
 import com.sunrise.core.dataservice.LockManager;
+import com.sunrise.core.dataservice.type.ChatType;
+import com.sunrise.core.dataservice.type.ChatStatsDBResult;
+import com.sunrise.core.notifier.WebSocketNotifier;
+import com.sunrise.core.service.result.*;
+
 import com.sunrise.helpclass.SimpleSnowflakeId;
 import com.sunrise.helpclass.ValidationException;
 
 import jakarta.validation.constraints.NotNull;
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Slf4j
@@ -30,8 +33,9 @@ public class ChatService {
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
+    private final WebSocketNotifier wsNotify;
 
-    public ResultOneArg<Long> createPersonalChat(long creatorId, long opponentId) {
+    public ResultOneArg<Long> createPersonalChat(long tempId, long creatorId, long opponentId) {
 
         if (creatorId == opponentId)
             return ResultOneArg.error("Cannot create personal chat with yourself");
@@ -44,24 +48,29 @@ public class ChatService {
             validator.validateActiveUser(creatorId);
             validator.validateActiveUser(opponentId);
 
+            LocalDateTime createdAt = LocalDateTime.now();
             Optional<LightChatDTO> optChat = dataOrchestrator.getPersonalChat(creatorId, opponentId);
-            LightChatDTO chat;
             if (optChat.isPresent()){
-                chat = optChat.get();
+                LightChatDTO chat = optChat.get();
+                long chatId = chat.getId();
                 if (chat.isDeleted()) {
-                    dataOrchestrator.restoreChat(chat.getId());
-                    log.info("[🔧] ✅ Restored personal chat {} between users {} and {}", chat.getId(), creatorId, opponentId);
+                    dataOrchestrator.restoreChat(chatId, createdAt);
+                    log.info("[🔧] ✅ Restored personal chat {} between users {} and {}", chatId, creatorId, opponentId);
                 }
-                return ResultOneArg.success(chat.getId());
+                return ResultOneArg.success(chatId);
             }
 
             long chatId = SimpleSnowflakeId.nextId();
-            chat = LightChatDTO.createPrivate(chatId, creatorId, opponentId);
 
-            var creator = LightChatMemberDTO.create(chatId, creatorId, false);
-            var opponent = LightChatMemberDTO.create(chatId, opponentId, false);
+            LightChatDTO chat = LightChatDTO.createPersonal(chatId, opponentId, createdAt, creatorId);
 
-            dataOrchestrator.savePersonalChatAndAddPerson(chat, creator, opponent);
+            var creator = ChatMemberDTO.create(chatId, creatorId, createdAt, false);
+            var opponent = ChatMemberDTO.create(chatId, opponentId, createdAt, false);
+
+            dataOrchestrator.savePersonalChatAndAddMembers(chat, creator, opponent);
+
+            // уведомить надо
+            wsNotify.notifyChatNew(tempId, chat, Set.of(creatorId, opponentId));
 
             log.info("[🔧] ✅ Created personal chat {} between users {} and {}", chatId, creatorId, opponentId);
             return ResultOneArg.success(chatId);
@@ -78,26 +87,43 @@ public class ChatService {
             lockManager.unLockPersonalChatCreation(creatorId, opponentId);
         }
     }
-    public ResultOneArg<Long> createGroupChat(long creatorId, @NotNull String chatName, @NotNull Map<Long, Boolean> usersToAdd) {
+    public ResultOneArg<Long> createGroupChat(long tempId, long creatorId, @NotNull String chatName, @NotNull String chatDescription, @NotNull ChatType chatType, @NotNull Map<Long, Boolean> usersToAdd) {
         try {
+            if (chatType.isPersonal()) {
+                throw new ValidationException("Cannot create group if chatType is personal");
+            }
+
             if (usersToAdd.containsKey(creatorId)) {
                 throw new ValidationException("Creator cannot be in usersToAdd list");
+            }
+
+            int membersCount = usersToAdd.size() + 1;
+            if (chatType.isMembersInBound(membersCount)) {
+                throw new ValidationException("Members not in bound of chatType --> " + chatType);
             }
 
             validator.validateActiveUsers(creatorId, usersToAdd.keySet());
 
             long chatId = SimpleSnowflakeId.nextId();
-            var chat = LightChatDTO.createGroup(chatId, chatName, creatorId);
+            LocalDateTime createdAt = LocalDateTime.now();
 
-            List<LightChatMemberDTO> chatMembers = new ArrayList<>(usersToAdd.size() + 1);
-            chatMembers.add(LightChatMemberDTO.create(chatId, creatorId, true));  // creator с правами админа
+            LightChatDTO chat = LightChatDTO.createGroup(chatId, chatName, chatDescription, chatType, membersCount, createdAt, creatorId);
+
+            var usersToNotify = new HashSet<>(usersToAdd.keySet());
+            List<ChatMemberDTO> chatMembers = new ArrayList<>(membersCount);
+            chatMembers.add(ChatMemberDTO.create(chatId, creatorId, createdAt, true));  // creator с правами админа
+            usersToNotify.add(creatorId);
 
             for (Map.Entry<Long, Boolean> entry : usersToAdd.entrySet()){
-                var chatMember = LightChatMemberDTO.create(chatId, entry.getKey(), entry.getValue());  // остальные без прав
+                var chatMember = ChatMemberDTO.create(chatId, entry.getKey(), createdAt, entry.getValue());  // остальные с правами хэш таблицы
                 chatMembers.add(chatMember);
+                usersToNotify.add(entry.getKey());
             }
 
-            dataOrchestrator.saveGroupChatAndAddPeople(chat, chatMembers);
+            dataOrchestrator.saveGroupChatAndAddMembers(chat, chatMembers);
+
+            // уведомить надо
+            wsNotify.notifyChatNew(tempId, chat, usersToNotify);
 
             log.info("[🔧] ✅ Created group chat {} '{}' with {} members by creator {}", chatId, chatName, usersToAdd.size(), creatorId);
             return ResultOneArg.success(chatId);
@@ -112,122 +138,75 @@ public class ChatService {
         }
     }
 
-    public ResultNoArgs addGroupMember(long chatId, long inviterId, long opponentId) {
+    public ResultNoArgs updateChatInfo(long chatId, long userId, String newName, String newDescription) {
         try {
-            if (inviterId == opponentId) {
-                throw new ValidationException("Cannot add yourself to the chat");
-            }
+            validator.validateCanUpdateChatInfo(chatId, userId);
 
-            validator.validateAddGroupMember(chatId, inviterId, opponentId);
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.updateChatInfo(chatId, newName, newDescription, updatedAt);
 
-            dataOrchestrator.saveOrRestoreChatMember(LightChatMemberDTO.create(chatId, opponentId, false));
+            // уведомить надо
+            wsNotify.notifyChatInfoUpdated(chatId, newName, newDescription, updatedAt);
 
-            log.info("[🔧] ✅ User {} added user {} to group chat {}", inviterId, opponentId, chatId);
+            log.info("[🔧] ✅ Chat info changed for chat {} by user {}", chatId, userId);
             return ResultNoArgs.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to add member to chat {}: {}", chatId, e.getMessage());
+        } catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to change chat info {}: {}", chatId, e.getMessage());
             return ResultNoArgs.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error adding member to chat {}: {}", chatId, e.getMessage());
-            return ResultNoArgs.error("AddGroupMember failed due to server error");
+        } catch (Exception e) {
+            log.error("[🔧] ⚠️ Error changing chat info {}: {}", chatId, e.getMessage());
+            return ResultNoArgs.error("ChangeChatInfo failed due to server error");
         }
     }
-    public ResultNoArgs addGroupMembers(long chatId, long inviterId, @NotNull Map<Long, Boolean> usersToAdd) {
-        try {
-            if (usersToAdd.containsKey(inviterId)) {
-                throw new ValidationException("Cannot add yourself to the chat");
-            }
-
-            validator.validateAddGroupMembers(chatId, inviterId, usersToAdd.keySet());
-
-            List<LightChatMemberDTO> members = new ArrayList<>(usersToAdd.size() + 1);
-            members.add(LightChatMemberDTO.create(chatId, inviterId, true));
-
-            for (Map.Entry<Long, Boolean> entry : usersToAdd.entrySet()){
-                members.add(LightChatMemberDTO.create(chatId, entry.getKey(), entry.getValue()));
-            }
-
-            dataOrchestrator.saveChatMembers(chatId, members);
-
-            log.info("[🔧] ✅ User {} added users {} to group chat {}", inviterId, members, chatId);
-            return ResultNoArgs.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to add members to chat {}: {}", chatId, e.getMessage());
-            return ResultNoArgs.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error adding members to chat {}: {}", chatId, e.getMessage());
-            return ResultNoArgs.error("AddGroupMember failed due to server error");
-        }
-    }
-
-    public ResultNoArgs updateAdminRights(long chatId, long adminId, long userToUpdate, boolean isAdmin) {
-        try {
-            if (adminId == userToUpdate) {
-                throw new ValidationException("Cannot update rights of yourself");
-            }
-
-            validator.validateActiveUsersInActiveChatAndOneIsAdmin(chatId, adminId, userToUpdate);
-
-            dataOrchestrator.updateAdminRights(chatId, userToUpdate, isAdmin);
-
-            log.info("[🔧] ✅ Updated admin rights for user {} by admin {} in group chat {}", userToUpdate, adminId, chatId);
-            return ResultNoArgs.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to update admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return ResultNoArgs.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error updating admin rights for user {} by admin {} in group chat {}: {}", userToUpdate, adminId, chatId, e.getMessage());
-            return ResultNoArgs.error("AddGroupMember failed due to server error");
-        }
-    }
-
-    public ResultNoArgs leaveChat(long chatId, long userId) {
-
-        // WRITE на чат
-        if (!lockManager.tryLockLeaveChatOperation(chatId))
-            return ResultNoArgs.error("Try again later");
-
+    public ResultNoArgs updateChatType(long chatId, long userId, ChatType newType) {
         try {
             LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
-            if (chat.isGroup()) {
-                if (chat.isMoreThenOneMember()) {
-                    dataOrchestrator.removeUserFromChat(chatId, userId);
-                    log.info("[🔧] ✅ {} {} left group chat {}", (userId == chat.getCreatedBy()) ? "Creator" : "User", userId, chatId);
-                } else {
-                    dataOrchestrator.deleteChat(chatId);
-                    log.info("[🔧] ✅ Last admin {} left group chat {}, chat deleted", userId, chatId);
-                }
+            if (chat.isPersonal()) {
+                throw new ValidationException("Cannot change type of personal chat");
             }
-            else {
-                dataOrchestrator.deleteChat(chatId);
-                log.info("[🔧] ✅ User {} deleted personal chat {}", userId, chatId);
+            if (!chat.isChangeable()) {
+                throw new ValidationException("This chat type cannot be changed");
             }
 
+            if (newType.isPersonal()) {
+                throw new ValidationException("Cannot change group chat to personal");
+            }
+            if (!newType.isChangeable()) {
+                throw new ValidationException("Invalid target type");
+            }
+
+            // Права: только администратор
+            Optional<Boolean> isAdmin = dataOrchestrator.isActiveAdminInActiveChat(chatId, userId);
+            if (isAdmin.isEmpty() || !isAdmin.get()) {
+                throw new ValidationException("Only admin can change chat type");
+            }
+
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.updateChatType(chatId, newType, updatedAt);
+
+            // уведомить надо
+            wsNotify.notifyChatTypeUpdated(chatId, newType, updatedAt);
+
+            log.info("[🔧] ✅ Chat {} type changed to {} by user {}", chatId, newType, userId);
             return ResultNoArgs.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to leave chat {}: {}", chatId, e.getMessage());
+        } catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to change chat type {}: {}", chatId, e.getMessage());
             return ResultNoArgs.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error leaving chat {}: {}", chatId, e.getMessage());
-            return ResultNoArgs.error("LeaveChat failed due to server error");
-        }
-        finally {
-            lockManager.unLockLeaveChatOperation(chatId);
+        } catch (Exception e) {
+            log.error("[🔧] ⚠️ Error changing chat type {}: {}", chatId, e.getMessage());
+            return ResultNoArgs.error("ChangeChatType failed due to server error");
         }
     }
+
     public ResultNoArgs deleteChat(long chatId, long userId) {
         try {
             validator.validateCanDeleteChat(chatId, userId);
 
-            dataOrchestrator.deleteChat(chatId);
+            LocalDateTime deletedAt = LocalDateTime.now();
+            dataOrchestrator.deleteChat(chatId, deletedAt);
+
+            // уведомить надо
+            wsNotify.notifyChatDeleted(chatId, deletedAt);
 
             log.info("[🔧] ✅ Admin {} deleted chat {}", userId, chatId);
             return ResultNoArgs.success();
@@ -242,11 +221,30 @@ public class ChatService {
         }
     }
 
-    public ResultOneArg<UserChatsPageDTO> getUserChatsPage(long userId, Long cursor, int limit) {
+    public ResultOneArg<FullChatDTO> getUserChat(long chatId, long userId) {
         try {
             validator.validateActiveUser(userId);
 
-            UserChatsPageDTO chats = dataOrchestrator.getUserChatsPage(userId, cursor, limit);
+            FullChatDTO chat = dataOrchestrator.getUserChat(chatId, userId)
+                    .orElseThrow(() -> new ValidationException("Chat is deleted or not found"));
+
+            log.debug("[🔧] ✅ User {} got chat {}", userId, chatId);
+            return ResultOneArg.success(chat);
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to get user {} chat {}: {}", userId, chatId, e.getMessage());
+            return ResultOneArg.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting user {} chat {}: {}", userId, chatId, e.getMessage());
+            return ResultOneArg.error("getUserChat failed due to server error");
+        }
+    }
+    public ResultOneArg<UserChatsPageDTO> getUserChatsPage(long userId, Boolean isPinnedCursor, Long lastMsgIdCursor, Long chatIdCursor, int limit) {
+        try {
+            validator.validateActiveUser(userId);
+
+            UserChatsPageDTO chats = dataOrchestrator.getUserChatsPage(userId, isPinnedCursor, lastMsgIdCursor, chatIdCursor, limit);
 
             log.debug("[🔧] ✅ User {} got {} chats", userId, chats.chats().size());
             return ResultOneArg.success(chats);
@@ -257,28 +255,9 @@ public class ChatService {
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting user {} chats: {}", userId, e.getMessage());
-            return ResultOneArg.error("getUserChats failed due to server error");
+            return ResultOneArg.error("getUserChatsPage failed due to server error");
         }
     }
-    public ResultOneArg<ChatMembersPageDTO> getChatMembersPage(long chatId, long userId, Long cursor, int limit) {
-        try {
-            validator.validateActiveChatMemberInActiveChat(chatId, userId);
-
-            ChatMembersPageDTO chatMembers = dataOrchestrator.getChatMembersPage(chatId, cursor, limit);
-
-            log.debug("[🔧] ✅ User {} got {} members of chat {}", userId, chatMembers.chatMembers().size(), chatId);
-            return ResultOneArg.success(chatMembers);
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed to get chat {} members: {}", chatId, e.getMessage());
-            return ResultOneArg.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error getting chat {} members: {}", chatId, e.getMessage());
-            return ResultOneArg.error("getChatMembers failed due to server error");
-        }
-    }
-
     public ResultOneArg<ChatStatsResult> getChatStats(long chatId, long userId) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
@@ -301,6 +280,18 @@ public class ChatService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error getting chat {} stats: {}", chatId, e.getMessage());
             return ResultOneArg.error("GetChatStats failed due to server error");
+        }
+    }
+    public ResultOneArg<Boolean> isActionsEnabledForChat(long chatId, long userId) {
+        try {
+            LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
+            return ResultOneArg.success(chat.isActionsEnabled());
+        } catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to get enabled actions for chat {}: {}", chatId, e.getMessage());
+            return ResultOneArg.error(e.getMessage());
+        } catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting enabled actions for chat {}: {}", chatId, e.getMessage());
+            return ResultOneArg.error("isActionsEnabledForChat failed due to server error");
         }
     }
 }

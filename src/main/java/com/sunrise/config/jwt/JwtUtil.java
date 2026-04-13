@@ -37,9 +37,9 @@ public class JwtUtil {
         this.secretKey = Keys.hmacShaKeyFor(secretBytes);
     }
 
-    public String generateToken(long userId) {
+    public String generateToken(long userId, int jwtVersion) {
         return Jwts.builder()
-                .setClaims(Map.of("userId", userId))
+                .setClaims(Map.of("userId", userId, "jwtVersion", jwtVersion))
                 .setSubject(String.valueOf(userId))
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + expiration * 1000))
@@ -62,8 +62,10 @@ public class JwtUtil {
     }
 
     public Long extractUserId(String token) {
-        Claims claims = getClaims(token);
-        return claims.get("userId", Long.class);
+        return getClaims(token).get("userId", Long.class);
+    }
+    public Integer extractJwtVersion(String token) {
+        return getClaims(token).get("jwtVersion", Integer.class);
     }
     private Claims getClaims(String token) {
         return Jwts.parserBuilder()

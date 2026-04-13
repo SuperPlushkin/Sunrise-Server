@@ -6,16 +6,14 @@ import com.sunrise.core.service.result.*;
 import com.sunrise.core.service.ChatService;
 import com.sunrise.config.annotation.ValidId;
 
-import com.sunrise.entity.dto.ChatMembersPageDTO;
-import com.sunrise.entity.dto.UserChatsPageDTO;
+import com.sunrise.entity.dto.FullChatDTO;
+import com.sunrise.entity.pagination.UserChatsPageDTO;
 import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @Validated
 @RequiredArgsConstructor
@@ -28,7 +26,7 @@ public class ChatController {
     @PostMapping("/create-personal")
     public ResponseEntity<?> createPersonalChat(@RequestBody @Valid CreatePersonalChatRequest request, @CurrentUserId long userId) {
 
-        ResultOneArg<Long> result = chatService.createPersonalChat(userId, request.getOtherUserId());
+        ResultOneArg<Long> result = chatService.createPersonalChat(request.getTempId(), userId, request.getOtherUserId());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());
@@ -41,8 +39,10 @@ public class ChatController {
     public ResponseEntity<?> createGroupChat(@RequestBody @Valid CreateGroupChatRequest request, @CurrentUserId long userId) {
 
         ResultOneArg<Long> result = chatService.createGroupChat(
-            userId,
+            request.getTempId(), userId,
             request.getChatName().trim(),
+            request.getChatDescription(),
+            request.getGroupType(),
             request.getMembers()
         );
 
@@ -53,34 +53,11 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/add-member")
-    public ResponseEntity<?> addGroupMember(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMemberRequest request, @CurrentUserId long userId) {
+    @PostMapping("/{chatId}/info")
+    public ResponseEntity<?> updateChatInfo(@PathVariable @ValidId long chatId, @RequestBody @Valid UpdateChatInfoRequest request, @CurrentUserId long userId) {
 
-        ResultNoArgs result = chatService.addGroupMember(chatId, userId, request.getNewUserId());
-
-        if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getOperationText());
-        } else {
-            return ResponseEntity.badRequest().body(result.getError());
-        }
-    }
-
-    @PostMapping("/{chatId}/add-members")
-    public ResponseEntity<?> addGroupMembers(@PathVariable @ValidId long chatId, @RequestBody @Valid AddGroupMembersRequest request, @CurrentUserId long userId) {
-
-        ResultNoArgs result = chatService.addGroupMembers(chatId, userId, request.getMembers());
-
-        if (result.isSuccess()) {
-            return ResponseEntity.ok(result.getOperationText());
-        } else {
-            return ResponseEntity.badRequest().body(result.getError());
-        }
-    }
-
-    @PostMapping("/{chatId}/admin-rights/{otherUserId}")
-    public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
-        ResultNoArgs result = chatService.updateAdminRights(
-            chatId, userId, otherUserId, request.getIsAdmin()
+        ResultNoArgs result = chatService.updateChatInfo(
+            chatId, userId, request.getChatName(), request.getChatDescription()
         );
 
         if (result.isSuccess()) {
@@ -90,10 +67,12 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/{chatId}/leave")
-    public ResponseEntity<?> leaveChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
+    @PostMapping("/{chatId}/chat-type")
+    public ResponseEntity<?> updateChatType(@PathVariable @ValidId long chatId, @RequestBody @Valid UpdateChatTypeRequest request, @CurrentUserId long userId) {
 
-        ResultNoArgs result = chatService.leaveChat(chatId, userId);
+        ResultNoArgs result = chatService.updateChatType(
+            chatId, userId, request.getGroupType()
+        );
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getOperationText());
@@ -125,10 +104,10 @@ public class ChatController {
         }
     }
 
-    @GetMapping("/{chatId}/members")
-    public ResponseEntity<?> getChatMembersPage(@PathVariable @ValidId long chatId, @Valid PaginationRequest request, @CurrentUserId long userId) {
+    @GetMapping("/{chatId}")
+    public ResponseEntity<?> getUserChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
-        ResultOneArg<ChatMembersPageDTO> result = chatService.getChatMembersPage(chatId, userId, request.getCursor(), request.getLimit());
+        ResultOneArg<FullChatDTO> result = chatService.getUserChat(chatId, userId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());
@@ -136,11 +115,13 @@ public class ChatController {
             return ResponseEntity.badRequest().body(result.getError());
         }
     }
-
     @GetMapping
-    public ResponseEntity<?> getUserChatsPage(@Valid PaginationRequest request, @CurrentUserId long userId) {
+    public ResponseEntity<?> getUserChatsPage(@Valid ChatPaginationRequest request, @CurrentUserId long userId) {
 
-        ResultOneArg<UserChatsPageDTO> result = chatService.getUserChatsPage(userId, request.getCursor(), request.getLimit());
+        ResultOneArg<UserChatsPageDTO> result = chatService.getUserChatsPage(
+            userId, request.getIsPinnedCursor(), request.getLastMsgIdCursor(),
+            request.getChatIdCursor(), request.getLimit()
+        );
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());

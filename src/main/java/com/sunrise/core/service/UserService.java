@@ -1,8 +1,9 @@
 package com.sunrise.core.service;
 
 import com.sunrise.core.dataservice.LockManager;
+import com.sunrise.core.notifier.WebSocketNotifier;
 import com.sunrise.core.service.result.*;
-import com.sunrise.entity.dto.UsersPageDTO;
+import com.sunrise.entity.pagination.UsersPageDTO;
 
 import com.sunrise.core.dataservice.DataOrchestrator;
 import com.sunrise.core.dataservice.DataValidator;
@@ -11,13 +12,12 @@ import com.sunrise.entity.dto.FullUserDTO;
 import com.sunrise.entity.dto.UserProfileDTO;
 import com.sunrise.helpclass.ValidationException;
 
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Slf4j
@@ -28,11 +28,12 @@ public class UserService {
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
     private final DataValidator validator;
+    private final WebSocketNotifier wsNotify;
 
-    public ResultOneArg<UserProfileDTO> updateProfile(long userId, String newUsername, String newName) {
+    public ResultNoArgs updateProfile(long userId, String newUsername, String newName) {
         // LOCK на username
         if (!lockManager.tryLockUsername(newUsername))
-            return ResultOneArg.error("Try again later");
+            return ResultNoArgs.error("Try again later");
 
         try {
             validator.validateActiveUser(userId);
@@ -53,25 +54,28 @@ public class UserService {
             }
 
             // Обновляем профиль
-            UserProfileDTO profile = new UserProfileDTO(userId, newUsername, newName, user.getCreatedAt());
-            dataOrchestrator.updateUserProfile(profile);
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.updateUserProfile(userId, newUsername, newName, updatedAt);
+
+            // уведомить всех надо об этом
+            wsNotify.notifyUserProfileUpdated(userId, newUsername, newName, updatedAt);
 
             log.info("[🔧] ✅ User {} updated profile", userId);
-            return ResultOneArg.success(profile);
+            return ResultNoArgs.success();
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to update profile for user {}: {}", userId, e.getMessage());
-            return ResultOneArg.error(e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
         }
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error updating profile for user {}: {}", userId, e.getMessage());
-            return ResultOneArg.error("Update profile failed due to server error");
+            return ResultNoArgs.error("Update profile failed due to server error");
         }
         finally {
             lockManager.unLockUsername(newUsername);
         }
     }
-    public ResultNoArgs deleteProfile(long userIdToDeleted, long userWhoDelete) {
+    public ResultNoArgs deleteUser(long userIdToDeleted, long userWhoDelete) {
         try {
             if (userIdToDeleted != userWhoDelete) {
                 validator.validateActiveUser(userWhoDelete);
@@ -79,7 +83,11 @@ public class UserService {
             validator.validateActiveUser(userIdToDeleted);
 
             // удаляем
-            dataOrchestrator.deleteUser(userIdToDeleted);
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.deleteUser(userIdToDeleted, updatedAt);
+
+            // уведомить всех надо об этом
+            wsNotify.notifyUserDeleted(userIdToDeleted, updatedAt);
 
             log.info("[🔧] ✅ User {} deleted profile {}", userWhoDelete, userIdToDeleted);
             return ResultNoArgs.success();

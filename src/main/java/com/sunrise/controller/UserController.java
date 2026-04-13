@@ -5,7 +5,7 @@ import com.sunrise.core.service.UserService;
 
 import com.sunrise.controller.request.PaginationRequest;
 import com.sunrise.core.service.result.ResultOneArg;
-import com.sunrise.entity.dto.UsersPageDTO;
+import com.sunrise.entity.pagination.UsersPageDTO;
 import jakarta.validation.Valid;
 
 import jakarta.validation.constraints.NotNull;

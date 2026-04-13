@@ -8,7 +8,7 @@ import jakarta.validation.constraints.Size;
 @lombok.Setter
 public class LoginRequest {
     @NotBlank(message = "Username is required")
-    @Size(min = 4, max = 30, message = "Username must be between 4 and 50 characters")
+    @Size(min = 4, max = 30, message = "Username must be between 4 and 30 characters")
     @Pattern(
         regexp = "^[a-zA-Z0-9_]+$",
         message = "Username must contain only letters, digits, and underscores"

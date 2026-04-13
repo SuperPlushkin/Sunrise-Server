@@ -40,21 +40,30 @@ public class DBService {
     public void saveUser(User user) {
         userRepository.save(user);
     }
-    public int deleteUser(long userId) {
-        return userRepository.deleteUser(userId);
-    }
-    public int restoreUser(long userId) {
-        return userRepository.restoreUser(userId);
-    }
     @Async("dbExecutor")
     public void updateLastLoginAsync(String username, LocalDateTime lastLogin) {
         userRepository.updateLastLogin(username, lastLogin);
     }
-    public int updateUserProfile(long userId, String username, String name) {
-        return userRepository.updateProfile(userId, username, name);
+    public int updateUserProfile(long userId, String username, String name, LocalDateTime updatedAt) {
+        return userRepository.updateProfile(userId, username, name, updatedAt);
     }
-    public int enableUser(long userId) {
-        return userRepository.enableUser(userId);
+    public int updateUserEmailAndGetJwtVersion(long userId, String email, LocalDateTime updatedAt) {
+        return userRepository.updateUserEmailAndGetJwtVersion(userId, email, updatedAt);
+    }
+    public int updateUserPasswordAndGetJwtVersion(long userId, String password, LocalDateTime updatedAt) {
+        return userRepository.updateUserPasswordAndGetJwtVersion(userId, password, updatedAt);
+    }
+    public int enableUser(long userId, LocalDateTime updatedAt) {
+        return userRepository.enableUser(userId, updatedAt);
+    }
+    public int disableUser(long userId, LocalDateTime updatedAt) {
+        return userRepository.disableUser(userId, updatedAt);
+    }
+    public int deleteUser(long userId, LocalDateTime updatedAt) {
+        return userRepository.deleteUser(userId, updatedAt);
+    }
+    public int restoreUser(long userId, LocalDateTime updatedAt) {
+        return userRepository.restoreUser(userId, updatedAt);
     }
 
 
@@ -83,32 +92,48 @@ public class DBService {
     // Основные методы
     public void saveGroupChat(Chat chat, Long[] memberIds, Boolean[] isAdminFlags) {
         chatRepository.saveGroupChatAndMembers(
-            chat.getId(), chat.getName(),
+            chat.getId(), chat.getName(), chat.getDescription(),
+            chat.getChatType().name(),
             memberIds, isAdminFlags,
             chat.getCreatedBy(), chat.getCreatedAt()
         );
     }
     public void savePersonalChat(Chat chat, long opponentId) {
-        chatRepository.savePersonalChatAndMembers(chat.getId(), chat.getCreatedBy(), opponentId, chat.getCreatedAt());
+        chatRepository.savePersonalChatAndMembers(
+            chat.getId(),
+            chat.getChatType().name(),
+            chat.getCreatedBy(), opponentId,
+            chat.getCreatedAt()
+        );
     }
 
-    public int restoreChat(long chatId) {
-        return chatRepository.restoreChat(chatId);
+    public int updateChatInfo(long chatId, String newName, String newDescription, LocalDateTime updatedAt) {
+        return chatRepository.updateChatInfo(chatId, newName, newDescription, updatedAt);
     }
-    public int deleteChat(long chatId) {
-        return chatRepository.deleteChat(chatId);
+    public int updateChatType(long chatId, ChatType newType, LocalDateTime updatedAt) {
+        return chatRepository.updateChatType(chatId, newType.name(), updatedAt);
+    }
+
+    public int restoreChat(long chatId, LocalDateTime updatedAt) {
+        return chatRepository.restoreChat(chatId, updatedAt);
+    }
+    public int deleteChat(long chatId, LocalDateTime updatedAt) {
+        return chatRepository.deleteChat(chatId, updatedAt);
     }
 
 
     // Вспомогательные методы
-    public Optional<Chat> getFullChat(long chatId) {
+    public Optional<Chat> getChat(long chatId) {
         return chatRepository.findById(chatId);
     }
-    public Optional<Chat> getFullPersonalChat(long userId1, long userId2) {
-        return chatRepository.getPersonalChat(userId1, userId2);
+    public Optional<Chat> getPersonalChat(long userId1, long userId2) {
+        return chatRepository.getPersonalChat(userId1, userId2, ChatType.PERSONAL);
     }
-    public List<UserFullChatResult> getFullUserChatsPage(long userId, Long cursor, int limit) {
-        return chatRepository.getUserChatsPage(userId, cursor, limit);
+    public List<UserChatResult> getUserChatsPage(long userId, Boolean isPinnedCursor, Long lastMsgIdCursor, Long chatIdCursor, int limit) {
+        return chatRepository.getUserChatsPage(userId, isPinnedCursor, lastMsgIdCursor, chatIdCursor, limit);
+    }
+    public Optional<UserChatResult> getUserChat(long chatId, long userId) {
+        return chatRepository.getUserChat(chatId, userId);
     }
 
 
@@ -116,17 +141,23 @@ public class DBService {
 
 
     // Основные методы
-    public int updateUserAdminRights(long chatId, long userId, boolean isAdmin) {
-        return chatMemberRepository.updateAdminRights(chatId, userId, isAdmin);
-    }
     public void upsertChatMember(ChatMember chatMember) {
-        chatMemberRepository.saveOrRestoreChatMember(chatMember.getChatId(), chatMember.getUserId(), chatMember.isAdmin());
+        chatMemberRepository.saveOrRestore(chatMember.getChatId(), chatMember.getUserId(), chatMember.isAdmin(), chatMember.getJoinedAt());
     }
-    public void upsertChatMembers(long chatId, Long[] memberIds, Boolean[] isAdminFlags) {
-        chatMemberRepository.saveOrRestoreChatMembers(chatId, memberIds, isAdminFlags);
+    public void upsertChatMembers(long chatId, Long[] memberIds, LocalDateTime joinedAt, Boolean[] isAdminFlags) {
+        chatMemberRepository.saveOrRestoreBatch(chatId, memberIds, joinedAt, isAdminFlags);
     }
-    public boolean removeUserFromChat(long userId, long chatId) {
-        return chatMemberRepository.removeChatMember(chatId, userId);
+    public int updateChatMemberInfo(long chatId, long userId, String tag, LocalDateTime updatedAt) {
+        return chatMemberRepository.updateInfo(chatId, userId, tag, updatedAt);
+    }
+    public int updateChatMemberAdminRights(long chatId, long userId, boolean isAdmin, LocalDateTime updatedAt) {
+        return chatMemberRepository.updateAdminRights(chatId, userId, isAdmin, updatedAt);
+    }
+    public int updateChatMemberSettings(long chatId, long userId, boolean isPinned, LocalDateTime updatedAt) {
+        return chatMemberRepository.updateSettings(chatId, userId, isPinned, updatedAt);
+    }
+    public boolean removeUserFromChat(long userId, long chatId, LocalDateTime updatedAt) {
+        return chatMemberRepository.remove(chatId, userId, updatedAt);
     }
 
 
@@ -135,14 +166,14 @@ public class DBService {
         return chatMemberRepository.findById(new ChatMemberId(chatId, userId));
     }
     public Optional<ChatMember> getActiveChatMember(long chatId, long userId) {
-        return chatMemberRepository.getActiveChatMember(chatId, userId);
+        return chatMemberRepository.getActive(chatId, userId);
     }
     public List<ChatMember> getActiveChatMembersByIds(long chatId, List<Long> missingIds) {
-        return chatMemberRepository.getActiveChatMembersByIds(chatId, missingIds);
+        return chatMemberRepository.getActiveByIds(chatId, missingIds);
     }
 
     public List<Long> getChatMemberIdsPage(long chatId, Long cursor, int limit) {
-        return chatMemberRepository.getChatMemberIdsPage(chatId, cursor, PageRequest.of(0, limit));
+        return chatMemberRepository.getIdsPage(chatId, cursor, PageRequest.of(0, limit));
     }
 
 
@@ -186,11 +217,14 @@ public class DBService {
     public void markMessagesUpToRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
         messageRepository.markMessagesUpToRead(chatId, userId, messageId, readAt, "7 days");
     }
-    public int restoreMessage(long messageId) {
-        return messageRepository.restoreMessage(messageId);
+    public int updateMessage(long messageId, String newText, LocalDateTime updatedAt) {
+        return messageRepository.updateMessage(messageId, newText, updatedAt);
     }
-    public int deleteMessage(long messageId) {
-        return messageRepository.deleteMessage(messageId);
+    public int restoreMessage(long messageId, LocalDateTime updatedAt) {
+        return messageRepository.restoreMessage(messageId, updatedAt);
+    }
+    public int deleteMessage(long messageId, LocalDateTime updatedAt) {
+        return messageRepository.deleteMessage(messageId, updatedAt);
     }
 
     // Вспомогательные методы

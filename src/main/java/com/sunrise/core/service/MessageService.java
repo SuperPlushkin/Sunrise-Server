@@ -1,9 +1,9 @@
 package com.sunrise.core.service;
 
-import com.sunrise.core.notifier.WsNotificationService;
+import com.sunrise.core.notifier.WebSocketNotifier;
 import com.sunrise.core.service.result.*;
 import com.sunrise.entity.dto.MessageReadStatusDTO;
-import com.sunrise.entity.dto.MessagesPageDTO;
+import com.sunrise.entity.pagination.MessagesPageDTO;
 import com.sunrise.entity.dto.MessageDTO;
 import com.sunrise.core.dataservice.DataOrchestrator;
 import com.sunrise.core.dataservice.type.Direction;
@@ -27,9 +27,9 @@ public class MessageService {
 
     private final DataValidator validator;
     private final DataOrchestrator dataOrchestrator;
-    private final WsNotificationService wsNotify;
+    private final WebSocketNotifier wsNotify;
 
-    public ResultOneArg<Long> makePublicMessage(long chatId, long senderId, long tempId, String text) {
+    public ResultOneArg<Long> makePublicMessage(long tempId, long chatId, long senderId, String text) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, senderId);
 
@@ -41,11 +41,11 @@ public class MessageService {
                 throw new ValidationException("Message text is too long");
             }
 
-            MessageDTO message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
+            MessageDTO message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text, LocalDateTime.now());
 
             dataOrchestrator.saveMessage(message);
 
-            // Отправляем сообщение в очередь на отправку всем участникам
+            // уведомить всех надо об этом
             wsNotify.notifyMessageNew(tempId, message);
 
             log.info("[🔧] ✅ User {} send public message {} in chat {}", senderId, message.getId(), chatId);
@@ -60,7 +60,7 @@ public class MessageService {
             return ResultOneArg.error("createPublicMessage failed due to server error");
         }
     }
-    public ResultOneArg<Long> makePrivateMessage(long chatId, long senderId, long userToSend, long tempId, String text) {
+    public ResultOneArg<Long> makePrivateMessage(long tempId, long chatId, long senderId, long userToSend, String text) {
         try {
             validator.validateCanSendPrivateMessage(chatId, senderId, userToSend);
 
@@ -73,10 +73,10 @@ public class MessageService {
                 throw new ValidationException("Message text is too long");
             }
 
-            MessageDTO message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text);
+            MessageDTO message = MessageDTO.create(SimpleSnowflakeId.nextId(), chatId, senderId, text, LocalDateTime.now());
 
-            // Отправляем приватное сообщение (при этом оно не хранится на сервере, надо удостовериться, что отослалось. Если нет - то ошибка)
-            wsNotify.notifyPrivateMessageNew(tempId, senderId, userToSend, message);
+            // уведомить всех надо об этом
+            wsNotify.notifyMessagePrivateNew(tempId, message, userToSend);
 
             log.info("[🔧] ✅ User {} send private message {} to user {} in chat {}", senderId, message.getId(), userToSend, chatId);
             return ResultOneArg.success(message.getId());
@@ -88,6 +88,51 @@ public class MessageService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error making private message: {}", e.getMessage());
             return ResultOneArg.error("createPrivateMessage failed due to server error");
+        }
+    }
+
+    public ResultNoArgs updateMessage(long chatId, long userId, long messageId, String newText) {
+        try {
+            validator.validateCanUpdateMessage(chatId, userId, messageId);
+
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.updateMessage(messageId, newText, updatedAt);
+
+            // уведомить всех надо об этом
+            wsNotify.notifyMessageInfoUpdated(chatId, messageId, newText, updatedAt);
+
+            log.info("[🔧] ✅ User {} updated message {} in chat {}", userId, messageId, chatId);
+            return ResultNoArgs.success();
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed updating message: {}", e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error updating message: {}", e.getMessage());
+            return ResultNoArgs.error("updateMessage failed due to server error");
+        }
+    }
+    public ResultNoArgs deleteMessage(long chatId, long userId, long messageId) {
+        try {
+            validator.validateCanDeleteMessage(chatId, userId, messageId);
+
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.deleteMessage(messageId, updatedAt);
+
+            // уведомить всех надо об этом
+            wsNotify.notifyMessageDeleted(chatId, messageId, updatedAt);
+
+            log.info("[🔧] ✅ User {} deleted message {} in chat {}", userId, messageId, chatId);
+            return ResultNoArgs.success();
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed deleting message: {}", e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error deleting message: {}", e.getMessage());
+            return ResultNoArgs.error("deleteMessage failed due to server error");
         }
     }
 
@@ -112,27 +157,6 @@ public class MessageService {
         catch (Exception e) {
             log.error("[🔧] ⚠️ Error marking message as read: {}", e.getMessage());
             return ResultNoArgs.error("MarkMessageAsRead failed due to server error");
-        }
-    }
-    public ResultNoArgs deleteMessage(long chatId, long userId, long messageId) {
-        try {
-            validator.validateCanDeleteMessage(chatId, userId, messageId);
-
-            dataOrchestrator.deleteMessage(chatId, messageId);
-
-            // уведомить всех надо об этом
-            wsNotify.notifyMessageDeleted(chatId, messageId);
-
-            log.info("[🔧] ✅ User {} deleted message {} in chat {}", userId, messageId, chatId);
-            return ResultNoArgs.success();
-        }
-        catch (ValidationException e) {
-            log.warn("[🔧] ☝️ Failed deleting message: {}", e.getMessage());
-            return ResultNoArgs.error(e.getMessage());
-        }
-        catch (Exception e) {
-            log.error("[🔧] ⚠️ Error deleting message: {}", e.getMessage());
-            return ResultNoArgs.error("deleteMessage failed due to server error");
         }
     }
 

@@ -20,5 +20,5 @@ public class MessageReadStatus {
     protected MessageReadStatusId id;
 
     @Column(name = "read_at", nullable = false)
-    private LocalDateTime readAt;
+    private LocalDateTime readAt = LocalDateTime.now();
 }

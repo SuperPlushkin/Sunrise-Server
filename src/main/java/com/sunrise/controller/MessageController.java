@@ -13,7 +13,7 @@ import com.sunrise.core.service.MessageService;
 
 import com.sunrise.entity.dto.MessageDTO;
 import com.sunrise.entity.dto.MessageReadStatusDTO;
-import com.sunrise.entity.dto.MessagesPageDTO;
+import com.sunrise.entity.pagination.MessagesPageDTO;
 import jakarta.validation.Valid;
 
 import jakarta.validation.constraints.NotNull;
@@ -36,7 +36,7 @@ public class MessageController {
     public ResponseEntity<?> sendPublicMessage(@PathVariable @ValidId long chatId,
                                                @RequestBody @Valid PublicMessageRequest request, @CurrentUserId long userId) {
 
-        ResultOneArg<Long> result = messageService.makePublicMessage(chatId, userId, request.getTempId(), request.getText());
+        ResultOneArg<Long> result = messageService.makePublicMessage(request.getTempId(), chatId, userId, request.getText());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());
@@ -49,7 +49,7 @@ public class MessageController {
     public ResponseEntity<?> sendPrivateMessage(@PathVariable @ValidId long chatId,
                                                 @RequestBody @Valid PrivateMessageRequest request, @CurrentUserId long userId) {
 
-        ResultOneArg<Long> result = messageService.makePrivateMessage(chatId, userId, request.getUserToSendId(), request.getTempId(), request.getText());
+        ResultOneArg<Long> result = messageService.makePrivateMessage(request.getTempId(), chatId, userId, request.getUserToSendId(), request.getText());
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());

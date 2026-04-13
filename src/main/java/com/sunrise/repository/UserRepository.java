@@ -22,28 +22,43 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.lastLogin = :lastLogin WHERE u.username = :username")
+    @Query("UPDATE User u SET u.lastLogin = :lastLogin, u.updatedAt = :lastLogin WHERE u.username = :username")
     void updateLastLogin(@Param("username") String username, @Param("lastLogin") LocalDateTime lastLogin);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.username = :username, u.name = :name WHERE u.id = :userId")
-    int updateProfile(@Param("userId") long userId, @Param("username") String username, @Param("name") String name);
+    @Query("UPDATE User u SET u.username = :username, u.name = :name, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    int updateProfile(@Param("userId") long userId, @Param("username") String username, @Param("name") String name, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isEnabled = true WHERE u.id = :userId")
-    int enableUser(@Param("userId") long userId);
+    @Query(value = "UPDATE users SET email = :email, jwt_version = jwt_version + 1, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int updateUserEmailAndGetJwtVersion(@Param("userId") long userId, @Param("email") String email, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isDeleted = true WHERE u.id = :userId")
-    int deleteUser(@Param("userId") long userId);
+    @Query(value = "UPDATE users SET hash_password = :password, jwt_version = jwt_version + 1, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int updateUserPasswordAndGetJwtVersion(@Param("userId") long userId, @Param("password") String password, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isDeleted = false WHERE u.id = :userId")
-    int restoreUser(@Param("userId") long userId);
+    @Query("UPDATE User u SET u.isEnabled = true, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    int enableUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.isEnabled = false, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    int disableUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.isDeleted = true, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    int deleteUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.isDeleted = false, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    int restoreUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
 
 
     // ========== ПОИСК ==========

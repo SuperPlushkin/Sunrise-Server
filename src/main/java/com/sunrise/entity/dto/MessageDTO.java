@@ -10,12 +10,14 @@ public class MessageDTO {
     private long chatId;
     private long senderId;
     private String text;
-    private LocalDateTime sentAt;
     private long readCount;
     private boolean readByUser;
-    private boolean hiddenByAdmin;
+    private LocalDateTime sentAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime deletedAt;
+    private boolean isDeleted;
 
-    public static MessageDTO create(long id, long chatId, long senderId, String text) {
-        return new MessageDTO(id, chatId, senderId, text, LocalDateTime.now(), 0L, false, false);
+    public static MessageDTO create(long id, long chatId, long senderId, String text, LocalDateTime createdAt) {
+        return new MessageDTO(id, chatId, senderId, text, 0L, false, createdAt, createdAt, null, false);
     }
 }

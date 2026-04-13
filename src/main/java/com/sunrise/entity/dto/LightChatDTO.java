@@ -1,6 +1,7 @@
 package com.sunrise.entity.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.sunrise.core.dataservice.type.ChatType;
 
 import java.time.LocalDateTime;
 
@@ -10,24 +11,38 @@ import java.time.LocalDateTime;
 public class LightChatDTO {
     private long id;
     private String name;
-    private boolean isGroup;
+    private String description;
+    private ChatType chatType;
     private Long opponentId;
     private int membersCount;
     private int deletedMembersCount;
+    private LocalDateTime updatedAt;
     private LocalDateTime createdAt;
     private long createdBy;
     private LocalDateTime deletedAt;
     private boolean isDeleted;
 
+    public static LightChatDTO createGroup(long id, String name, String description, ChatType type, int membersCount, LocalDateTime createdAt, long createdBy){
+        return new LightChatDTO(id, name, description, type, null, membersCount, 0, createdAt, createdAt, createdBy, null, false);
+    }
+    public static LightChatDTO createPersonal(long id, long opponentId, LocalDateTime createdAt, long createdBy){
+        return new LightChatDTO(id, null, null, ChatType.PERSONAL, opponentId, 2, 0, createdAt, createdAt, createdBy, null, false);
+    }
+
     @JsonIgnore
     public boolean isMoreThenOneMember() {
         return membersCount > 1;
     }
-
-    public static LightChatDTO createPrivate(long id, long createdBy, long opponentId){
-        return new LightChatDTO(id, null, false, opponentId, 0, 0, LocalDateTime.now(), createdBy, null, false);
+    @JsonIgnore
+    public boolean isPersonal() {
+        return chatType.isPersonal();
     }
-    public static LightChatDTO createGroup(long id, String name, long createdBy){
-        return new LightChatDTO(id, name, true, null, 0, 0, LocalDateTime.now(), createdBy, null, false);
+    @JsonIgnore
+    public boolean isChangeable() {
+        return chatType.isChangeable();
+    }
+    @JsonIgnore
+    public boolean isActionsEnabled() {
+        return chatType.isActionsEnabled();
     }
 }

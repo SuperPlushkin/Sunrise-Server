@@ -1,5 +1,6 @@
 package com.sunrise.core.dataservice;
 
+import com.sunrise.core.dataservice.type.ChatType;
 import com.sunrise.entity.cache.*;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -29,7 +30,7 @@ public class CacheService {
             .build();
 
     private final Cache<String, Long> usernameIndex = Caffeine.newBuilder() // username -> userId (для регистрации)
-            .maximumSize(150_000)
+            .maximumSize(100_000)
             .expireAfterAccess(1, TimeUnit.HOURS)
             .softValues()  // при нехватке памяти delete-аем
             .recordStats()
@@ -50,21 +51,21 @@ public class CacheService {
 
     private final Cache<String, Long> personalChatIndex = Caffeine.newBuilder() // "creatorId:userId" -> chatId (личные чаты)
             .maximumSize(100_000)
-            .expireAfterAccess(12, TimeUnit.HOURS)
+            .expireAfterAccess(1, TimeUnit.HOURS)
             .softValues() // при нехватке памяти delete-аем
             .recordStats()
             .build();
 
 
     // контейнеры участников чата
-    private final Cache<Long, CacheChatMembersContainer> chatMembersContainerCache = Caffeine.newBuilder() // chatId -> CacheChatMembersContainer (контейнер с участниками чата)
-            .maximumSize(200_000)
+    private final Cache<Long, CacheChatMembersContainer> chatMembersCache = Caffeine.newBuilder() // chatId -> CacheChatMembersContainer (контейнер с участниками чата)
+            .maximumSize(100_000)
             .expireAfterAccess(1, TimeUnit.HOURS)
             .recordStats()
             .build();
 
     private final Cache<Long, CacheMessage> messageCache = Caffeine.newBuilder() // messageId -> CacheMessage (сообщения)
-            .maximumSize(300_000)
+            .maximumSize(200_000)
             .expireAfterAccess(1, TimeUnit.HOURS)
             .recordStats()
             .build();
@@ -96,26 +97,6 @@ public class CacheService {
         emailIndex.put(user.getEmail().toLowerCase(), user.getId());
         log.debug("[⚡] Saved user {} in cache and updated indexes || saveUser", user.getId());
     }
-    public void deleteUser(long userId) {
-        getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.setDeleted(true);
-            log.debug("[⚡] Marked user {} as deleted in cache || deleteUser", userId);
-        });
-    }
-    public void restoreUser(long userId) {
-        getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.setDeleted(false);
-            log.debug("[⚡] Restored user {} in cache || restoreUser", userId);
-        });
-    }
-
-    // Вспомогательные методы
-    public void updateUserIsEnabled(long userId, boolean isEnabled) {
-        getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.setEnabled(isEnabled);
-            log.debug("[⚡] Updated user {} enabled status to {} in cache || updateUserIsEnabled", userId, isEnabled);
-        });
-    }
     public void updateUserLastLogin(String username, LocalDateTime lastLogin) {
         String key = username.toLowerCase();
         Long userId = usernameIndex.getIfPresent(key);
@@ -126,7 +107,7 @@ public class CacheService {
             log.debug("[⚡] Updated last login for user {} to {} || updateUserLastLogin", user.getId(), lastLogin);
         });
     }
-    public void updateUserProfile(long userId, String username, String name) {
+    public void updateUserProfile(long userId, String username, String name, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(user -> {
             // Обновляем username в индексе
             String oldUsername = user.getUsername();
@@ -137,12 +118,48 @@ public class CacheService {
             }
 
             // Обновляем данные пользователя
-            user.setUsername(username);
-            user.setName(name);
+            user.setUsernameAndName(username, name, updatedAt);
             log.debug("[⚡] Updated profile for user {}: username={}, name={} || updateUserProfile", userId, username, name);
         });
     }
+    public void updateUserEmailAndJwtVersion(long userId, String email, int newVersion, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(user -> {
+            user.setEmail(email, newVersion, updatedAt);
+            log.debug("[⚡] Updated email for user {} || updateUserEmailAndJwtVersion", userId);
+        });
+    }
+    public void updateUserPasswordAndJwtVersion(long userId, String password, int newVersion, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(user -> {
+            user.setEmail(password, newVersion, updatedAt);
+            log.debug("[⚡] Updated password for user {} || updateUserEmailAndJwtVersion", userId);
+        });
+    }
+    public void enableUser(long userId, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(cacheUser -> {
+            cacheUser.enable(updatedAt);
+            log.debug("[⚡] Enabled user {} in cache || enableUser", userId);
+        });
+    }
+    public void disableUser(long userId, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(cacheUser -> {
+            cacheUser.disable(updatedAt);
+            log.debug("[⚡] Disabled user  {} in cache || disableUser", userId);
+        });
+    }
+    public void deleteUser(long userId, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(cacheUser -> {
+            cacheUser.delete(updatedAt);
+            log.debug("[⚡] Marked user {} as deleted in cache || deleteUser", userId);
+        });
+    }
+    public void restoreUser(long userId, LocalDateTime updatedAt) {
+        getUserLink(userId).ifPresent(cacheUser -> {
+            cacheUser.restore(updatedAt);
+            log.debug("[⚡] Restored user {} in cache || restoreUser", userId);
+        });
+    }
 
+    // Вспомогательные методы
     public Map<Long, CacheUser> getCacheUsersByIds(Collection<Long> userIds, Collection<Long> missingIds) {
         Map<Long, CacheUser> result = new HashMap<>(userIds.size());
         for (Long userId : userIds) {
@@ -155,9 +172,6 @@ public class CacheService {
         }
         return result;
     }
-    public Optional<CacheUser> getUser(long userId) {
-        return Optional.ofNullable(CacheUser.copy(userCache.getIfPresent(userId)));
-    }
     public Optional<CacheUser> getUserByUsername(String username) {
         String key = username.toLowerCase();
         Long userId = usernameIndex.getIfPresent(key);
@@ -169,13 +183,13 @@ public class CacheService {
         }
         return user;
     }
+    public Optional<CacheUser> getUser(long userId) {
+        return Optional.ofNullable(CacheUser.copy(userCache.getIfPresent(userId)));
+    }
     private Optional<CacheUser> getUserLink(long userId) {
         return Optional.ofNullable(userCache.getIfPresent(userId));
     }
 
-    public boolean existsUser(long userId) {
-        return getUserLink(userId).isPresent();
-    }
     public boolean existsUserByUsername(String username) {
         return usernameIndex.getIfPresent(username.toLowerCase()) != null;
     }
@@ -195,7 +209,7 @@ public class CacheService {
                 oldChat.get().updateFromCache(newChat);
             } else {
                 chatInfoCache.put(newChat.getId(), CacheChat.copy(newChat));
-                if(!newChat.isGroup()) {
+                if (newChat.isPersonal()) {
                     savePersonalChatIndex(newChat.getId(), newChat.getCreatedBy(), newChat.getOpponentId());
                 }
             }
@@ -208,41 +222,58 @@ public class CacheService {
             oldChat.get().updateFromCache(newChat);
         } else {
             chatInfoCache.put(newChat.getId(), CacheChat.copy(newChat));
-            if(!newChat.isGroup()) {
+            if (newChat.isPersonal()) {
                 savePersonalChatIndex(newChat.getId(), newChat.getCreatedBy(), newChat.getOpponentId());
             }
         }
         log.debug("[⚡] Saved chat {} in cache and updated indexes || saveChat", newChat.getId());
     }
-    public void updateChatCreator(long chatId, long newCreatorId) {
-        getChatLink(chatId).ifPresent(chat -> {
-            chat.setCreatedBy(newCreatorId);
-            log.debug("[⚡] Updated chat {} creator to {} || updateChatCreator", chatId, newCreatorId);
-        });
+    public void saveChatAndAddMembers(CacheChat newChat, Collection<CacheChatMember> members) {
+        long chatId = newChat.getId();
 
-        getChatMembersContainer(chatId).ifPresent(container -> {
-            container.updateChatCreator(newCreatorId);
-            log.debug("[⚡] Updated members container for chat {} with new creator {} || updateChatCreator", chatId, newCreatorId);
+        // добавляем чат
+        Optional<CacheChat> oldChat = getChatLink(newChat.getId());
+        if (oldChat.isPresent()) {
+            oldChat.get().updateFromCache(newChat);
+        } else {
+            chatInfoCache.put(newChat.getId(), CacheChat.copy(newChat));
+            if (newChat.isPersonal()) {
+                savePersonalChatIndex(newChat.getId(), newChat.getCreatedBy(), newChat.getOpponentId());
+            }
+        }
+        log.debug("[⚡] Saved chat {} in cache and updated indexes || saveChatAndAddMembers", newChat.getId());
+
+        // добавляем участников
+        getOrCreateChatMembersContainer(chatId).addBatch(members);
+        log.debug("[⚡] Batch saved {} chat members in chat {} || saveChatAndAddMembers", members.size(), chatId);
+    }
+    public void updateChatInfo(long chatId, String newName, String newDescription, LocalDateTime updatedAt) {
+        getChatLink(chatId).ifPresent(chat -> {
+            chat.setChatInfo(newName, newDescription, updatedAt);
+            log.debug("[⚡] Updated chatName {} and chatDescription {} on chat {} || updateChatInfo", newName, newDescription, chatId);
         });
     }
-    public void deleteChat(long chatId) {
+    public void updateChatType(long chatId, ChatType newType, LocalDateTime updatedAt) {
         getChatLink(chatId).ifPresent(chat -> {
-            chat.delete();
+            chat.setChatType(newType, updatedAt);
+            log.debug("[⚡] Updated chatType {} on chat {} || updateChatCreator", newType, chatId);
+        });
+    }
+    public void deleteChat(long chatId, LocalDateTime updatedAt) {
+        getChatLink(chatId).ifPresent(chat -> {
+            chat.delete(updatedAt);
             log.debug("[⚡] Marked chat {} as deleted in cache || deleteChat", chatId);
         });
     }
-    public void restoreChat(long chatId) {
+    public void restoreChat(long chatId, LocalDateTime updatedAt) {
         getChatLink(chatId).ifPresent(chat -> {
-            chat.restore();
+            chat.restore(updatedAt);
             log.debug("[⚡] Restored chat {} in cache || restoreChat", chatId);
         });
     }
 
 
     // Вспомогательные методы
-    public Optional<CacheChat> getChat(long chatId) {
-        return Optional.ofNullable(CacheChat.copy(chatInfoCache.getIfPresent(chatId)));
-    }
     public Optional<CacheChat> getPersonalChat(long userId1, long userId2) {
         String key = getPersonalChatKey(userId1, userId2);
         Long chatId = personalChatIndex.getIfPresent(key);
@@ -252,6 +283,9 @@ public class CacheService {
         if (chat.isEmpty()) personalChatIndex.invalidate(key);
         return chat;
     }
+    public Optional<CacheChat> getChat(long chatId) {
+        return Optional.ofNullable(CacheChat.copy(chatInfoCache.getIfPresent(chatId)));
+    }
     private Optional<CacheChat> getChatLink(long chatId) {
         return Optional.ofNullable(chatInfoCache.getIfPresent(chatId));
     }
@@ -260,7 +294,7 @@ public class CacheService {
         return getChatLink(chatId).map(CacheChat::isActive);
     }
     public Optional<Boolean> isActiveGroupChat(long chatId) {
-        return getChatLink(chatId).filter(CacheChat::isActive).map(CacheChat::isGroup);
+        return getChatLink(chatId).filter(CacheChat::isActive).map(CacheChat::isNotPersonal);
     }
 
 
@@ -274,20 +308,20 @@ public class CacheService {
 
 
 
-    // ========== CHAT MEMBER METHODS ==========
+    // ========== CHAT MEMBER METHODS ========== TODO: СЧЕТЧИК НЕ ОБНОВЛЯЕТСЯ В ЧАТЕ
 
 
     // Основные методы
     private CacheChatMembersContainer getOrCreateChatMembersContainer(long chatId) {
-        return chatMembersContainerCache.get(chatId, key -> new CacheChatMembersContainer(chatId));
+        return chatMembersCache.get(chatId, key -> new CacheChatMembersContainer(chatId));
     }
     private Optional<CacheChatMembersContainer> getChatMembersContainer(long chatId) {
-        return Optional.ofNullable(chatMembersContainerCache.getIfPresent(chatId));
+        return Optional.ofNullable(chatMembersCache.getIfPresent(chatId));
     }
 
     public void saveChatMembers(long chatId, Collection<CacheChatMember> members) {
         // Обновляем контейнер
-        getOrCreateChatMembersContainer(chatId).addMembers(members);
+        getOrCreateChatMembersContainer(chatId).addBatch(members);
         log.debug("[⚡] Batch saved {} chat members in chat {} || saveChatMember", members.size(), chatId);
     }
     public void saveChatMember(CacheChatMember chatMember) {
@@ -295,26 +329,38 @@ public class CacheService {
         long userId = chatMember.getUserId();
 
         // Обновляем контейнер
-        getOrCreateChatMembersContainer(chatId).addMember(chatMember);
+        getOrCreateChatMembersContainer(chatId).add(chatMember);
         log.debug("[⚡] Saved chat member {} in chat {} || saveChatMember", userId, chatId);
     }
-    public void updateAdminRights(long chatId, long userId, boolean isAdmin) {
+    public void updateChatMemberInfo(long chatId, long userId, String tag, LocalDateTime updatedAt) {
         getChatMembersContainer(chatId).ifPresent(cont -> {
-            cont.updateAdminRights(userId, isAdmin);
+            cont.updateInfo(userId, tag, updatedAt);
+            log.debug("[⚡] Updated info for member {} in chat {} || updateAdminRights", userId, chatId);
+        });
+    }
+    public void updateChatMemberAdminRights(long chatId, long userId, boolean isAdmin, LocalDateTime updatedAt) {
+        getChatMembersContainer(chatId).ifPresent(cont -> {
+            cont.updateAdminRights(userId, isAdmin, updatedAt);
             log.debug("[⚡] Updated admin rights for member {} in chat {} || updateAdminRights", userId, chatId);
         });
     }
-    public void removeChatMember(long userId, long chatId) {
+    public void updateChatMemberSettings(long chatId, long userId, boolean isPinned, LocalDateTime updatedAt) {
+        getChatMembersContainer(chatId).ifPresent(cont -> {
+            cont.updateSettings(userId, isPinned, updatedAt);
+            log.debug("[⚡] Updated settings for member {} in chat {} || updateAdminRights", userId, chatId);
+        });
+    }
+    public void removeChatMember(long userId, long chatId, LocalDateTime updatedAt) {
         // Обновляем контейнер
         getChatMembersContainer(chatId).ifPresent(c -> {
-            c.markMemberAsDeleted(userId);
+            c.markMemberAsDeleted(userId, updatedAt);
             log.debug("[⚡] Marked member {} as deleted in chat {} || removeChatMember", userId, chatId);
         });
     }
-    public void restoreChatMember(long userId, long chatId, boolean isAdmin) {
+    public void restoreChatMember(long userId, long chatId, boolean isAdmin, LocalDateTime updatedAt) {
         // Обновляем контейнер
         getChatMembersContainer(chatId).ifPresent(c -> {
-            c.restoreMember(userId, isAdmin);
+            c.restoreMember(userId, isAdmin, updatedAt);
             log.debug("[⚡] Restored member {} in chat {} (isAdmin={}) || restoreChatMember", userId, chatId, isAdmin);
         });
     }
@@ -394,16 +440,16 @@ public class CacheService {
         }
         log.debug("[⚡] Batch saved {} messages to cache || saveMessages", messages.size());
     }
-    public void restoreMessage(long chatId, long messageId) {
+    public void restoreMessage(long messageId) {
         getMessageLink(messageId).ifPresent(message -> {
             message.restore();
-            log.debug("[⚡] Restored message {} in cache (chat={}) || restoreMessage", messageId, chatId);
+            log.debug("[⚡] Restored message {} in cache || restoreMessage", messageId);
         });
     }
-    public void deleteMessage(long chatId, long messageId) {
+    public void deleteMessage(long messageId, LocalDateTime deletedAt) {
         getMessageLink(messageId).ifPresent(message -> {
-            message.delete();
-            log.debug("[⚡] Deleted message {} in cache (chat={}) || deleteMessage", messageId, chatId);
+            message.delete(deletedAt);
+            log.debug("[⚡] Deleted message {} in cache || deleteMessage", messageId);
         });
     }
 
@@ -414,7 +460,6 @@ public class CacheService {
     private Optional<CacheMessage> getMessageLink(long messageId) {
         return Optional.ofNullable(messageCache.getIfPresent(messageId));
     }
-
 
 
     // ========== CACHE STATISTICS AND MANAGEMENT ==========
@@ -437,7 +482,7 @@ public class CacheService {
     public CacheStats getCacheStatus() {
         Map<Long, CacheUser> userCacheSnapshot = userCache.asMap();
         Map<Long, CacheChat> chatInfoCacheSnapshot = chatInfoCache.asMap();
-        Map<Long, CacheChatMembersContainer> containersSnapshot = chatMembersContainerCache.asMap();
+        Map<Long, CacheChatMembersContainer> containersSnapshot = chatMembersCache.asMap();
 
         long activatedUserCount = userCacheSnapshot.values().stream()
                 .filter(user -> !user.isDeleted() && user.isEnabled())
@@ -494,8 +539,8 @@ public class CacheService {
         stats.put("chatCache.missRate", chatStats.missRate());
         stats.put("chatCache.evictionCount", chatStats.evictionCount());
 
-        var containerStats = chatMembersContainerCache.stats();
-        stats.put("chatMembersContainerCache.estimatedSize", chatMembersContainerCache.estimatedSize());
+        var containerStats = chatMembersCache.stats();
+        stats.put("chatMembersContainerCache.estimatedSize", chatMembersCache.estimatedSize());
         stats.put("chatMembersContainerCache.hitRate", containerStats.hitRate());
         stats.put("chatMembersContainerCache.missRate", containerStats.missRate());
         stats.put("chatMembersContainerCache.evictionCount", containerStats.evictionCount());

@@ -1,4 +1,6 @@
-package com.sunrise.entity.dto;
+package com.sunrise.entity.pagination;
+
+import com.sunrise.entity.dto.FullChatDTO;
 
 import java.util.Map;
 

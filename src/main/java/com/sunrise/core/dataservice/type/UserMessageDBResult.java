@@ -7,8 +7,10 @@ public interface UserMessageDBResult {
     Long getChatId();
     Long getSenderId();
     String getText();
-    LocalDateTime getSentAt();
     Long getReadCount();
     Boolean getIsReadByUser();
+    LocalDateTime getSentAt();
+    LocalDateTime getUpdatedAt();
+    LocalDateTime getDeletedAt();
     Boolean getIsDeleted();
 }

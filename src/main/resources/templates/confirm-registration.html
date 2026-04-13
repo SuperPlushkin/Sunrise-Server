@@ -11,6 +11,7 @@
             --success-gradient: linear-gradient(135deg, #00b09b, #96c93d);
             --error-gradient: linear-gradient(135deg, #ff416c, #ff4b2b);
             --light-gradient: linear-gradient(135deg, #FFCC00 0%, #FF8C00 80%);
+            --medium-gradient: linear-gradient(135deg, #FFE066 0%, #FFB347 80%);
         }
 
         body {
@@ -43,7 +44,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            margin: 0;
+            background: var(--medium-gradient);
         }
 
         .status-success {
@@ -238,7 +239,6 @@
         <!-- Техническая информация -->
         <div class="footer-links">
             <small>
-                <span th:text="${type}"></span> •
                 <span th:text="${#dates.format(#dates.createNow(), 'dd.MM.yyyy HH:mm')}"></span>
             </small>
         </div>

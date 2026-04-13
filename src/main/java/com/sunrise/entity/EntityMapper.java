@@ -22,8 +22,12 @@ public class EntityMapper {
             user.getEmail(),
             user.getHashPassword(),
             user.getLastLogin(),
+            user.getProfileUpdatedAt(),
+            user.getUpdatedAt(),
             user.getCreatedAt(),
+            user.getJwtVersion(),
             user.isEnabled(),
+            user.getDeletedAt(),
             user.isDeleted()
         );
     }
@@ -31,15 +35,19 @@ public class EntityMapper {
         if (user == null) return null;
 
         return new CacheUser(
-                user.getId(),
-                user.getUsername(),
-                user.getName(),
-                user.getEmail(),
-                user.getHashPassword(),
-                user.getLastLogin(),
-                user.getCreatedAt(),
-                user.isEnabled(),
-                user.isDeleted()
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getEmail(),
+            user.getHashPassword(),
+            user.getLastLogin(),
+            user.getProfileUpdatedAt(),
+            user.getUpdatedAt(),
+            user.getCreatedAt(),
+            user.getJwtVersion(),
+            user.isEnabled(),
+            user.getDeletedAt(),
+            user.isDeleted()
         );
     }
 
@@ -47,50 +55,60 @@ public class EntityMapper {
         if (user == null) return null;
 
         return new User(
-                user.getId(),
-                user.getUsername(),
-                user.getName(),
-                user.getEmail(),
-                user.getHashPassword(),
-                user.getLastLogin(),
-                user.getCreatedAt(),
-                user.isEnabled(),
-                user.isDeleted()
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getEmail(),
+            user.getHashPassword(),
+            user.getLastLogin(),
+            user.getProfileUpdatedAt(),
+            user.getUpdatedAt(),
+            user.getCreatedAt(),
+            user.getJwtVersion(),
+            user.isEnabled(),
+            user.getDeletedAt(),
+            user.isDeleted()
         );
     }
-
 
     public static FullUserDTO toFullDTO(User user) {
         if (user == null) return null;
 
         return new FullUserDTO(
-                user.getId(),
-                user.getUsername(),
-                user.getName(),
-                user.getEmail(),
-                user.getHashPassword(),
-                user.getLastLogin(),
-                user.getCreatedAt(),
-                user.isEnabled(),
-                user.isDeleted()
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getEmail(),
+            user.getHashPassword(),
+            user.getLastLogin(),
+            user.getProfileUpdatedAt(),
+            user.getUpdatedAt(),
+            user.getCreatedAt(),
+            user.getJwtVersion(),
+            user.isEnabled(),
+            user.getDeletedAt(),
+            user.isDeleted()
         );
     }
     public static FullUserDTO toFullDTO(CacheUser user) {
         if (user == null) return null;
 
         return new FullUserDTO(
-                user.getId(),
-                user.getUsername(),
-                user.getName(),
-                user.getEmail(),
-                user.getHashPassword(),
-                user.getLastLogin(),
-                user.getCreatedAt(),
-                user.isEnabled(),
-                user.isDeleted()
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getEmail(),
+            user.getHashPassword(),
+            user.getLastLogin(),
+            user.getProfileUpdatedAt(),
+            user.getUpdatedAt(),
+            user.getCreatedAt(),
+            user.getJwtVersion(),
+            user.isEnabled(),
+            user.getDeletedAt(),
+            user.isDeleted()
         );
     }
-
 
     public static UserProfileDTO toUserProfileDTO(FullUserDTO user) {
         if (user == null) return null;
@@ -106,36 +124,40 @@ public class EntityMapper {
 
     // ========== CHAT ==========
 
-    public static CacheChat toCache(LightChatDTO chat) {
-        if (chat == null) return null;
-
-        return new CacheChat(
-            chat.getId(),
-            chat.getName(),
-            chat.isGroup(),
-            chat.getOpponentId(),
-            chat.getMembersCount(),
-            chat.getDeletedMembersCount(),
-            chat.getCreatedAt(),
-            chat.getCreatedBy(),
-            chat.getDeletedAt(),
-            chat.isDeleted()
-        );
-    }
     public static CacheChat toCache(Chat chat) {
         if (chat == null) return null;
 
         return new CacheChat(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),
             chat.isDeleted()
+        );
+    }
+    public static CacheChat toCache(LightChatDTO chat) {
+        if (chat == null) return null;
+
+        return new CacheChat(
+                chat.getId(),
+                chat.getName(),
+                chat.getDescription(),
+                chat.getChatType(),
+                chat.getOpponentId(),
+                chat.getMembersCount(),
+                chat.getDeletedMembersCount(),
+                chat.getUpdatedAt(),
+                chat.getCreatedAt(),
+                chat.getCreatedBy(),
+                chat.getDeletedAt(),
+                chat.isDeleted()
         );
     }
     public static CacheChat toCache(FullChatDTO chat) {
@@ -144,14 +166,34 @@ public class EntityMapper {
         return new CacheChat(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),
             chat.isDeleted()
+        );
+    }
+    public static CacheChat toCache(UserChatResult chat) {
+        if (chat == null) return null;
+
+        return new CacheChat(
+            chat.getId(),
+            chat.getName(),
+            chat.getDescription(),
+            ChatType.valueOf(chat.getChatType()),
+            chat.getOpponentId(),
+            chat.getMembersCount(),
+            chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
+            chat.getCreatedAt(),
+            chat.getCreatedBy(),
+            chat.getDeletedAt(),
+            chat.getIsDeleted()
         );
     }
 
@@ -161,10 +203,12 @@ public class EntityMapper {
         return new Chat(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),
@@ -178,10 +222,12 @@ public class EntityMapper {
         return new LightChatDTO(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),
@@ -194,10 +240,12 @@ public class EntityMapper {
         return new LightChatDTO(
             chat.getId(),
             chat.getName(),
-            chat.isGroup(),
+            chat.getDescription(),
+            chat.getChatType(),
             chat.getOpponentId(),
             chat.getMembersCount(),
             chat.getDeletedMembersCount(),
+            chat.getUpdatedAt(),
             chat.getCreatedAt(),
             chat.getCreatedBy(),
             chat.getDeletedAt(),
@@ -205,29 +253,34 @@ public class EntityMapper {
         );
     }
 
-    public static Map<Long, FullChatDTO> toFullDTOs(Collection<UserFullChatResult> chats, Map<Long, FullChatDTO> resultMap) {
+    public static Map<Long, FullChatDTO> toFullDTOs(Collection<UserChatResult> chats, Map<Long, FullChatDTO> resultMap) {
         if (chats == null) return null;
 
-        for (UserFullChatResult chat : chats){
+        for (UserChatResult chat : chats){
             MessageDTO msg = new MessageDTO(
                 chat.getLastMessageId(),
                 chat.getLastMessageChatId(),
                 chat.getLastMessageSenderId(),
                 chat.getLastMessageText(),
-                chat.getLastMessageSentAt(),
                 chat.getLastMessageReadCount(),
                 chat.getLastMessageIsReadByUser(),
+                chat.getLastMessageSentAt(),
+                chat.getLastMessageUpdatedAt(),
+                chat.getLastMessageDeletedAt(),
                 chat.getLastMessageIsDeleted()
             );
 
             resultMap.put(chat.getId(), new FullChatDTO(
                 chat.getId(),
                 chat.getName(),
-                chat.getIsGroup(),
+                chat.getDescription(),
+                ChatType.valueOf(chat.getChatType()),
                 chat.getOpponentId(),
                 chat.getMembersCount(),
                 chat.getDeletedMembersCount(),
                 msg,
+                chat.getUnreadMessagesCount(),
+                chat.getUpdatedAt(),
                 chat.getCreatedAt(),
                 chat.getCreatedBy(),
                 chat.getDeletedAt(),
@@ -235,6 +288,39 @@ public class EntityMapper {
             ));
         }
         return resultMap;
+    }
+    public static FullChatDTO toFullDTO(UserChatResult chat) {
+        if (chat == null) return null;
+
+        MessageDTO msg = new MessageDTO(
+            chat.getLastMessageId(),
+            chat.getLastMessageChatId(),
+            chat.getLastMessageSenderId(),
+            chat.getLastMessageText(),
+            chat.getLastMessageReadCount(),
+            chat.getLastMessageIsReadByUser(),
+            chat.getLastMessageSentAt(),
+            chat.getLastMessageUpdatedAt(),
+            chat.getLastMessageDeletedAt(),
+            chat.getLastMessageIsDeleted()
+        );
+
+        return new FullChatDTO(
+            chat.getId(),
+            chat.getName(),
+            chat.getDescription(),
+            ChatType.valueOf(chat.getChatType()),
+            chat.getOpponentId(),
+            chat.getMembersCount(),
+            chat.getDeletedMembersCount(),
+            msg,
+            chat.getUnreadMessagesCount(),
+            chat.getUpdatedAt(),
+            chat.getCreatedAt(),
+            chat.getCreatedBy(),
+            chat.getDeletedAt(),
+            chat.getIsDeleted()
+        );
     }
 
 
@@ -246,76 +332,92 @@ public class EntityMapper {
         return new CacheChatMember(
             member.getChatId(),
             member.getUserId(),
+            member.getTag(),
+            member.getSettingsUpdatedAt(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
+            member.isPinned(),
             member.isAdmin(),
+            member.getDeletedAt(),
             member.isDeleted()
         );
     }
-    public static CacheChatMember toCache(LightChatMemberDTO member) {
+    public static CacheChatMember toCache(ChatMemberDTO member) {
         if (member == null) return null;
 
         return new CacheChatMember(
             member.getChatId(),
             member.getUserId(),
+            member.getTag(),
+            member.getSettingsUpdatedAt(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
+            member.isPinned(),
             member.isAdmin(),
-            member.isDeleted()
-        );
-    }
-    public static CacheChatMember toCache(FullChatMemberDTO member) {
-        if (member == null) return null;
-
-        return new CacheChatMember(
-            member.getChatId(),
-            member.getUserId(),
-            member.getJoinedAt(),
-            member.isAdmin(),
+            member.getDeletedAt(),
             member.isDeleted()
         );
     }
 
-    public static ChatMember toEntity(LightChatMemberDTO member) {
+    public static ChatMember toEntity(ChatMemberDTO member) {
         if (member == null) return null;
 
         return new ChatMember(
             new ChatMemberId(member.getChatId(), member.getUserId()),
+            member.getTag(),
+            member.getSettingsUpdatedAt(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
+            member.isPinned(),
             member.isAdmin(),
+            member.getDeletedAt(),
             member.isDeleted()
         );
     }
 
-    public static LightChatMemberDTO toLightDTO(ChatMember member) {
+    public static ChatMemberDTO toLightDTO(ChatMember member) {
         if (member == null) return null;
 
-        return new LightChatMemberDTO(
+        return new ChatMemberDTO(
             member.getChatId(),
             member.getUserId(),
+            member.getTag(),
+            member.getSettingsUpdatedAt(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
+            member.isPinned(),
             member.isAdmin(),
+            member.getDeletedAt(),
             member.isDeleted()
         );
     }
-    public static LightChatMemberDTO toLightDTO(CacheChatMember member) {
+    public static ChatMemberDTO toLightDTO(CacheChatMember member) {
         if (member == null) return null;
 
-        return new LightChatMemberDTO(
+        return new ChatMemberDTO(
             member.getChatId(),
             member.getUserId(),
+            member.getTag(),
+            member.getSettingsUpdatedAt(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
+            member.isPinned(),
             member.isAdmin(),
+            member.getDeletedAt(),
             member.isDeleted()
         );
     }
 
-    public static FullChatMemberDTO toFullDTO(FullUserDTO user, LightChatMemberDTO member) {
+    public static ChatMemberProfileDTO toFullDTO(FullUserDTO user, ChatMemberDTO member) {
         if (user == null || member == null) return null;
 
-        return new FullChatMemberDTO(
+        return new ChatMemberProfileDTO(
             member.getChatId(),
             member.getUserId(),
             user.getUsername(),
             user.getName(),
+            member.getTag(),
+            member.getUpdatedAt(),
             member.getJoinedAt(),
             member.isAdmin(),
             member.isDeleted(),
@@ -334,6 +436,7 @@ public class EntityMapper {
             message.getChatId(),
             message.getSenderId(),
             message.getSentAt(),
+            message.getDeletedAt(),
             message.isDeleted()
         );
     }
@@ -341,11 +444,12 @@ public class EntityMapper {
         if (message == null) return null;
 
         return new CacheMessage(
-                message.getId(),
-                message.getChatId(),
-                message.getSenderId(),
-                message.getSentAt(),
-                message.getIsDeleted()
+            message.getId(),
+            message.getChatId(),
+            message.getSenderId(),
+            message.getSentAt(),
+            message.getDeletedAt(),
+            message.getIsDeleted()
         );
     }
     public static CacheMessage toCache(MessageDTO message) {
@@ -356,7 +460,8 @@ public class EntityMapper {
             message.getChatId(),
             message.getSenderId(),
             message.getSentAt(),
-            message.isHiddenByAdmin()
+            message.getDeletedAt(),
+            message.isDeleted()
         );
     }
 
@@ -368,9 +473,11 @@ public class EntityMapper {
             message.getChatId(),
             message.getSenderId(),
             message.getText(),
-            message.getSentAt(),
             message.getReadCount(),
-            message.isHiddenByAdmin()
+            message.getSentAt(),
+            message.getUpdatedAt(),
+            message.getDeletedAt(),
+            message.isDeleted()
         );
     }
 
@@ -382,9 +489,11 @@ public class EntityMapper {
             message.getChatId(),
             message.getSenderId(),
             message.getText(),
-            message.getSentAt(),
             message.getReadCount(),
             message.getIsReadByUser() != null && message.getIsReadByUser(),
+            message.getSentAt(),
+            message.getUpdatedAt(),
+            message.getDeletedAt(),
             message.getIsDeleted()
         );
     }
@@ -396,24 +505,24 @@ public class EntityMapper {
         if (verificationToken == null) return null;
 
         return new CacheVerificationToken(
-                verificationToken.getId(),
-                verificationToken.getUserId(),
-                verificationToken.getToken(),
-                verificationToken.getExpiryDate(),
-                verificationToken.getCreatedAt(),
-                verificationToken.getTokenType()
+            verificationToken.getId(),
+            verificationToken.getUserId(),
+            verificationToken.getToken(),
+            verificationToken.getTokenType(),
+            verificationToken.getExpiryDate(),
+            verificationToken.getCreatedAt()
         );
     }
     public static CacheVerificationToken toCache(VerificationTokenDTO verificationToken) {
         if (verificationToken == null) return null;
 
         return new CacheVerificationToken(
-                verificationToken.getId(),
-                verificationToken.getUserId(),
-                verificationToken.getToken(),
-                verificationToken.getExpiryDate(),
-                verificationToken.getCreatedAt(),
-                verificationToken.getTokenType()
+            verificationToken.getId(),
+            verificationToken.getUserId(),
+            verificationToken.getToken(),
+            verificationToken.getTokenType(),
+            verificationToken.getExpiryDate(),
+            verificationToken.getCreatedAt()
         );
     }
 
@@ -421,12 +530,12 @@ public class EntityMapper {
         if (verificationToken == null) return null;
 
         return new VerificationToken(
-                verificationToken.getId(),
-                verificationToken.getUserId(),
-                verificationToken.getToken(),
-                verificationToken.getExpiryDate(),
-                verificationToken.getCreatedAt(),
-                verificationToken.getTokenType()
+            verificationToken.getId(),
+            verificationToken.getUserId(),
+            verificationToken.getToken(),
+            verificationToken.getTokenType(),
+            verificationToken.getExpiryDate(),
+            verificationToken.getCreatedAt()
         );
     }
 
@@ -434,24 +543,24 @@ public class EntityMapper {
         if (verificationToken == null) return null;
 
         return new VerificationTokenDTO(
-                verificationToken.getId(),
-                verificationToken.getUserId(),
-                verificationToken.getToken(),
-                verificationToken.getExpiryDate(),
-                verificationToken.getCreatedAt(),
-                verificationToken.getTokenType()
+            verificationToken.getId(),
+            verificationToken.getUserId(),
+            verificationToken.getToken(),
+            verificationToken.getTokenType(),
+            verificationToken.getExpiryDate(),
+            verificationToken.getCreatedAt()
         );
     }
     public static VerificationTokenDTO toDTO(CacheVerificationToken verificationToken) {
         if (verificationToken == null) return null;
 
         return new VerificationTokenDTO(
-                verificationToken.getId(),
-                verificationToken.getUserId(),
-                verificationToken.getToken(),
-                verificationToken.getExpiryDate(),
-                verificationToken.getCreatedAt(),
-                verificationToken.getTokenType()
+            verificationToken.getId(),
+            verificationToken.getUserId(),
+            verificationToken.getToken(),
+            verificationToken.getTokenType(),
+            verificationToken.getExpiryDate(),
+            verificationToken.getCreatedAt()
         );
     }
 
@@ -482,11 +591,11 @@ public class EntityMapper {
         }
         return cached;
     }
-    public static List<CacheChatMember> toCacheLightChatMembers(Collection<LightChatMemberDTO> items) {
+    public static List<CacheChatMember> toCacheLightChatMembers(Collection<ChatMemberDTO> items) {
         if (items == null) return Collections.emptyList();
 
         List<CacheChatMember> cached = new ArrayList<>();
-        for (LightChatMemberDTO item : items) {
+        for (ChatMemberDTO item : items) {
             cached.add(EntityMapper.toCache(item));
         }
         return cached;
