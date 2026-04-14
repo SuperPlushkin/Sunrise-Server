@@ -6,6 +6,7 @@ public interface UserMessageDBResult {
     Long getId();
     Long getChatId();
     Long getSenderId();
+    LocalDateTime getProfileUpdatedAt();
     String getText();
     Long getReadCount();
     Boolean getIsReadByUser();

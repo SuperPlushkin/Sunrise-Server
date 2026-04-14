@@ -64,13 +64,19 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
 
     @Query("""
-           SELECT c
-           FROM Chat c
+           SELECT c FROM Chat c
            INNER JOIN ChatMember cm1 ON cm1.id.chatId = c.id AND cm1.id.userId = :userId1 AND cm1.isDeleted = false
            INNER JOIN ChatMember cm2 ON cm2.id.chatId = c.id AND cm2.id.userId = :userId2 AND cm2.isDeleted = false
            WHERE c.chatType = :chatType
            """)
     Optional<Chat> getPersonalChat(@Param("userId1") long userId1, @Param("userId2") long userId2, @Param("chatType") ChatType chatType);
+
+    @Query("""
+           SELECT c FROM Chat c
+           INNER JOIN ChatMember cm ON cm.id.chatId = c.id AND cm.id.userId = :userId AND cm.isDeleted = false
+           WHERE c.isDeleted = false
+           """)
+    List<Long> getUserChatIds(@Param("userId") long userId);
 
     @Query(value = "SELECT * FROM get_user_chats_page(:user_id, :isPinnedCursor, :lastMsgIdCursor, :chatIdCursor, , :limit)", nativeQuery = true)
     List<UserChatResult> getUserChatsPage(@Param("user_id") long userId, @Param("isPinnedCursor") Boolean isPinnedCursor, @Param("lastMsgIdCursor") Long lastMsgIdCursor, @Param("chatIdCursor") Long chatIdCursor, @Param("limit") int limit);

@@ -21,6 +21,7 @@ public interface UserChatResult {
     Long getLastMessageId();
     Long getLastMessageChatId();
     Long getLastMessageSenderId();
+    LocalDateTime getLastMessageProfileUpdatedAt();
     String getLastMessageText();
     Long getLastMessageReadCount();
     Boolean getLastMessageIsReadByUser();

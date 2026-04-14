@@ -1,7 +1,7 @@
 package com.sunrise.entity.pagination;
 
-import com.sunrise.entity.dto.LightUserDTO;
+import com.sunrise.entity.dto.UserProfileDTO;
 
 import java.util.Map;
 
-public record UsersPageDTO(Map<Long, LightUserDTO> users, Long nextCursor) { }
+public record UsersPageDTO(Map<Long, UserProfileDTO> users, Long nextCursor) { }

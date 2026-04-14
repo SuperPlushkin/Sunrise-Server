@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 @lombok.Setter
 @lombok.Getter
 @lombok.AllArgsConstructor
-public class FullUserDTO {
+public class UserDTO {
     private long id;
     private String username;
     private String name;
@@ -20,7 +20,7 @@ public class FullUserDTO {
     private LocalDateTime deletedAt;
     private boolean isDeleted;
 
-    public static FullUserDTO create(Long id, String username, String name, String email, String hashPassword, LocalDateTime createdAt) {
-        return new FullUserDTO(id, username, name, email, hashPassword, null, createdAt, createdAt, createdAt, 1, false, null, false);
+    public static UserDTO create(Long id, String username, String name, String email, String hashPassword, LocalDateTime createdAt) {
+        return new UserDTO(id, username, name, email, hashPassword, null, createdAt, createdAt, createdAt, 1, false, null, false);
     }
 }

@@ -24,6 +24,17 @@ public class CacheChat {
 
     private final LocalDateTime cachedAt = LocalDateTime.now();
 
+    public void onAddMember(){
+        membersCount++;
+    }
+    public void onAddMembers(int membersToAdd){
+        membersCount += membersToAdd;
+    }
+    public void onDeleteMember(){
+        membersCount--;
+        deletedMembersCount++;
+    }
+
     public void setChatType(ChatType chatType, LocalDateTime updatedAt) {
         this.chatType = chatType;
         this.updatedAt = updatedAt;

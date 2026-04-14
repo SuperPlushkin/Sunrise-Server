@@ -6,7 +6,7 @@ import com.sunrise.core.service.result.*;
 import com.sunrise.core.service.ChatService;
 import com.sunrise.config.annotation.ValidId;
 
-import com.sunrise.entity.dto.FullChatDTO;
+import com.sunrise.entity.dto.UserChatDTO;
 import com.sunrise.entity.pagination.UserChatsPageDTO;
 import jakarta.validation.Valid;
 
@@ -14,6 +14,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Validated
 @RequiredArgsConstructor
@@ -104,10 +106,20 @@ public class ChatController {
         }
     }
 
+    @GetMapping("/ids")
+    public ResponseEntity<?> getUserChatIds(@CurrentUserId long userId) {
+        ResultOneArg<List<Long>> result = chatService.getUserChatIds(userId);
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getResult());
+        } else {
+            return ResponseEntity.badRequest().body(result.getError());
+        }
+    }
     @GetMapping("/{chatId}")
     public ResponseEntity<?> getUserChat(@PathVariable @ValidId long chatId, @CurrentUserId long userId) {
 
-        ResultOneArg<FullChatDTO> result = chatService.getUserChat(chatId, userId);
+        ResultOneArg<UserChatDTO> result = chatService.getUserChat(chatId, userId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getResult());

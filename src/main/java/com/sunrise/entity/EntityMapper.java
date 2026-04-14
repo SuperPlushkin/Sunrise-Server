@@ -31,7 +31,7 @@ public class EntityMapper {
             user.isDeleted()
         );
     }
-    public static CacheUser toCache(FullUserDTO user) {
+    public static CacheUser toCache(UserDTO user) {
         if (user == null) return null;
 
         return new CacheUser(
@@ -51,7 +51,7 @@ public class EntityMapper {
         );
     }
 
-    public static User toEntity(FullUserDTO user) {
+    public static User toEntity(UserDTO user) {
         if (user == null) return null;
 
         return new User(
@@ -71,10 +71,10 @@ public class EntityMapper {
         );
     }
 
-    public static FullUserDTO toFullDTO(User user) {
+    public static UserDTO toFullDTO(User user) {
         if (user == null) return null;
 
-        return new FullUserDTO(
+        return new UserDTO(
             user.getId(),
             user.getUsername(),
             user.getName(),
@@ -90,10 +90,10 @@ public class EntityMapper {
             user.isDeleted()
         );
     }
-    public static FullUserDTO toFullDTO(CacheUser user) {
+    public static UserDTO toFullDTO(CacheUser user) {
         if (user == null) return null;
 
-        return new FullUserDTO(
+        return new UserDTO(
             user.getId(),
             user.getUsername(),
             user.getName(),
@@ -110,15 +110,36 @@ public class EntityMapper {
         );
     }
 
-    public static UserProfileDTO toUserProfileDTO(FullUserDTO user) {
+    public static UserProfileDTO toUserProfileDTO(UserDTO user) {
         if (user == null) return null;
 
         return new UserProfileDTO(
-                user.getId(),
-                user.getUsername(),
-                user.getName(),
-                user.getCreatedAt()
+            user.getId(),
+            user.getUsername(),
+            user.getName(),
+            user.getProfileUpdatedAt(),
+            user.getCreatedAt(),
+            user.isEnabled(),
+            user.getDeletedAt(),
+            user.isDeleted()
         );
+    }
+    public static Map<Long, UserProfileDTO> toUserProfileDTOs(Collection<UserResult> items, Map<Long, UserProfileDTO> resultMap) {
+        if (items == null) return resultMap;
+
+        for (var item : items) {
+            resultMap.put(item.getUserId(), new UserProfileDTO(
+                    item.getUserId(),
+                    item.getUsername(),
+                    item.getName(),
+                    item.getProfileUpdatedAt(),
+                    item.getCreatedAt(),
+                    item.getIsEnabled(),
+                    item.getDeletedAt(),
+                    item.getIsDeleted()
+            ));
+        }
+        return resultMap;
     }
 
 
@@ -142,7 +163,7 @@ public class EntityMapper {
             chat.isDeleted()
         );
     }
-    public static CacheChat toCache(LightChatDTO chat) {
+    public static CacheChat toCache(ChatDTO chat) {
         if (chat == null) return null;
 
         return new CacheChat(
@@ -160,7 +181,7 @@ public class EntityMapper {
                 chat.isDeleted()
         );
     }
-    public static CacheChat toCache(FullChatDTO chat) {
+    public static CacheChat toCache(UserChatDTO chat) {
         if (chat == null) return null;
 
         return new CacheChat(
@@ -196,8 +217,17 @@ public class EntityMapper {
             chat.getIsDeleted()
         );
     }
+    public static List<CacheChat> toCaches(Collection<UserChatDTO> items) {
+        if (items == null) return Collections.emptyList();
 
-    public static Chat toEntity(LightChatDTO chat) {
+        List<CacheChat> cached = new ArrayList<>();
+        for (UserChatDTO item : items) {
+            cached.add(EntityMapper.toCache(item));
+        }
+        return cached;
+    }
+
+    public static Chat toEntity(ChatDTO chat) {
         if (chat == null) return null;
 
         return new Chat(
@@ -216,10 +246,10 @@ public class EntityMapper {
         );
     }
 
-    public static LightChatDTO toLightDTO(Chat chat) {
+    public static ChatDTO toDTO(Chat chat) {
         if (chat == null) return null;
 
-        return new LightChatDTO(
+        return new ChatDTO(
             chat.getId(),
             chat.getName(),
             chat.getDescription(),
@@ -234,10 +264,10 @@ public class EntityMapper {
             chat.isDeleted()
         );
     }
-    public static LightChatDTO toLightDTO(CacheChat chat) {
+    public static ChatDTO toDTO(CacheChat chat) {
         if (chat == null) return null;
 
-        return new LightChatDTO(
+        return new ChatDTO(
             chat.getId(),
             chat.getName(),
             chat.getDescription(),
@@ -253,7 +283,41 @@ public class EntityMapper {
         );
     }
 
-    public static Map<Long, FullChatDTO> toFullDTOs(Collection<UserChatResult> chats, Map<Long, FullChatDTO> resultMap) {
+    public static UserChatDTO toFullDTO(UserChatResult chat) {
+        if (chat == null) return null;
+
+        MessageDTO msg = new MessageDTO(
+                chat.getLastMessageId(),
+                chat.getLastMessageChatId(),
+                chat.getLastMessageSenderId(),
+                chat.getLastMessageProfileUpdatedAt(),
+                chat.getLastMessageText(),
+                chat.getLastMessageReadCount(),
+                chat.getLastMessageIsReadByUser(),
+                chat.getLastMessageSentAt(),
+                chat.getLastMessageUpdatedAt(),
+                chat.getLastMessageDeletedAt(),
+                chat.getLastMessageIsDeleted()
+        );
+
+        return new UserChatDTO(
+                chat.getId(),
+                chat.getName(),
+                chat.getDescription(),
+                ChatType.valueOf(chat.getChatType()),
+                chat.getOpponentId(),
+                chat.getMembersCount(),
+                chat.getDeletedMembersCount(),
+                msg,
+                chat.getUnreadMessagesCount(),
+                chat.getUpdatedAt(),
+                chat.getCreatedAt(),
+                chat.getCreatedBy(),
+                chat.getDeletedAt(),
+                chat.getIsDeleted()
+        );
+    }
+    public static Map<Long, UserChatDTO> toFullDTOs(Collection<UserChatResult> chats, Map<Long, UserChatDTO> resultMap) {
         if (chats == null) return null;
 
         for (UserChatResult chat : chats){
@@ -261,6 +325,7 @@ public class EntityMapper {
                 chat.getLastMessageId(),
                 chat.getLastMessageChatId(),
                 chat.getLastMessageSenderId(),
+                chat.getLastMessageProfileUpdatedAt(),
                 chat.getLastMessageText(),
                 chat.getLastMessageReadCount(),
                 chat.getLastMessageIsReadByUser(),
@@ -270,7 +335,7 @@ public class EntityMapper {
                 chat.getLastMessageIsDeleted()
             );
 
-            resultMap.put(chat.getId(), new FullChatDTO(
+            resultMap.put(chat.getId(), new UserChatDTO(
                 chat.getId(),
                 chat.getName(),
                 chat.getDescription(),
@@ -288,39 +353,6 @@ public class EntityMapper {
             ));
         }
         return resultMap;
-    }
-    public static FullChatDTO toFullDTO(UserChatResult chat) {
-        if (chat == null) return null;
-
-        MessageDTO msg = new MessageDTO(
-            chat.getLastMessageId(),
-            chat.getLastMessageChatId(),
-            chat.getLastMessageSenderId(),
-            chat.getLastMessageText(),
-            chat.getLastMessageReadCount(),
-            chat.getLastMessageIsReadByUser(),
-            chat.getLastMessageSentAt(),
-            chat.getLastMessageUpdatedAt(),
-            chat.getLastMessageDeletedAt(),
-            chat.getLastMessageIsDeleted()
-        );
-
-        return new FullChatDTO(
-            chat.getId(),
-            chat.getName(),
-            chat.getDescription(),
-            ChatType.valueOf(chat.getChatType()),
-            chat.getOpponentId(),
-            chat.getMembersCount(),
-            chat.getDeletedMembersCount(),
-            msg,
-            chat.getUnreadMessagesCount(),
-            chat.getUpdatedAt(),
-            chat.getCreatedAt(),
-            chat.getCreatedBy(),
-            chat.getDeletedAt(),
-            chat.getIsDeleted()
-        );
     }
 
 
@@ -375,7 +407,7 @@ public class EntityMapper {
         );
     }
 
-    public static ChatMemberDTO toLightDTO(ChatMember member) {
+    public static ChatMemberDTO toDTO(ChatMember member) {
         if (member == null) return null;
 
         return new ChatMemberDTO(
@@ -391,7 +423,7 @@ public class EntityMapper {
             member.isDeleted()
         );
     }
-    public static ChatMemberDTO toLightDTO(CacheChatMember member) {
+    public static ChatMemberDTO toDTO(CacheChatMember member) {
         if (member == null) return null;
 
         return new ChatMemberDTO(
@@ -407,8 +439,17 @@ public class EntityMapper {
             member.isDeleted()
         );
     }
+    public static List<CacheChatMember> toCacheLightChatMembers(Collection<ChatMemberDTO> items) {
+        if (items == null) return Collections.emptyList();
 
-    public static ChatMemberProfileDTO toFullDTO(FullUserDTO user, ChatMemberDTO member) {
+        List<CacheChatMember> cached = new ArrayList<>();
+        for (ChatMemberDTO item : items) {
+            cached.add(EntityMapper.toCache(item));
+        }
+        return cached;
+    }
+
+    public static ChatMemberProfileDTO toFullDTO(UserDTO user, ChatMemberDTO member) {
         if (user == null || member == null) return null;
 
         return new ChatMemberProfileDTO(
@@ -481,13 +522,14 @@ public class EntityMapper {
         );
     }
 
-    public static MessageDTO toLightDTO(UserMessageDBResult message) {
+    public static MessageDTO toDTO(UserMessageDBResult message) {
         if (message == null) return null;
 
         return new MessageDTO(
             message.getId(),
             message.getChatId(),
             message.getSenderId(),
+            message.getProfileUpdatedAt(),
             message.getText(),
             message.getReadCount(),
             message.getIsReadByUser() != null && message.getIsReadByUser(),
@@ -496,6 +538,21 @@ public class EntityMapper {
             message.getDeletedAt(),
             message.getIsDeleted()
         );
+    }
+
+
+    // ========== MESSAGE READ STATUS ==========
+
+    public static Map<Long, MessageReadStatusDTO> toMessageReadDTOs(Collection<MessageReadStatusResult> items, Map<Long, MessageReadStatusDTO> resultMap) {
+        if (items == null) return resultMap;
+
+        for (var item : items) {
+            resultMap.put(item.getUserId(), new MessageReadStatusDTO(
+                    item.getUserId(),
+                    item.getReadAt()
+            ));
+        }
+        return resultMap;
     }
 
 
@@ -577,51 +634,5 @@ public class EntityMapper {
             loginHistory.getDeviceInfo(),
             loginHistory.getLoginAt()
         );
-    }
-
-
-    // ========== BATCH MAPPING ==========
-
-    public static List<CacheChat> toCacheChats(Collection<FullChatDTO> items) {
-        if (items == null) return Collections.emptyList();
-
-        List<CacheChat> cached = new ArrayList<>();
-        for (FullChatDTO item : items) {
-            cached.add(EntityMapper.toCache(item));
-        }
-        return cached;
-    }
-    public static List<CacheChatMember> toCacheLightChatMembers(Collection<ChatMemberDTO> items) {
-        if (items == null) return Collections.emptyList();
-
-        List<CacheChatMember> cached = new ArrayList<>();
-        for (ChatMemberDTO item : items) {
-            cached.add(EntityMapper.toCache(item));
-        }
-        return cached;
-    }
-
-    public static Map<Long, LightUserDTO> toLightUserDTOs(Collection<UserResult> items, Map<Long, LightUserDTO> resultMap) {
-        if (items == null) return resultMap;
-
-        for (var item : items) {
-            resultMap.put(item.getUserId(), new LightUserDTO(
-                item.getUserId(),
-                item.getUsername(),
-                item.getName()
-            ));
-        }
-        return resultMap;
-    }
-    public static Map<Long, MessageReadStatusDTO> toMessageReadDTOs(Collection<MessageReadStatusResult> items, Map<Long, MessageReadStatusDTO> resultMap) {
-        if (items == null) return resultMap;
-
-        for (var item : items) {
-            resultMap.put(item.getUserId(), new MessageReadStatusDTO(
-                item.getUserId(),
-                item.getReadAt()
-            ));
-        }
-        return resultMap;
     }
 }

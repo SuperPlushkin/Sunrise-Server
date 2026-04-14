@@ -40,27 +40,31 @@ public class CacheUser {
         this.lastLogin = lastLogin;
         this.updatedAt = lastLogin;
     }
-    public void enable(LocalDateTime updatedAt){
+    public void enable(int jwtVersion, LocalDateTime updatedAt){
         this.isEnabled = true;
         this.profileUpdatedAt = updatedAt;
         this.updatedAt = updatedAt;
+        this.jwtVersion = jwtVersion;
     }
-    public void disable(LocalDateTime updatedAt){
+    public void disable(int jwtVersion, LocalDateTime updatedAt){
         this.isEnabled = false;
         this.profileUpdatedAt = updatedAt;
         this.updatedAt = updatedAt;
+        this.jwtVersion = jwtVersion;
     }
-    public void delete(LocalDateTime updatedAt){
+    public void delete(int jwtVersion, LocalDateTime updatedAt){
         this.deletedAt = updatedAt;
         this.isDeleted = true;
         this.profileUpdatedAt = updatedAt;
         this.updatedAt = updatedAt;
+        this.jwtVersion = jwtVersion;
     }
-    public void restore(LocalDateTime updatedAt){
+    public void restore(int jwtVersion, LocalDateTime updatedAt){
         this.deletedAt = null;
         this.isDeleted = false;
         this.profileUpdatedAt = updatedAt;
         this.updatedAt = updatedAt;
+        this.jwtVersion = jwtVersion;
     }
 
     public static CacheUser copy(CacheUser user) {

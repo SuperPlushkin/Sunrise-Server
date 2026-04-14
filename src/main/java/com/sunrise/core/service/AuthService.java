@@ -2,7 +2,7 @@ package com.sunrise.core.service;
 
 import com.sunrise.core.dataservice.type.TokenType;
 import com.sunrise.core.service.result.*;
-import com.sunrise.entity.dto.FullUserDTO;
+import com.sunrise.entity.dto.UserDTO;
 import com.sunrise.entity.dto.LoginHistoryDTO;
 import com.sunrise.entity.dto.VerificationTokenDTO;
 import com.sunrise.core.dataservice.DataOrchestrator;
@@ -51,7 +51,7 @@ public class AuthService {
 
             LocalDateTime createdAt = LocalDateTime.now();
 
-            FullUserDTO user = FullUserDTO.create(
+            UserDTO user = UserDTO.create(
                 SimpleSnowflakeId.nextId(), username, name, email,
                 passwordEncoder.encode(password), createdAt
             );
@@ -84,11 +84,11 @@ public class AuthService {
     } // TODO: ПРОБЛЕМА С ВЫЗОВОМ НЕСКОЛЬКИХ ФУНКЦИЙ ПО СОХРАНЕНИЮ В БД И КЕШ
     public ResultOneArg<UserLoginResult> authenticateUser(String username, String password, HttpServletRequest httpRequest) {
         try {
-            Optional<FullUserDTO> userOpt = dataOrchestrator.getUserByUsername(username);
+            Optional<UserDTO> userOpt = dataOrchestrator.getUserByUsername(username);
             if (userOpt.isEmpty())
                 throw new ValidationException("Invalid username or password");
 
-            FullUserDTO user = userOpt.get();
+            UserDTO user = userOpt.get();
             if (!user.isEnabled())
                 throw new ValidationException("Please verify your email first");
 
@@ -121,7 +121,7 @@ public class AuthService {
 
     public ResultNoArgs requestEmailUpdate(long userId, String newEmail) {
         try {
-            FullUserDTO user = dataOrchestrator.getUser(userId)
+            UserDTO user = dataOrchestrator.getUser(userId)
                     .orElseThrow(() -> new ValidationException("User not found"));
 
             if (dataOrchestrator.existsUserByEmail(newEmail)){
@@ -152,7 +152,7 @@ public class AuthService {
     }
     public ResultNoArgs requestPasswordUpdate(String username) {
         try {
-            FullUserDTO user = dataOrchestrator.getUserByUsername(username)
+            UserDTO user = dataOrchestrator.getUserByUsername(username)
                     .orElseThrow(() -> new ValidationException("Email already exists"));
 
             // Генерация токена

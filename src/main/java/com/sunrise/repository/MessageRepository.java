@@ -25,6 +25,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.id AS id,
                m.chatId AS chatId,
                m.senderId AS senderId,
+               u.profileUpdatedAt AS profileUpdatedAt,
                m.text AS text,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
@@ -33,6 +34,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
+           INNER JOIN User u
+               ON u.id = m.senderId
            LEFT JOIN UserChatReadStatus ucrs
                ON ucrs.id.userId = :userId
                AND ucrs.id.chatId = m.chatId
@@ -45,6 +48,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.id AS id,
                m.chatId AS chatId,
                m.senderId AS senderId,
+               u.profileUpdatedAt AS profileUpdatedAt,
                m.text AS text,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
@@ -53,6 +57,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
+           INNER JOIN User u
+               ON u.id = m.senderId
            LEFT JOIN UserChatReadStatus ucrs
                ON ucrs.id.userId = :userId
                AND ucrs.id.chatId = m.chatId
@@ -66,6 +72,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.id AS id,
                m.chatId AS chatId,
                m.senderId AS senderId,
+               u.profileUpdatedAt AS profileUpdatedAt,
                m.text AS text,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
@@ -74,6 +81,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
+           INNER JOIN User u
+               ON u.id = m.senderId
            LEFT JOIN UserChatReadStatus ucrs
                ON ucrs.id.userId = :userId AND ucrs.id.chatId = m.chatId
            WHERE m.chatId = :chatId AND m.id < :cursor
@@ -86,6 +95,7 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.id AS id,
                m.chatId AS chatId,
                m.senderId AS senderId,
+               u.profileUpdatedAt AS profileUpdatedAt,
                m.text AS text,
                m.readCount AS readCount,
                (ucrs.lastReadMessageId IS NOT NULL AND m.id <= ucrs.lastReadMessageId) AS isReadByUser,
@@ -94,6 +104,8 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
                m.deletedAt as deletedAt,
                m.isDeleted AS isDeleted
            FROM Message m
+           INNER JOIN User u
+               ON u.id = m.senderId
            LEFT JOIN UserChatReadStatus ucrs
                ON ucrs.id.userId = :userId AND ucrs.id.chatId = m.chatId
            WHERE m.chatId = :chatId AND m.id > :cursor

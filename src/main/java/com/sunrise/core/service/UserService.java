@@ -1,14 +1,13 @@
 package com.sunrise.core.service;
 
 import com.sunrise.core.dataservice.LockManager;
-import com.sunrise.core.notifier.WebSocketNotifier;
 import com.sunrise.core.service.result.*;
 import com.sunrise.entity.pagination.UsersPageDTO;
 
 import com.sunrise.core.dataservice.DataOrchestrator;
 import com.sunrise.core.dataservice.DataValidator;
 
-import com.sunrise.entity.dto.FullUserDTO;
+import com.sunrise.entity.dto.UserDTO;
 import com.sunrise.entity.dto.UserProfileDTO;
 import com.sunrise.helpclass.ValidationException;
 
@@ -18,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -28,7 +26,6 @@ public class UserService {
     private final DataOrchestrator dataOrchestrator;
     private final LockManager lockManager;
     private final DataValidator validator;
-    private final WebSocketNotifier wsNotify;
 
     public ResultNoArgs updateProfile(long userId, String newUsername, String newName) {
         // LOCK на username
@@ -38,7 +35,7 @@ public class UserService {
         try {
             validator.validateActiveUser(userId);
 
-            FullUserDTO user = dataOrchestrator.getUser(userId)
+            UserDTO user = dataOrchestrator.getUser(userId)
                     .orElseThrow(() -> new ValidationException("User not found"));
 
             boolean usernameNotChanged = user.getUsername().equals(newUsername);
@@ -54,11 +51,7 @@ public class UserService {
             }
 
             // Обновляем профиль
-            LocalDateTime updatedAt = LocalDateTime.now();
-            dataOrchestrator.updateUserProfile(userId, newUsername, newName, updatedAt);
-
-            // уведомить всех надо об этом
-            wsNotify.notifyUserProfileUpdated(userId, newUsername, newName, updatedAt);
+            dataOrchestrator.updateUserProfile(userId, newUsername, newName, LocalDateTime.now());
 
             log.info("[🔧] ✅ User {} updated profile", userId);
             return ResultNoArgs.success();
@@ -86,9 +79,6 @@ public class UserService {
             LocalDateTime updatedAt = LocalDateTime.now();
             dataOrchestrator.deleteUser(userIdToDeleted, updatedAt);
 
-            // уведомить всех надо об этом
-            wsNotify.notifyUserDeleted(userIdToDeleted, updatedAt);
-
             log.info("[🔧] ✅ User {} deleted profile {}", userWhoDelete, userIdToDeleted);
             return ResultNoArgs.success();
         }
@@ -106,13 +96,11 @@ public class UserService {
         try {
             validator.validateActiveUser(userId);
 
-            Optional<UserProfileDTO> profileOpt = dataOrchestrator.getUserProfile(userId);
-            if (profileOpt.isEmpty()) {
-                throw new ValidationException("User not found or is deleted");
-            }
+            UserProfileDTO profile = dataOrchestrator.getUserProfile(userId)
+                    .orElseThrow(() -> new ValidationException("User not found or is deleted"));
 
             log.debug("[🔧] ✅ Loaded profile for user {}", userId);
-            return ResultOneArg.success(profileOpt.get());
+            return ResultOneArg.success(profile);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get self profile for user {}: {}", userId, e.getMessage());
@@ -128,13 +116,11 @@ public class UserService {
             validator.validateActiveUser(currentUserId);
             validator.validateActiveUser(otherUserId);
 
-            Optional<UserProfileDTO> profileOpt = dataOrchestrator.getUserProfile(otherUserId);
-            if (profileOpt.isEmpty()) {
-                throw new ValidationException("User not found or is deleted");
-            }
+            UserProfileDTO profile = dataOrchestrator.getUserProfile(otherUserId)
+                    .orElseThrow(() -> new ValidationException("User not found or is deleted"));
 
             log.debug("[🔧] ✅ User {} retrieved profile of user {}", currentUserId, otherUserId);
-            return ResultOneArg.success(profileOpt.get());
+            return ResultOneArg.success(profile);
         }
         catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get other profile for user {}: {}", otherUserId, e.getMessage());

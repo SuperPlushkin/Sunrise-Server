@@ -2,10 +2,7 @@ package com.sunrise.controller;
 
 import com.sunrise.config.annotation.CurrentUserId;
 import com.sunrise.config.annotation.ValidId;
-import com.sunrise.controller.request.AddGroupMemberRequest;
-import com.sunrise.controller.request.AddGroupMembersRequest;
-import com.sunrise.controller.request.PaginationRequest;
-import com.sunrise.controller.request.UpdateAdminRightsRequest;
+import com.sunrise.controller.request.*;
 import com.sunrise.core.service.ChatMemberService;
 import com.sunrise.core.service.result.ResultNoArgs;
 import com.sunrise.core.service.result.ResultOneArg;
@@ -51,11 +48,48 @@ public class ChatMemberController {
         }
     }
 
-    @PostMapping("/admin-rights/{otherUserId}")
+    @PostMapping("/members/info/{otherUserId}")
+    public ResponseEntity<?> updateChatMemberInfo(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateChatMemberInfoRequest request, @CurrentUserId long userId) {
+        ResultNoArgs result = chatMemberService.updateChatMemberInfo(
+            chatId, userId, otherUserId, request.getTag()
+        );
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getOperationText());
+        } else {
+            return ResponseEntity.badRequest().body(result.getError());
+        }
+    }
+
+    @PostMapping("/members/admin-rights/{otherUserId}")
     public ResponseEntity<?> updateAdminRights(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @RequestBody @Valid UpdateAdminRightsRequest request, @CurrentUserId long userId) {
         ResultNoArgs result = chatMemberService.updateChatMemberAdminRight(
                 chatId, userId, otherUserId, request.getIsAdmin()
         );
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getOperationText());
+        } else {
+            return ResponseEntity.badRequest().body(result.getError());
+        }
+    }
+
+    @PostMapping("/members/self-settings")
+    public ResponseEntity<?> updateSelfChatSettings(@PathVariable @ValidId long chatId, @RequestBody @Valid UpdateSelfChatSettingsRequest request, @CurrentUserId long userId) {
+        ResultNoArgs result = chatMemberService.updateSelfChatSettings(
+            chatId, userId, request.getIsPinned()
+        );
+
+        if (result.isSuccess()) {
+            return ResponseEntity.ok(result.getOperationText());
+        } else {
+            return ResponseEntity.badRequest().body(result.getError());
+        }
+    }
+
+    @PostMapping("/members/kick/{otherUserId}")
+    public ResponseEntity<?> updateChatMemberInfo(@PathVariable @ValidId long chatId, @PathVariable @ValidId long otherUserId, @CurrentUserId long userId) {
+        ResultNoArgs result = chatMemberService.kickChatMember(chatId, userId, otherUserId);
 
         if (result.isSuccess()) {
             return ResponseEntity.ok(result.getOperationText());

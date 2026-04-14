@@ -27,7 +27,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.username = :username, u.name = :name, u.updatedAt = :updatedAt WHERE u.id = :userId")
+    @Query("UPDATE User u SET u.username = :username, u.name = :name, u.profileUpdatedAt = :updatedAt, u.updatedAt = :updatedAt WHERE u.id = :userId")
     int updateProfile(@Param("userId") long userId, @Param("username") String username, @Param("name") String name, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
@@ -42,23 +42,23 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isEnabled = true, u.updatedAt = :updatedAt WHERE u.id = :userId")
-    int enableUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+    @Query(value = "UPDATE users SET is_enabled = true, jwt_version = jwt_version + 1, profile_updated_at = :updatedAt, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int enableUserAndGetJwtVersion(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isEnabled = false, u.updatedAt = :updatedAt WHERE u.id = :userId")
-    int disableUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+    @Query(value = "UPDATE users SET is_enabled = false, jwt_version = jwt_version + 1, profile_updated_at = :updatedAt, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int disableUserAndGetJwtVersion(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isDeleted = true, u.updatedAt = :updatedAt WHERE u.id = :userId")
-    int deleteUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+    @Query(value = "UPDATE users SET is_deleted = true, jwt_version = jwt_version + 1, profile_updated_at = :updatedAt, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int deleteUserAndGetJwtVersion(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
 
     @Modifying
     @Transactional
-    @Query("UPDATE User u SET u.isDeleted = false, u.updatedAt = :updatedAt WHERE u.id = :userId")
-    int restoreUser(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
+    @Query(value = "UPDATE users SET is_deleted = false, jwt_version = jwt_version + 1, profile_updated_at = :updatedAt, updated_at = :updatedAt WHERE id = :userId RETURNING jwt_version", nativeQuery = true)
+    int restoreUserAndGetJwtVersion(@Param("userId") long userId, @Param("updatedAt") LocalDateTime updatedAt);
 
 
     // ========== ПОИСК ==========
@@ -75,9 +75,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
            SELECT
                u.id,
                u.username,
-               u.name
+               u.name,
+               u.profileUpdatedAt,
+               u.createdAt,
+               u.isEnabled,
+               u.deletedAt,
+               u.isDeleted
            FROM User u
-           WHERE u.isDeleted = false
+           WHERE u.isDeleted = false AND u.isEnabled = true
                AND (:filter = ''
                    OR LOWER(u.username) LIKE LOWER(CONCAT('%', :filter, '%'))
                    OR LOWER(u.name) LIKE LOWER(CONCAT('%', :filter, '%')))

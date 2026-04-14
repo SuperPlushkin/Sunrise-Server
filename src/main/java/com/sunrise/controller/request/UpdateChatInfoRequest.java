@@ -11,8 +11,8 @@ public class UpdateChatInfoRequest {
     @NotBlank(message = "chatName is required")
     @Size(min = 4, max = 30, message = "chatName must be between 4 and 30 characters")
     @Pattern(
-            regexp = "^[a-zA-Z0-9_]+$",
-            message = "chatName must contain only letters, digits, and underscores"
+        regexp = "^[a-zA-Z0-9_]+$",
+        message = "chatName must contain only letters, digits, and underscores"
     )
     private String chatName;
 

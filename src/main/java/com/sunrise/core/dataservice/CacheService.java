@@ -122,39 +122,39 @@ public class CacheService {
             log.debug("[⚡] Updated profile for user {}: username={}, name={} || updateUserProfile", userId, username, name);
         });
     }
-    public void updateUserEmailAndJwtVersion(long userId, String email, int newVersion, LocalDateTime updatedAt) {
+    public void updateUserEmail(long userId, String email, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(user -> {
             user.setEmail(email, newVersion, updatedAt);
             log.debug("[⚡] Updated email for user {} || updateUserEmailAndJwtVersion", userId);
         });
     }
-    public void updateUserPasswordAndJwtVersion(long userId, String password, int newVersion, LocalDateTime updatedAt) {
+    public void updateUserPassword(long userId, String password, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(user -> {
-            user.setEmail(password, newVersion, updatedAt);
+            user.setPassword(password, newVersion, updatedAt);
             log.debug("[⚡] Updated password for user {} || updateUserEmailAndJwtVersion", userId);
         });
     }
-    public void enableUser(long userId, LocalDateTime updatedAt) {
+    public void enableUser(long userId, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.enable(updatedAt);
+            cacheUser.enable(newVersion, updatedAt);
             log.debug("[⚡] Enabled user {} in cache || enableUser", userId);
         });
     }
-    public void disableUser(long userId, LocalDateTime updatedAt) {
+    public void disableUser(long userId, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.disable(updatedAt);
+            cacheUser.disable(newVersion, updatedAt);
             log.debug("[⚡] Disabled user  {} in cache || disableUser", userId);
         });
     }
-    public void deleteUser(long userId, LocalDateTime updatedAt) {
+    public void deleteUser(long userId, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.delete(updatedAt);
+            cacheUser.delete(newVersion, updatedAt);
             log.debug("[⚡] Marked user {} as deleted in cache || deleteUser", userId);
         });
     }
-    public void restoreUser(long userId, LocalDateTime updatedAt) {
+    public void restoreUser(long userId, int newVersion, LocalDateTime updatedAt) {
         getUserLink(userId).ifPresent(cacheUser -> {
-            cacheUser.restore(updatedAt);
+            cacheUser.restore(newVersion, updatedAt);
             log.debug("[⚡] Restored user {} in cache || restoreUser", userId);
         });
     }
@@ -322,6 +322,7 @@ public class CacheService {
     public void saveChatMembers(long chatId, Collection<CacheChatMember> members) {
         // Обновляем контейнер
         getOrCreateChatMembersContainer(chatId).addBatch(members);
+        getChatLink(chatId).ifPresent(chat -> chat.onAddMembers(members.size()));
         log.debug("[⚡] Batch saved {} chat members in chat {} || saveChatMember", members.size(), chatId);
     }
     public void saveChatMember(CacheChatMember chatMember) {
@@ -330,6 +331,7 @@ public class CacheService {
 
         // Обновляем контейнер
         getOrCreateChatMembersContainer(chatId).add(chatMember);
+        getChatLink(chatId).ifPresent(CacheChat::onAddMember);
         log.debug("[⚡] Saved chat member {} in chat {} || saveChatMember", userId, chatId);
     }
     public void updateChatMemberInfo(long chatId, long userId, String tag, LocalDateTime updatedAt) {
@@ -356,6 +358,7 @@ public class CacheService {
             c.markMemberAsDeleted(userId, updatedAt);
             log.debug("[⚡] Marked member {} as deleted in chat {} || removeChatMember", userId, chatId);
         });
+        getChatLink(chatId).ifPresent(CacheChat::onDeleteMember);
     }
     public void restoreChatMember(long userId, long chatId, boolean isAdmin, LocalDateTime updatedAt) {
         // Обновляем контейнер
@@ -363,6 +366,7 @@ public class CacheService {
             c.restoreMember(userId, isAdmin, updatedAt);
             log.debug("[⚡] Restored member {} in chat {} (isAdmin={}) || restoreChatMember", userId, chatId, isAdmin);
         });
+        getChatLink(chatId).ifPresent(CacheChat::onAddMember);
     }
 
 

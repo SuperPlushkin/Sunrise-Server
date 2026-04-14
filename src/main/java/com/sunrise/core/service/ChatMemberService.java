@@ -7,12 +7,15 @@ import com.sunrise.core.notifier.WebSocketNotifier;
 import com.sunrise.core.service.result.ResultNoArgs;
 import com.sunrise.core.service.result.ResultOneArg;
 import com.sunrise.entity.pagination.ChatMembersPageDTO;
-import com.sunrise.entity.dto.LightChatDTO;
+import com.sunrise.entity.dto.ChatDTO;
 import com.sunrise.entity.dto.ChatMemberDTO;
 import com.sunrise.helpclass.ValidationException;
+
 import jakarta.validation.constraints.NotNull;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -123,7 +126,6 @@ public class ChatMemberService {
             validator.validateActiveUsersInActiveChatAndOneIsAdmin(chatId, adminId, userToUpdateId);
 
             LocalDateTime updatedAt = LocalDateTime.now();
-
             dataOrchestrator.updateChatMemberAdminRights(chatId, userToUpdateId, isAdmin, updatedAt);
 
             // уведомить всех надо об этом
@@ -141,7 +143,7 @@ public class ChatMemberService {
             return ResultNoArgs.error("updateChatMemberAdminRight failed due to server error");
         }
     }
-    public ResultNoArgs updateChatMemberSettings(long chatId, long userId, boolean isPinned) {
+    public ResultNoArgs updateSelfChatSettings(long chatId, long userId, boolean isPinned) {
         try {
             validator.validateActiveChatMemberInActiveChat(chatId, userId);
 
@@ -149,7 +151,7 @@ public class ChatMemberService {
             dataOrchestrator.updateChatMemberSetting(chatId, userId, isPinned, updatedAt);
 
             // уведомить всех надо об этом
-            wsNotify.notifyChatMemberSettingsUpdated(chatId, userId, isPinned, updatedAt);
+            wsNotify.notifySelfChatSettingsUpdated(chatId, userId, isPinned, updatedAt);
 
             log.info("[🔧] ✅ Updated member info for user {} chat {}", userId, chatId);
             return ResultNoArgs.success();
@@ -163,15 +165,47 @@ public class ChatMemberService {
             return ResultNoArgs.error("updateChatMemberInfo failed due to server error");
         }
     }
+    public ResultNoArgs kickChatMember(long chatId, long adminId, long userToKickId) {
+        try {
+            if (adminId == userToKickId) {
+                throw new ValidationException("Cannot update rights of yourself");
+            }
+
+            if (!lockManager.tryLockLeaveChatOperation(chatId)) {
+                throw new ValidationException("Try again later");
+            }
+
+            validator.validateActiveUsersInActiveChatAndOneIsAdmin(chatId, adminId, userToKickId);
+
+            LocalDateTime updatedAt = LocalDateTime.now();
+            dataOrchestrator.removeUserFromChat(chatId, userToKickId, updatedAt);
+
+            // уведомить всех надо об этом
+            wsNotify.notifyChatMemberDeleted(chatId, userToKickId, updatedAt);
+
+            log.info("[🔧] ✅ User {} kicked from chat {} by user {}", userToKickId, chatId, adminId);
+            return ResultNoArgs.success();
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to kick user {} from chat {}: {}", userToKickId, chatId, e.getMessage());
+            return ResultNoArgs.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error kicking user {} from chat {}: {}", userToKickId, chatId, e.getMessage());
+            return ResultNoArgs.error("kickChatMember failed due to server error");
+        }
+        finally {
+            lockManager.unLockLeaveChatOperation(chatId);
+        }
+    }
 
     public ResultNoArgs leaveChat(long chatId, long userId) {
-
-        // WRITE на чат
-        if (!lockManager.tryLockLeaveChatOperation(chatId))
-            return ResultNoArgs.error("Try again later");
-
         try {
-            LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
+            if (!lockManager.tryLockLeaveChatOperation(chatId)) {
+                return ResultNoArgs.error("Try again later");
+            }
+
+            ChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
             LocalDateTime updatedAt = LocalDateTime.now();
             if (chat.getChatType().isPersonal()) {
                 if (chat.isMoreThenOneMember()) {

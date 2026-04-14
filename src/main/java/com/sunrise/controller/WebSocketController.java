@@ -1,10 +1,11 @@
 package com.sunrise.controller;
 
+import com.sunrise.config.annotation.ValidId;
 import com.sunrise.config.annotation.WsCurrentUserId;
 import com.sunrise.core.notifier.WebSocketNotifier;
 import com.sunrise.core.service.ChatService;
 import com.sunrise.core.service.MessageService;
-import com.sunrise.core.service.PresenceService;
+import com.sunrise.core.service.UserGlobalStatusKeeper;
 import com.sunrise.core.service.result.ResultNoArgs;
 import com.sunrise.core.service.result.ResultOneArg;
 
@@ -28,7 +29,7 @@ public class WebSocketController {
 
     private final MessageService messageService;
     private final WebSocketNotifier wsNotify;
-    private final PresenceService presenceService;
+    private final UserGlobalStatusKeeper userGlobalStatusKeeper;
     private final ChatService chatService;
 
 
@@ -82,6 +83,24 @@ public class WebSocketController {
 
 
     // =========================== ACTIONS/PRESENCE/OTHER ===========================
+
+    @MessageMapping("subscribe/user-status/{userId}")
+    public void subscribeUserGlobalStatus(@DestinationVariable @ValidId long userId, Principal principal) {
+        userGlobalStatusKeeper.subscribeUserGlobalStatus(userId, principal.getName());
+    }
+    @MessageMapping("/user-status/{status}")
+    public void updateUserGlobalStatus(@WsCurrentUserId long userId, @DestinationVariable String status) {
+
+        Set<String> sessionsToNotify = userGlobalStatusKeeper.updateUserGlobalStatus(userId, status);
+        if (!sessionsToNotify.isEmpty()){
+            wsNotify.notifyUserStatusChange(userId, status, sessionsToNotify);
+        }
+    }
+    @MessageMapping("unsubscribe/user-status/{userId}")
+    public void unsubscribeUserGlobalStatus(@DestinationVariable @ValidId long userId, Principal principal) {
+        userGlobalStatusKeeper.unsubscribeUserGlobalStatus(userId, principal.getName());
+    }
+
     @MessageMapping("/chats/{chatId}/actions/{action}")
     public void updateUserChatAction(@DestinationVariable long chatId, @DestinationVariable String action,
                                      @WsCurrentUserId long userId, Principal principal, @Header("simpDestination") String errorUrl) {
@@ -97,17 +116,8 @@ public class WebSocketController {
             return;
         }
 
-        if (presenceService.updateUserAction(userId, chatId, action)){
+        if (userGlobalStatusKeeper.updateUserAction(chatId, userId, action)){
             wsNotify.notifyUserAction(chatId, userId, action);
-        }
-    }
-
-    @MessageMapping("/user-status/{status}")
-    public void updateUserGlobalStatus(@WsCurrentUserId long userId, @DestinationVariable String status) {
-
-        Set<String> sessionsToNotify = presenceService.updateUserOnlineStatus(userId, status);
-        if (!sessionsToNotify.isEmpty()){
-            wsNotify.notifyUserStatusChange(userId, status, sessionsToNotify);
         }
     }
 

@@ -1,7 +1,7 @@
 package com.sunrise.core.notifier;
 
 import com.sunrise.core.dataservice.type.ChatType;
-import com.sunrise.entity.dto.LightChatDTO;
+import com.sunrise.entity.dto.ChatDTO;
 import com.sunrise.entity.dto.ChatMemberDTO;
 import com.sunrise.entity.dto.MessageDTO;
 import com.sunrise.websocket.WsRequests;
@@ -53,7 +53,7 @@ public class WebSocketNotifier { // TODO: Добавить @Async если бо�
 
 
     // ========================= CHAT =============================
-    public void notifyChatNew(long tempId, LightChatDTO chat, Set<Long> userIdsToNotify) {
+    public void notifyChatNew(long tempId, ChatDTO chat, Set<Long> userIdsToNotify) {
         var response = new WsRequests.ChatNewResponse(
             tempId, chat.getId(), chat.getName(), chat.getDescription(),
             chat.getChatType(), chat.getOpponentId(), chat.getMembersCount(),
@@ -70,6 +70,9 @@ public class WebSocketNotifier { // TODO: Добавить @Async если бо�
     }
     public void notifyChatTypeUpdated(long chatId, ChatType newChatType, LocalDateTime updatedAt) {
         sendToChatTopic(chatId, new WsRequests.ChatTypeUpdateResponse(chatId, newChatType, updatedAt));
+    }
+    public void notifySelfChatSettingsUpdated(long chatId, long userId, boolean isPinned, LocalDateTime updatedAt) {
+        sendToUserSessions(userId, "/chat-settings", new WsRequests.SelfChatSettingsUpdateResponse(chatId, isPinned, updatedAt));
     }
     public void notifyChatDeleted(long chatId, LocalDateTime deletedAt) {
         sendToChatTopic(chatId, new WsRequests.ChatDeleteResponse(chatId, deletedAt));
@@ -99,29 +102,8 @@ public class WebSocketNotifier { // TODO: Добавить @Async если бо�
     public void notifyChatMemberAdminRightsUpdated(long chatId, long userId, boolean isAdmin, LocalDateTime updatedAt) {
         sendToChatTopic(chatId, new WsRequests.ChatMemberAdminRightsUpdateResponse(chatId, userId, isAdmin, updatedAt));
     }
-    public void notifyChatMemberSettingsUpdated(long chatId, long userId, boolean isPinned, LocalDateTime updatedAt) {
-        sendToChatTopic(chatId, new WsRequests.ChatMemberSettingsUpdateResponse(chatId, userId, isPinned, updatedAt));
-    }
     public void notifyChatMemberDeleted(long chatId, long userId, LocalDateTime deletedAt) {
         sendToChatTopic(chatId, new WsRequests.ChatMemberDeleteResponse(chatId, userId, deletedAt));
-    }
-
-
-    // ========================= USER =============================
-    public void notifyUserProfileUpdated(long userId, String newUsername, String newName, LocalDateTime updatedAt) {
-
-    }
-    public void notifyUserEmailUpdate(long userId, LocalDateTime deletedAt) {
-
-    }
-    public void notifyUserPasswordUpdate(long userId, LocalDateTime deletedAt) {
-
-    }
-    public void notifyUserDisabled(long userId, LocalDateTime deletedAt) {
-
-    }
-    public void notifyUserDeleted(long userId, LocalDateTime deletedAt) {
-
     }
 
 

@@ -53,17 +53,17 @@ public class DBService {
     public int updateUserPasswordAndGetJwtVersion(long userId, String password, LocalDateTime updatedAt) {
         return userRepository.updateUserPasswordAndGetJwtVersion(userId, password, updatedAt);
     }
-    public int enableUser(long userId, LocalDateTime updatedAt) {
-        return userRepository.enableUser(userId, updatedAt);
+    public int enableUserAndGetJwtVersion(long userId, LocalDateTime updatedAt) {
+        return userRepository.enableUserAndGetJwtVersion(userId, updatedAt);
     }
-    public int disableUser(long userId, LocalDateTime updatedAt) {
-        return userRepository.disableUser(userId, updatedAt);
+    public int disableUserAndGetJwtVersion(long userId, LocalDateTime updatedAt) {
+        return userRepository.disableUserAndGetJwtVersion(userId, updatedAt);
     }
-    public int deleteUser(long userId, LocalDateTime updatedAt) {
-        return userRepository.deleteUser(userId, updatedAt);
+    public int deleteUserAndGetJwtVersion(long userId, LocalDateTime updatedAt) {
+        return userRepository.deleteUserAndGetJwtVersion(userId, updatedAt);
     }
-    public int restoreUser(long userId, LocalDateTime updatedAt) {
-        return userRepository.restoreUser(userId, updatedAt);
+    public int restoreUserAndGetJwtVersion(long userId, LocalDateTime updatedAt) {
+        return userRepository.restoreUserAndGetJwtVersion(userId, updatedAt);
     }
 
 
@@ -135,6 +135,9 @@ public class DBService {
     public Optional<UserChatResult> getUserChat(long chatId, long userId) {
         return chatRepository.getUserChat(chatId, userId);
     }
+    public List<Long> getUserChatIds(long userId) {
+        return chatRepository.getUserChatIds(userId);
+    }
 
 
     // ========== CHAT MEMBER METHODS ==========
@@ -156,7 +159,7 @@ public class DBService {
     public int updateChatMemberSettings(long chatId, long userId, boolean isPinned, LocalDateTime updatedAt) {
         return chatMemberRepository.updateSettings(chatId, userId, isPinned, updatedAt);
     }
-    public boolean removeUserFromChat(long userId, long chatId, LocalDateTime updatedAt) {
+    public boolean removeChatMember(long userId, long chatId, LocalDateTime updatedAt) {
         return chatMemberRepository.remove(chatId, userId, updatedAt);
     }
 
@@ -216,7 +219,7 @@ public class DBService {
     }
     public void markMessagesUpToRead(long chatId, long userId, long messageId, LocalDateTime readAt) {
         messageRepository.markMessagesUpToRead(chatId, userId, messageId, readAt, "7 days");
-    }
+    } // TODO: ДОБАВИТЬ В КОНФИГ
     public int updateMessage(long messageId, String newText, LocalDateTime updatedAt) {
         return messageRepository.updateMessage(messageId, newText, updatedAt);
     }
@@ -229,15 +232,14 @@ public class DBService {
 
     // Вспомогательные методы
     public List<UserMessageDBResult> getMessagePage(long chatId, long userId, Long cursor, int limit, Direction direction) {
-        Pageable pageable = PageRequest.of(0, limit);
         if (cursor == null) {
-            return messageRepository.getFirstMessagePage(chatId, userId, pageable);
+            return messageRepository.getFirstMessagePage(chatId, userId, PageRequest.of(0, limit));
         }
         if (direction == Direction.FORWARD) {
-            return messageRepository.getMessagePageAfter(chatId, userId, cursor, pageable);
+            return messageRepository.getMessagePageAfter(chatId, userId, cursor, PageRequest.of(0, limit));
         }
 
-        return messageRepository.getMessagePageBefore(chatId, userId, cursor, pageable);
+        return messageRepository.getMessagePageBefore(chatId, userId, cursor, PageRequest.of(0, limit));
     }
 
     public ChatStatsDBResult getChatMessagesDeletedStats(long chatId, long userId) {

@@ -1,8 +1,8 @@
 package com.sunrise.core.service;
 
-import com.sunrise.entity.dto.FullChatDTO;
+import com.sunrise.entity.dto.UserChatDTO;
 import com.sunrise.entity.pagination.UserChatsPageDTO;
-import com.sunrise.entity.dto.LightChatDTO;
+import com.sunrise.entity.dto.ChatDTO;
 import com.sunrise.entity.dto.ChatMemberDTO;
 
 import com.sunrise.core.dataservice.DataOrchestrator;
@@ -49,9 +49,9 @@ public class ChatService {
             validator.validateActiveUser(opponentId);
 
             LocalDateTime createdAt = LocalDateTime.now();
-            Optional<LightChatDTO> optChat = dataOrchestrator.getPersonalChat(creatorId, opponentId);
+            Optional<ChatDTO> optChat = dataOrchestrator.getPersonalChat(creatorId, opponentId);
             if (optChat.isPresent()){
-                LightChatDTO chat = optChat.get();
+                ChatDTO chat = optChat.get();
                 long chatId = chat.getId();
                 if (chat.isDeleted()) {
                     dataOrchestrator.restoreChat(chatId, createdAt);
@@ -62,7 +62,7 @@ public class ChatService {
 
             long chatId = SimpleSnowflakeId.nextId();
 
-            LightChatDTO chat = LightChatDTO.createPersonal(chatId, opponentId, createdAt, creatorId);
+            ChatDTO chat = ChatDTO.createPersonal(chatId, opponentId, createdAt, creatorId);
 
             var creator = ChatMemberDTO.create(chatId, creatorId, createdAt, false);
             var opponent = ChatMemberDTO.create(chatId, opponentId, createdAt, false);
@@ -107,7 +107,7 @@ public class ChatService {
             long chatId = SimpleSnowflakeId.nextId();
             LocalDateTime createdAt = LocalDateTime.now();
 
-            LightChatDTO chat = LightChatDTO.createGroup(chatId, chatName, chatDescription, chatType, membersCount, createdAt, creatorId);
+            ChatDTO chat = ChatDTO.createGroup(chatId, chatName, chatDescription, chatType, membersCount, createdAt, creatorId);
 
             var usersToNotify = new HashSet<>(usersToAdd.keySet());
             List<ChatMemberDTO> chatMembers = new ArrayList<>(membersCount);
@@ -160,7 +160,7 @@ public class ChatService {
     }
     public ResultNoArgs updateChatType(long chatId, long userId, ChatType newType) {
         try {
-            LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
+            ChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
             if (chat.isPersonal()) {
                 throw new ValidationException("Cannot change type of personal chat");
             }
@@ -221,11 +221,29 @@ public class ChatService {
         }
     }
 
-    public ResultOneArg<FullChatDTO> getUserChat(long chatId, long userId) {
+    public ResultOneArg<List<Long>> getUserChatIds(long userId) {
         try {
             validator.validateActiveUser(userId);
 
-            FullChatDTO chat = dataOrchestrator.getUserChat(chatId, userId)
+            List<Long> chatIds = dataOrchestrator.getUserChatIds(userId);
+
+            log.debug("[🔧] ✅ User {} got {} chatIds", userId, chatIds.size());
+            return ResultOneArg.success(chatIds);
+        }
+        catch (ValidationException e) {
+            log.warn("[🔧] ☝️ Failed to get user {} chatIds: {}", userId, e.getMessage());
+            return ResultOneArg.error(e.getMessage());
+        }
+        catch (Exception e) {
+            log.error("[🔧] ⚠️ Error getting user {} chatIds: {}", userId, e.getMessage());
+            return ResultOneArg.error("getUserChat failed due to server error");
+        }
+    }
+    public ResultOneArg<UserChatDTO> getUserChat(long chatId, long userId) {
+        try {
+            validator.validateActiveUser(userId);
+
+            UserChatDTO chat = dataOrchestrator.getUserChat(chatId, userId)
                     .orElseThrow(() -> new ValidationException("Chat is deleted or not found"));
 
             log.debug("[🔧] ✅ User {} got chat {}", userId, chatId);
@@ -284,7 +302,7 @@ public class ChatService {
     }
     public ResultOneArg<Boolean> isActionsEnabledForChat(long chatId, long userId) {
         try {
-            LightChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
+            ChatDTO chat = validator.validateActiveUserInActiveChatAndGetChat(chatId, userId);
             return ResultOneArg.success(chat.isActionsEnabled());
         } catch (ValidationException e) {
             log.warn("[🔧] ☝️ Failed to get enabled actions for chat {}: {}", chatId, e.getMessage());

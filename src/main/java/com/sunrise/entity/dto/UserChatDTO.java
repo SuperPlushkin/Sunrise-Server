@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 @lombok.Setter
 @lombok.Getter
 @lombok.AllArgsConstructor
-public class FullChatDTO {
+public class UserChatDTO {
     private long id;
     private String name;
     private String description;

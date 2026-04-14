@@ -1,6 +1,6 @@
 package com.sunrise.core.dataservice;
 
-import com.sunrise.entity.dto.LightChatDTO;
+import com.sunrise.entity.dto.ChatDTO;
 import com.sunrise.helpclass.ValidationException;
 import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,8 +41,8 @@ public class DataValidator {
             throw new ValidationException("Chat is a personal chat: " + chatId);
         }
     }
-    private LightChatDTO validateActiveChatAndGet(long chatId) {
-        Optional<LightChatDTO> chatOpt = dataOrchestrator.getActiveChat(chatId);
+    private ChatDTO validateActiveChatAndGet(long chatId) {
+        Optional<ChatDTO> chatOpt = dataOrchestrator.getActiveChat(chatId);
         if (chatOpt.isEmpty()) {
             throw new ValidationException("Chat does not exist or is deleted: " + chatId);
         }
@@ -80,16 +80,16 @@ public class DataValidator {
         validateActiveChat(chatId);
         validateActiveChatMemberIsAdmin(chatId, adminId);
     }
-    public LightChatDTO validateActiveUserInActiveChatAndGetChat(long chatId, long userId) {
+    public ChatDTO validateActiveUserInActiveChatAndGetChat(long chatId, long userId) {
         validateActiveUser(userId);
-        LightChatDTO chat = validateActiveChatAndGet(chatId);
+        ChatDTO chat = validateActiveChatAndGet(chatId);
         validateActiveChatMember(chatId, userId);
         return chat;
     }
 
     public void validateCanUpdateChatInfo(long chatId, long userId) {
         validateActiveUser(userId);
-        LightChatDTO chat = validateActiveChatAndGet(chatId);
+        ChatDTO chat = validateActiveChatAndGet(chatId);
         if (chat.isPersonal()) {
             throw new ValidationException("Chat info is not changeable for private chat");
         }
